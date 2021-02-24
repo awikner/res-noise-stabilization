@@ -1,11 +1,22 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+#!/homes/awikner1/.python-venvs/reservoir-rls/bin/python -u
+#Assume will be finished in no more than 18 hours
+#SBATCH -t 00:20:00
+#Launch on 20 cores distributed over as many nodes as needed
+#SBATCH --ntasks=10
+#SBATCH -N 1
+#Assume need 6 GB/core (6144 MB/core)
+#SBATCH --mem-per-cpu=6144
+#SBATCH --mail-user=awikner1@umd.edu
+#SBATCH --mail-type=BEGIN
+#SBATCH --mail-type=END
 """
 Created on Wed Jun  3 12:57:49 2020
 
 @author: josephharvey
 """
 import sys, getopt
+sys.path.append('/lustre/awikner1/res-noise-stabilization/')
+
 from datetime import datetime
 # from lorenzrungekutta_numba import fx
 # from lorenzrungekutta_numba import fy
@@ -89,7 +100,7 @@ class RungeKutta:
         
 @jit(nopython = True, fastmath = True)
 def RungeKuttawrapped(x0 = 2,y0 = 2,z0 = 23, h = 0.01, T = 300, ttsplit = 5000, noise_scaling = 0, noise_seed = 10):
-    u_arr = rungekutta(x0,y0,z0,h,T)[:, ::10] 
+    u_arr = np.ascontiguousarray(rungekutta(x0,y0,z0,h,T)[:, ::10]) 
     # self.train_length = ttsplit
     # self.noise_scaling = noise_scaling
 
@@ -117,7 +128,7 @@ def getX(res, rk,x0 = 1,y0 = 1,z0 = 1, noise = False):
         u_training = rk.u_arr_train_noise
     else:
         u_training = rk.u_arr_train
-    res.X = getXwrapped(u_training, res.X, res.Win, res.W)
+    res.X = getXwrapped(np.ascontiguousarray(u_training), res.X, res.Win, res.W)
     
     return res.X
 #takes a reservoir object res along with initial conditions
@@ -136,7 +147,7 @@ def getXwrapped(u_training, res_X, Win, W):
 
 def get_states(res, rk, skip = 150, noise_realizations = 1):
     res.data_trstates, res.states_trstates = get_states_wrapped(\
-        rk.u_arr_train, rk.u_arr_train_noise, res.X, res.Win, res.W, \
+        np.ascontiguousarray(rk.u_arr_train), np.ascontiguousarray(rk.u_arr_train_noise), res.X, res.Win, res.W, \
         rk.noise_scaling, skip, noise_realizations)
     
 @jit(nopython = True, fastmath = True)      
@@ -299,16 +310,34 @@ def predictwrapped(res_X, Win, W, Wout, x0, y0, z0, steps):
 
     return Y
 
-def test(res, num_tests = 100, rkTime = 1000, split = 3000, showMapError = False, showTrajectories = False, showHist = False):
+@jit(nopython = True, fastmath = True)
+def get_test_data(num_tests, rkTime, split):
+    np.random.seed(0)
+    ic = np.random.rand(3)*2-1
+    p, u_arr_train_nonoise, u_arr_test, p, p = RungeKuttawrapped(x0 = ic[0], \
+         y0 = ic[1], z0 = 30*ic[2], T = rkTime, ttsplit = split)
+    rktest_u_arr_train_nonoise = np.zeros((u_arr_train_nonoise.shape[0], u_arr_train_nonoise.shape[1], num_tests))
+    rktest_u_arr_test = np.zeros((u_arr_test.shape[0], u_arr_test.shape[1], num_tests))
+    rktest_u_arr_train_nonoise[:,:,0] = u_arr_train_nonoise
+    rktest_u_arr_test[:,:,0] = u_arr_test
+    for i in range(1,num_tests):
+        np.random.seed(i)
+        ic = np.random.rand(3)*2-1
+        p, rktest_u_arr_train_nonoise[:,:,i], rktest_u_arr_test[:,:,i], p, p = RungeKuttawrapped(x0 = ic[0], \
+             y0 = ic[1], z0 = 30*ic[2], T = rkTime, ttsplit = split)
+        
+    return rktest_u_arr_train_nonoise, rktest_u_arr_test
+
+def test(res, rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests = 100, rkTime = 1000, split = 3000, showMapError = False, showTrajectories = False, showHist = False):
     tic = time.perf_counter()
-    stable_count = testwrapped(res.X, res.Win, res.W, res.Wout, num_tests, rkTime, split, showMapError, showTrajectories, showHist)
+    stable_count = testwrapped(res.X, res.Win, res.W, res.Wout, rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests, rkTime, split, showMapError, showTrajectories, showHist)
     toc = time.perf_counter()
     runtime = toc - tic
     print('Test time: %f sec.' % runtime)
     return stable_count/num_tests
 
 @jit(nopython = True, fastmath = True)
-def testwrapped(res_X, Win, W, Wout, num_tests, rkTime, split, showMapError = True, showTrajectories = True, showHist = True):
+def testwrapped(res_X, Win, W, Wout, rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests, rkTime, split, showMapError = True, showTrajectories = True, showHist = True):
 
     stable_count = 0
     valid_time = np.zeros(num_tests)
@@ -321,16 +350,18 @@ def testwrapped(res_X, Win, W, Wout, num_tests, rkTime, split, showMapError = Tr
         
         vtchange = 0
     
+        """
         np.random.seed(i)
         ic = np.random.rand(3)*2-1
         u_arr_train, u_arr_train_nonoise, u_arr_test, train_length, noise_scaling = \
             RungeKuttawrapped(x0 = ic[0], y0 = ic[1], z0 = 30*ic[2], T = rkTime, ttsplit = split)
+        """
         #res_X = (np.zeros((res.rsvr_size, split+2))*2 - 1)
         
         #sets res.X
-        res_X = getXwrapped(u_arr_test, res_X, Win, W)
+        res_X = getXwrapped(np.ascontiguousarray(rktest_u_arr_train_nonoise[:,:,i]), res_X, Win, W)
         
-        pred = predictwrapped(res_X, Win, W, Wout, x0 = u_arr_test[0,0], y0 = u_arr_test[1,0], z0 = u_arr_test[2,0], steps = (int(rkTime/0.1)-split))
+        pred = predictwrapped(res_X, Win, W, Wout, x0 = rktest_u_arr_test[0,0,i], y0 = rktest_u_arr_test[1,0,i], z0 = rktest_u_arr_test[2,0,i], steps = (int(rkTime/0.1)-split))
         lorenz_map_x = np.zeros(pred[0].size)
         lorenz_map_x[0] = pred[0][0]
         x2y2z2 = np.zeros(pred.shape[1])
@@ -339,7 +370,7 @@ def testwrapped(res_X, Win, W, Wout, num_tests, rkTime, split, showMapError = Tr
         for j in range(0, pred[0].size):
             if (j > 0):
                 # vtchange = vtchange + (u_arr_test[0, j] - u_arr_test[0, j-1])**2 + (u_arr_test[1, j] - u_arr_test[1, j-1])**2 + (u_arr_test[2, j] - u_arr_test[2, j-1])**2
-                vtchange += np.sum((u_arr_test[:,j]-u_arr_test[:,j-1])**2)
+                vtchange += np.sum((rktest_u_arr_test[:,j,i]-rktest_u_arr_test[:,j-1,i])**2)
                 
                 rkmap_u_arr_train = RungeKuttawrapped(pred[0][j-1]*7.929788629895004, pred[1][j-1]*8.9932616136662, pred[2][j-1]*8.575917849311919+23.596294463016896, h=0.01, T=0.1)[0]
                 lorenz_map_x[j] = rkmap_u_arr_train[0][1] 
@@ -352,7 +383,7 @@ def testwrapped(res_X, Win, W, Wout, num_tests, rkTime, split, showMapError = Tr
                 # x2y2z2 = np.append(x2y2z2, (x2error+y2error+z2error))
                 x2y2z2[j] = np.sum((pred[:,j]-rkmap_u_arr_train[:,1])**2)
                 
-            if (np.abs(pred[0, j] - u_arr_test[0, j]) > 1.5) and check_vt:
+            if (np.abs(pred[0, j] - rktest_u_arr_test[0, j,i]) > 1.5) and check_vt:
                 valid_time[i] = j
                 
                 # print("Test " + str(i) + " valid time: " + str(j))
@@ -437,7 +468,7 @@ def generate_res(num_res, rk, res_size, noise_realizations = 1):
             # print("eigenvalue error occured.")
     return reservoirs
 
-def optim_func(reservoirs, alpha):
+def optim_func(reservoirs, rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests, alpha, rkTime = 400, split = 2000):
 
     results = np.zeros(len(reservoirs))
 
@@ -446,7 +477,7 @@ def optim_func(reservoirs, alpha):
         idenmat = np.identity(res.rsvr_size+4)*alpha
         res.Wout = np.transpose(solve(np.transpose(res.states_trstates + idenmat),np.transpose(res.data_trstates))) 
 
-        results[i] = test(res, rkTime = 400, split = 2000, \
+        results[i] = test(res, rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests = num_tests, rkTime = rkTime, split =split, \
             showMapError = False, showTrajectories = False, showHist = False)
         #except:
             #print("eigenvalue error occured.")
@@ -477,6 +508,7 @@ def main(argv):
     res_size = 100
     res_per_test = 100
     noise_realizations = 1
+    num_tests = 100
     
     try:
         opts, args = getopt.getopt(argv, "T:N:r:", [])
@@ -496,16 +528,21 @@ def main(argv):
     ########################################
     # train_time = 500
     # res_size = 100
-    res_per_test = 100
+    # res_per_test = 100
     # noise_realizations = 1
     noise_values = np.logspace(-3.666666666666, 0, num = 12, base = 10)
     alpha_values = np.logspace(-8, -2, 13)
     stable_frac  = np.zeros(noise_values.size)
     stable_frac_alpha  = np.zeros(noise_values.size)
+    
+    foldername = '/lustre/awikner1/res-noise-stabilization/'
 
 
     #rk = RungeKutta(x0 = 1, y0 = 1, z0 = 30, T = train_time, ttsplit = int(train_time/0.1), noise_scaling = 0.01)
     #reservoirs = generate_res(res_per_test, rk, res_size = res_size)
+    rkTime_test = 400
+    split_test  = 2000
+    rktest_u_arr_train_nonoise, rktest_u_arr_test = get_test_data(num_tests = num_tests, rkTime = rkTime_test, split = split_test)
 
     for i, noise in enumerate(noise_values):
         ic = np.random.rand(3)*2-1
@@ -517,7 +554,7 @@ def main(argv):
             #r.states_trstates = 0 
         #    get_states(r, rk, skip = 150)
 
-        min_optim_func = lambda alpha: optim_func(reservoirs, alpha)
+        min_optim_func = lambda alpha: optim_func(reservoirs, rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests, alpha, rkTime_test, split_test)
         func_vals = np.zeros(alpha_values.size)
         for j in range(alpha_values.size):
             func_vals[j] = min_optim_func(alpha_values[j])
@@ -525,6 +562,7 @@ def main(argv):
         result_x   = alpha_values[np.argmin(func_vals)]
         stable_frac[i] = -result_fun    
         stable_frac_alpha[i] = result_x
+        """
         f = open("noise varying data", "a")
         now = datetime.now()
         currenttime = now.strftime("%H:%M:%S")
@@ -542,8 +580,10 @@ def main(argv):
         f.write("\n")
         f.write("\n")
         f.close()
-        np.savetxt('stable_frac_%dnodes_%dtrainiters_%dnoisereals.csv' %(res_size, train_time, noise_realizations), stable_frac, delimiter = ',')
-        np.savetxt('stable_frac_alpha_%dnodes_%dtrainiters_%dnoisereals.csv' %(res_size, train_time, noise_realizations), stable_frac_alpha, delimiter = ',')
+        """
+        
+        np.savetxt(foldername+'stable_frac_%dnodes_%dtrainiters_%dnoisereals.csv' %(res_size, train_time, noise_realizations), stable_frac, delimiter = ',')
+        np.savetxt(foldername+'stable_frac_alpha_%dnodes_%dtrainiters_%dnoisereals.csv' %(res_size, train_time, noise_realizations), stable_frac_alpha, delimiter = ',')
         
 if __name__ == "__main__":
     main(sys.argv[1:])
