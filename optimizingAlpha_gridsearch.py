@@ -53,19 +53,22 @@ class Reservoir:
         # self.W = sparse.csr_matrix(spectral_radius/np.abs(max_eig)*unnormalized_W)
         self.W   = spectral_radius/np.abs(max_eig)*unnormalized_W
 
-        # const_conn = int(rsvr_size*0.15)
-        # Win = np.zeros((rsvr_size, 4))
-        # Win[:const_conn, 0] = (np.random.rand(Win[:const_conn, 0].size)*2 - 1)*input_weight
-        # Win[const_conn: const_conn + int((rsvr_size-const_conn)/3), 1] = (np.random.rand(Win[const_conn: const_conn + int((rsvr_size-const_conn)/3), 1].size)*2 - 1)*input_weight
-        # Win[const_conn + int((rsvr_size-const_conn)/3):const_conn + 2*int((rsvr_size-const_conn)/3), 2] = (np.random.rand(Win[const_conn + int((rsvr_size-const_conn)/3):const_conn + 2*int((rsvr_size-const_conn)/3), 2].size)*2 - 1)*input_weight
-        # Win[const_conn + 2*int((rsvr_size-const_conn)/3):, 3] = (np.random.rand(Win[const_conn + 2*int((rsvr_size-const_conn)/3):, 3].size)*2 - 1)*input_weight
-
+        const_conn = int(rsvr_size*0.15)
+        Win = np.zeros((rsvr_size, 4))
+        Win[:const_conn, 0] = (np.random.rand(Win[:const_conn, 0].size)*2 - 1)*input_weight
+        Win[const_conn: const_conn + int((rsvr_size-const_conn)/3), 1] = (np.random.rand(Win[const_conn: const_conn + int((rsvr_size-const_conn)/3), 1].size)*2 - 1)*input_weight
+        Win[const_conn + int((rsvr_size-const_conn)/3):const_conn + 2*int((rsvr_size-const_conn)/3), 2] = (np.random.rand(Win[const_conn + int((rsvr_size-const_conn)/3):const_conn + 2*int((rsvr_size-const_conn)/3), 2].size)*2 - 1)*input_weight
+        Win[const_conn + 2*int((rsvr_size-const_conn)/3):, 3] = (np.random.rand(Win[const_conn + 2*int((rsvr_size-const_conn)/3):, 3].size)*2 - 1)*input_weight
+        
+        
+        """
         Win = np.zeros((rsvr_size, 3))
         q   = int(rsvr_size//3)
         for i in range(3):
             Win[q*i:q*(i+1),i] = input_weight*(np.random.rand(q)*2-1)
 
         # self.Win = sparse.csr_matrix(Win)
+        """
         self.Win = Win
         self.X = (np.random.rand(rsvr_size, rk.train_length+2)*2 - 1)
         self.Wout = np.array([])
@@ -141,7 +144,7 @@ def getXwrapped(u_training, res_X, Win, W):
         # u = np.append(1, u_training[:,i]).reshape(4,1)
         # u = u_training[:,i].reshape(3,1)
         # x = res_X[:,i].reshape(res.rsvr_size,1)
-        res_X[:,i+1] = np.tanh(Win @ u_training[:,i]+W @ res_X[:,i])
+        res_X[:,i+1] = np.tanh(Win @ np.append(1., u_training[:,i])+W @ res_X[:,i])
 
     return res_X
 
@@ -301,7 +304,7 @@ def predictwrapped(res_X, Win, W, Wout, x0, y0, z0, steps):
     for i in range(0, steps):
         # y_in = Y[:,i].reshape(3,1)
         # x_prev = X[:,i].reshape(res.rsvr_size,1)
-        X[:,i+1] = np.tanh(Win @ Y[:,i] + W @ X[:,i])
+        X[:,i+1] = np.tanh(Win @ np.append(1., Y[:,i]) + W @ X[:,i])
         #X = np.concatenate((X, x_current), axis = 1)
         Y[:,i+1] = Wout @ np.concatenate((np.array([1.]), X[:,i+1], Y[:,i]))
         #y_out = np.matmul(res.Wout, x_current)
@@ -393,12 +396,11 @@ def testwrapped(res_X, Win, W, Wout, rktest_u_arr_train_nonoise, rktest_u_arr_te
         #print(vtchange/(pred[0].size-1))
         #print("Mean: " + str(np.mean(pred[0])))
         #print("Variance: " + str(np.var(pred[0])))
-
         """
         if showHist:
             plt.figure()
             plt.hist(pred[0], bins = 11, label = "Predictions", alpha = 0.75)
-            plt.hist(u_arr_test[0], bins = 11, label = "Truth", alpha = 0.75)
+            plt.hist(rktest_u_arr_test[0,:,i], bins = 11, label = "Truth", alpha = 0.75)
             plt.legend(loc="upper right")
 
         if showMapError:
@@ -414,18 +416,19 @@ def testwrapped(res_X, Win, W, Wout, rktest_u_arr_train_nonoise, rktest_u_arr_te
             plt.figure()
             #plt.plot(lorenz_map_x, label = "Map Trajectory", color = "green")
             plt.plot(pred[0], label = "Predictions")
-            plt.plot(u_arr_test[0], label = "Truth")
+            plt.plot(rktest_u_arr_test[0,:,i], label = "Truth")
+            plt.ylim(-3,3)
             plt.legend(loc="upper right")
 
-        print("Variance of lorenz data x dim: " + np.var(u_arr_test[0]))
-        print("Variance of predictions: " + np.var(pred[0]))
-        print("Max of total square error: " + max(x2y2z2))
-        print("Mean of total error: " + np.mean(x2y2z2))
-        # print("Wasserstein distance: " + str(wasserstein_distance(pred[0], u_arr_test[0])))
+        print("Variance of lorenz data x dim: " + str(np.var(rktest_u_arr_test[0,:,i])))
+        print("Variance of predictions: " + str(np.var(pred[0])))
+        print("Max of total square error: " + str(np.max(x2y2z2)))
+        print("Mean of total error: " + str(np.mean(x2y2z2)))
+        print("Wasserstein distance: " + str(wasserstein_distance(pred[0], rktest_u_arr_test[0,:,i])))
         print()
         """
 
-        max_sum_square[i] = max(x2y2z2)
+        max_sum_square[i] = np.max(x2y2z2)
         mean_sum_square[i] = np.mean(x2y2z2)
 
         means[i] = np.mean(pred[0])
@@ -459,11 +462,13 @@ def testwrapped(res_X, Win, W, Wout, rktest_u_arr_train_nonoise, rktest_u_arr_te
 def generate_res(num_res, rk, res_size, noise_realizations = 1):
 
     reservoirs = []
-
+    itr = 0
+    
     while len(reservoirs) < num_res:
         # try:
-        reservoirs.append(Reservoir(rk, rsvr_size = res_size, spectral_radius = 0.5, input_weight = 1.0))
+        reservoirs.append(Reservoir(rk, rsvr_size = res_size, spectral_radius = 0.5, input_weight = 1.0, res_seed = itr))
         get_states(reservoirs[-1], rk, skip = 150, noise_realizations = noise_realizations)
+        itr += 1
         # except:
             # print("eigenvalue error occured.")
     return reservoirs
@@ -478,7 +483,7 @@ def optim_func(reservoirs, rktest_u_arr_train_nonoise, rktest_u_arr_test, num_te
         res.Wout = np.transpose(solve(np.transpose(res.states_trstates + idenmat),np.transpose(res.data_trstates)))
 
         results[i] = test(res, rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests = num_tests, rkTime = rkTime, split =split, \
-            showMapError = False, showTrajectories = False, showHist = False)
+            showMapError = True, showTrajectories = True, showHist = True)
         #except:
             #print("eigenvalue error occured.")
 
@@ -506,9 +511,9 @@ def trainAndTest(alph):
 def main(argv):
     train_time = 500
     res_size = 100
-    res_per_test = 100
+    res_per_test = 200
     noise_realizations = 1
-    num_tests = 100
+    num_tests = 50
 
     try:
         opts, args = getopt.getopt(argv, "T:N:r:", [])
@@ -536,6 +541,7 @@ def main(argv):
     stable_frac_alpha  = np.zeros(noise_values.size)
 
     foldername = '/lustre/awikner1/res-noise-stabilization/'
+    # foldername = ''
 
 
     #rk = RungeKutta(x0 = 1, y0 = 1, z0 = 30, T = train_time, ttsplit = int(train_time/0.1), noise_scaling = 0.01)
@@ -582,8 +588,8 @@ def main(argv):
         f.close()
         """
 
-        np.savetxt(foldername+'stable_frac_%dnodes_%dtrainiters_%dnoisereals.csv' %(res_size, train_time, noise_realizations), stable_frac, delimiter = ',')
-        np.savetxt(foldername+'stable_frac_alpha_%dnodes_%dtrainiters_%dnoisereals.csv' %(res_size, train_time, noise_realizations), stable_frac_alpha, delimiter = ',')
+        np.savetxt(foldername+'stable_frac_%dnodes_%dtrainiters_%dnoisereals_numbatest.csv' %(res_size, train_time, noise_realizations), stable_frac, delimiter = ',')
+        np.savetxt(foldername+'stable_frac_alpha_%dnodes_%dtrainiters_%dnoisereals_numbatest.csv' %(res_size, train_time, noise_realizations), stable_frac_alpha, delimiter = ',')
 
 if __name__ == "__main__":
     main(sys.argv[1:])
