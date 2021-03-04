@@ -542,10 +542,11 @@ def find_stability(noise_values, train_time, res_size, res_per_test, noise_reali
 def main(argv):
     train_time = 500
     res_size = 100
-    res_per_test = 200
+    res_per_test = 10
     noise_realizations = 1
-    num_tests = 50
-    num_procs = 5
+    num_tests = 10
+    num_procs = 4
+    ray.init(num_cpus = num_procs)
 
     try:
         opts, args = getopt.getopt(argv, "T:N:r:", [])
@@ -568,6 +569,20 @@ def main(argv):
     # res_per_test = 100
     # noise_realizations = 1
     
+    noise_values_array = np.logspace(-3.666666666666, 0, num = 12, base = 10).reshape(num_procs, -1)
+    alpha_values = np.logspace(-8, -2, 13)
+    print('Starting Ray Computation')
+    results = [find_stability.remote(noise_values_array(i), train_time, \
+            res_size, res_per_test, noise_realizations, num_tests, alpha_values) for i in range(num_procs)]
+    results = ray.get(results)
+    
+    stable_frac = []
+    stable_frac_alpha = []
+    for i in range(num_procs):
+        stable_frac.append(results[i][0])
+        stable_frac_alpha.append(results[i][1])
+    
+    """
     noise_values = np.logspace(-3.666666666666, 0, num = 12, base = 10)
     alpha_values = np.logspace(-8, -2, 13)
     stable_frac  = np.zeros(noise_values.size)
@@ -601,42 +616,11 @@ def main(argv):
         result_x   = alpha_values[np.argmin(func_vals)]
         stable_frac[i] = -result_fun
         stable_frac_alpha[i] = result_x
-        """
-        f = open("noise varying data", "a")
-        now = datetime.now()
-        currenttime = now.strftime("%H:%M:%S")
-        f.write(currenttime)
-        f.write("\n")
-        f.write("noise level: " + str(noise))
-        f.write("\n")
-        f.write("res size: " + str(res_size))
-        f.write("\n")
-        f.write("train time: " + str(train_time))
-        f.write("\n")
-        f.write("max fraction of stable reservoirs: " + str(-1*result_fun))
-        f.write("\n")
-        f.write("optimal alpha: " + str(result_x))
-        f.write("\n")
-        f.write("\n")
-        f.close()
-        """
-
-        np.savetxt(foldername+'stable_frac_%dnodes_%dtrainiters_%dnoisereals_numbatest.csv' %(res_size, train_time, noise_realizations), stable_frac, delimiter = ',')
-        np.savetxt(foldername+'stable_frac_alpha_%dnodes_%dtrainiters_%dnoisereals_numbatest.csv' %(res_size, train_time, noise_realizations), stable_frac_alpha, delimiter = ',')
+    """
+    print('Ray finished')
+    np.savetxt(foldername+'stable_frac_%dnodes_%dtrainiters_%dnoisereals_numbatest.csv' %(res_size, train_time, noise_realizations), stable_frac, delimiter = ',')
+    np.savetxt(foldername+'stable_frac_alpha_%dnodes_%dtrainiters_%dnoisereals_numbatest.csv' %(res_size, train_time, noise_realizations), stable_frac_alpha, delimiter = ',')
+    ray.shutdown()
 
 if __name__ == "__main__":
     main(sys.argv[1:])
-
-
-
-
-
-
-
-
-
-
-
-
-
-
