@@ -556,10 +556,10 @@ def find_stability(noise, train_time, res_size, res_per_test, noise_realizations
 
 
 def main(argv):
-    train_time = 500
+    train_time = 50
     res_size = 100
     res_per_test = 50
-    noise_realizations = 1
+    noise_realizations = 2
     num_tests = 50
     num_procs = 12
     ifray = True
