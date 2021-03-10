@@ -1,6 +1,6 @@
 #!/homes/awikner1/anaconda3/envs/reservoir-rls/bin/python -u
 #Assume will be finished in no more than 18 hours
-#SBATCH -t 6:00:00
+#SBATCH -t 2:30:00
 #Launch on 12 cores distributed over as many nodes as needed
 #SBATCH --ntasks=12
 #SBATCH -N 1
@@ -549,10 +549,10 @@ def find_stability(noise_values, train_time, res_size, res_per_test, noise_reali
 
 
 def main(argv):
-    train_time = 500
+    train_time = 100
     res_size = 100
     res_per_test = 200
-    noise_realizations = 1
+    noise_realizations = 2
     num_tests = 50
     num_procs = 12
     ifray = True

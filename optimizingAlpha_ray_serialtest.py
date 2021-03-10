@@ -1,8 +1,8 @@
-#!/homes/awikner1/anaconda3/envs/reservoir-rls/bin/python -u
+#!/homes/awikner1/.python-venvs/reservoir-rls/bin/python -u
 #Assume will be finished in no more than 18 hours
-#SBATCH -t 6:00:00
-#Launch on 12 cores distributed over as many nodes as needed
-#SBATCH --ntasks=12
+#SBATCH -t 48:00:00
+#Launch on 20 cores distributed over as many nodes as needed
+#SBATCH --ntasks=4
 #SBATCH -N 1
 #Assume need 6 GB/core (6144 MB/core)
 #SBATCH --mem-per-cpu=6144
@@ -31,17 +31,8 @@ from scipy.stats import wasserstein_distance
 from matplotlib import pyplot as plt
 from numba import jit
 import time
-
-import pkg_resources, os
-installed_packages = pkg_resources.working_set
-installed_packages_list = sorted(["%s==%s" % (i.key, i.version) for i in installed_packages])
-isray = [('ray==' in elem) for elem in installed_packages_list]
-if (True in isray):
-    print('Ray installed')
-else:
-    os.system('pip install -r -U ray')
-
 import ray
+
 from lorenzrungekutta_numba import rungekutta
 
 
@@ -111,7 +102,7 @@ class RungeKutta:
         self.u_arr_test = u_arr[:, ttsplit:]
         #size 1001
 
-@jit(nopython = True, fastmath = True)
+#@jit(nopython = True, fastmath = True)
 def RungeKuttawrapped(x0 = 2,y0 = 2,z0 = 23, h = 0.01, T = 300, ttsplit = 5000, noise_scaling = 0, noise_seed = 10):
     u_arr = np.ascontiguousarray(rungekutta(x0,y0,z0,h,T)[:, ::10])
     # self.train_length = ttsplit
@@ -146,7 +137,7 @@ def getX(res, rk,x0 = 1,y0 = 1,z0 = 1, noise = False):
     return res.X
 #takes a reservoir object res along with initial conditions
 
-@jit(nopython = True, fastmath = True)
+#@jit(nopython = True, fastmath = True)
 def getXwrapped(u_training, res_X, Win, W):
 
     #loops through every timestep
@@ -163,7 +154,7 @@ def get_states(res, rk, skip = 150, noise_realizations = 1):
         np.ascontiguousarray(rk.u_arr_train), np.ascontiguousarray(rk.u_arr_train_noise), res.X, res.Win, res.W, \
         rk.noise_scaling, skip, noise_realizations)
 
-@jit(nopython = True, fastmath = True)
+#@jit(nopython = True, fastmath = True)
 def get_states_wrapped(u_arr_train, u_arr_train_noise, res_X, Win, W, noise_scaling, skip, noise_realizations):
     if noise_realizations == 1:
         Y_train = u_arr_train_noise[:, skip+1:]
@@ -302,7 +293,7 @@ def predict(res, x0 = 0, y0 = 0, z0 = 0, steps = 1000):
     Y = predictwrapped(res.X, res.Win, res.W, res.Wout, x0, y0, z0, steps)
     return Y
 
-@jit(nopython = True, fastmath = True)
+#@jit(nopython = True, fastmath = True)
 def predictwrapped(res_X, Win, W, Wout, x0, y0, z0, steps):
     Y = np.empty((3, steps + 1))
     X = np.empty((res_X.shape[0], steps + 1))
@@ -323,7 +314,7 @@ def predictwrapped(res_X, Win, W, Wout, x0, y0, z0, steps):
 
     return Y
 
-@jit(nopython = True, fastmath = True)
+#@jit(nopython = True, fastmath = True)
 def get_test_data(num_tests, rkTime, split):
     np.random.seed(0)
     ic = np.random.rand(3)*2-1
@@ -349,7 +340,7 @@ def test(res, rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests = 100, rk
     # print('Test time: %f sec.' % runtime)
     return stable_count/num_tests
 
-@jit(nopython = True, fastmath = True)
+#@jit(nopython = True, fastmath = True)
 def testwrapped(res_X, Win, W, Wout, rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests, rkTime, split, showMapError = True, showTrajectories = True, showHist = True):
 
     stable_count = 0
@@ -373,6 +364,7 @@ def testwrapped(res_X, Win, W, Wout, rktest_u_arr_train_nonoise, rktest_u_arr_te
 
         #sets res.X
         res_X = getXwrapped(np.ascontiguousarray(rktest_u_arr_train_nonoise[:,:,i]), res_X, Win, W)
+
 
         pred = predictwrapped(res_X, Win, W, Wout, x0 = rktest_u_arr_test[0,0,i], y0 = rktest_u_arr_test[1,0,i], z0 = rktest_u_arr_test[2,0,i], steps = (int(rkTime/0.1)-split))
         lorenz_map_x = np.zeros(pred[0].size)
@@ -517,7 +509,6 @@ def trainAndTest(alph):
             print("eigenvalue error occured.")
     return -1*np.mean(results)
 
-@ray.remote
 def find_stability(noise_values, train_time, res_size, res_per_test, noise_realizations, num_tests, alpha_values):
     stable_frac  = np.zeros(noise_values.size)
     stable_frac_alpha  = np.zeros(noise_values.size)
@@ -549,14 +540,12 @@ def find_stability(noise_values, train_time, res_size, res_per_test, noise_reali
 
 
 def main(argv):
-    train_time = 500
+    train_time = 50
     res_size = 100
     res_per_test = 200
     noise_realizations = 1
-    num_tests = 50
-    num_procs = 12
-    ifray = True
-    ray.init(num_cpus = num_procs)
+    num_tests = 2
+    num_procs = 6
 
     try:
         opts, args = getopt.getopt(argv, "T:N:r:", [])
@@ -580,13 +569,12 @@ def main(argv):
     # noise_realizations = 1
 
     noise_values_array = np.logspace(-3.666666666666, 0, num = 12, base = 10).reshape(num_procs, -1)
-    alpha_values = np.logspace(-8, -2, 13)
-    #alpha_values = np.logspace(-8,-2,2)
+    #alpha_values = np.logspace(-8, -2, 13)
+    alpha_values = np.logspace(-8,-2,2)
     print('Starting Ray Computation')
     tic = time.perf_counter()
-    results = [find_stability.remote(noise_values_array[i], train_time, \
+    results = [find_stability(noise_values_array[i], train_time, \
             res_size, res_per_test, noise_realizations, num_tests, alpha_values) for i in range(num_procs)]
-    results = ray.get(results)
     toc = time.perf_counter()
     runtime = toc - tic
     print('Runtime with %d cores: %f sec.' %(num_procs, runtime))

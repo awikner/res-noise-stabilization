@@ -1,8 +1,8 @@
-#!/homes/awikner1/anaconda3/envs/reservoir-rls/bin/python -u
+#!/homes/awikner1/.python-venvs/reservoir-rls/bin/python -u
 #Assume will be finished in no more than 18 hours
-#SBATCH -t 6:00:00
-#Launch on 12 cores distributed over as many nodes as needed
-#SBATCH --ntasks=12
+#SBATCH -t 48:00:00
+#Launch on 20 cores distributed over as many nodes as needed
+#SBATCH --ntasks=2
 #SBATCH -N 1
 #Assume need 6 GB/core (6144 MB/core)
 #SBATCH --mem-per-cpu=6144
@@ -32,16 +32,6 @@ from matplotlib import pyplot as plt
 from numba import jit
 import time
 
-import pkg_resources, os
-installed_packages = pkg_resources.working_set
-installed_packages_list = sorted(["%s==%s" % (i.key, i.version) for i in installed_packages])
-isray = [('ray==' in elem) for elem in installed_packages_list]
-if (True in isray):
-    print('Ray installed')
-else:
-    os.system('pip install -r -U ray')
-
-import ray
 from lorenzrungekutta_numba import rungekutta
 
 
@@ -342,11 +332,11 @@ def get_test_data(num_tests, rkTime, split):
     return rktest_u_arr_train_nonoise, rktest_u_arr_test
 
 def test(res, rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests = 100, rkTime = 1000, split = 3000, showMapError = False, showTrajectories = False, showHist = False):
-    # tic = time.perf_counter()
+    tic = time.perf_counter()
     stable_count = testwrapped(res.X, res.Win, res.W, res.Wout, rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests, rkTime, split, showMapError, showTrajectories, showHist)
-    # toc = time.perf_counter()
-    # runtime = toc - tic
-    # print('Test time: %f sec.' % runtime)
+    toc = time.perf_counter()
+    runtime = toc - tic
+    print('Test time: %f sec.' % runtime)
     return stable_count/num_tests
 
 @jit(nopython = True, fastmath = True)
@@ -369,7 +359,7 @@ def testwrapped(res_X, Win, W, Wout, rktest_u_arr_train_nonoise, rktest_u_arr_te
         u_arr_train, u_arr_train_nonoise, u_arr_test, train_length, noise_scaling = \
             RungeKuttawrapped(x0 = ic[0], y0 = ic[1], z0 = 30*ic[2], T = rkTime, ttsplit = split)
         """
-        res_X = (np.zeros((res_X.shape[0], split+2))*2 - 1)
+        #res_X = (np.zeros((res.rsvr_size, split+2))*2 - 1)
 
         #sets res.X
         res_X = getXwrapped(np.ascontiguousarray(rktest_u_arr_train_nonoise[:,:,i]), res_X, Win, W)
@@ -481,6 +471,7 @@ def generate_res(num_res, rk, res_size, noise_realizations = 1):
             get_states(reservoirs[-1], rk, skip = 150, noise_realizations = noise_realizations)
         except:
             print("eigenvalue error occured.")
+
     return reservoirs
 
 def optim_func(reservoirs, rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests, alpha, rkTime = 400, split = 2000):
@@ -517,46 +508,13 @@ def trainAndTest(alph):
             print("eigenvalue error occured.")
     return -1*np.mean(results)
 
-@ray.remote
-def find_stability(noise_values, train_time, res_size, res_per_test, noise_realizations, num_tests, alpha_values):
-    stable_frac  = np.zeros(noise_values.size)
-    stable_frac_alpha  = np.zeros(noise_values.size)
-
-    rkTime_test = 400
-    split_test  = 2000
-    rktest_u_arr_train_nonoise, rktest_u_arr_test = get_test_data(num_tests = num_tests, rkTime = rkTime_test, split = split_test)
-
-    for i, noise in enumerate(noise_values):
-        ic = np.random.rand(3)*2-1
-        rk = RungeKutta(x0 = ic[0], y0 = ic[1], z0 = 30*ic[2], T = train_time, ttsplit = int(train_time/0.1), noise_scaling = noise)
-
-        reservoirs = generate_res(res_per_test, rk, res_size = res_size, noise_realizations = noise_realizations)
-        #for r in reservoirs:
-            #r.data_trstates = 0
-            #r.states_trstates = 0
-        #    get_states(r, rk, skip = 150)
-
-        min_optim_func = lambda alpha: optim_func(reservoirs, rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests, alpha, rkTime_test, split_test)
-        func_vals = np.zeros(alpha_values.size)
-        for j in range(alpha_values.size):
-            func_vals[j] = min_optim_func(alpha_values[j])
-        result_fun = np.min(func_vals)
-        result_x   = alpha_values[np.argmin(func_vals)]
-        stable_frac[i] = -result_fun
-        stable_frac_alpha[i] = result_x
-
-    return stable_frac, stable_frac_alpha
-
 
 def main(argv):
-    train_time = 500
+    train_time = 50
     res_size = 100
     res_per_test = 200
-    noise_realizations = 1
+    noise_realizations = 2
     num_tests = 50
-    num_procs = 12
-    ifray = True
-    ray.init(num_cpus = num_procs)
 
     try:
         opts, args = getopt.getopt(argv, "T:N:r:", [])
@@ -578,27 +536,6 @@ def main(argv):
     # res_size = 100
     # res_per_test = 100
     # noise_realizations = 1
-
-    noise_values_array = np.logspace(-3.666666666666, 0, num = 12, base = 10).reshape(num_procs, -1)
-    alpha_values = np.logspace(-8, -2, 13)
-    #alpha_values = np.logspace(-8,-2,2)
-    print('Starting Ray Computation')
-    tic = time.perf_counter()
-    results = [find_stability.remote(noise_values_array[i], train_time, \
-            res_size, res_per_test, noise_realizations, num_tests, alpha_values) for i in range(num_procs)]
-    results = ray.get(results)
-    toc = time.perf_counter()
-    runtime = toc - tic
-    print('Runtime with %d cores: %f sec.' %(num_procs, runtime))
-
-    stable_frac = []
-    stable_frac_alpha = []
-    for i in range(num_procs):
-        stable_frac.append(results[i][0])
-        stable_frac_alpha.append(results[i][1])
-    foldername = '/lustre/awikner1/res-noise-stabilization/'
-    # foldername = ''
-    """
     noise_values = np.logspace(-3.666666666666, 0, num = 12, base = 10)
     alpha_values = np.logspace(-8, -2, 13)
     stable_frac  = np.zeros(noise_values.size)
@@ -632,10 +569,42 @@ def main(argv):
         result_x   = alpha_values[np.argmin(func_vals)]
         stable_frac[i] = -result_fun
         stable_frac_alpha[i] = result_x
-    """
-    print('Ray finished')
-    np.savetxt(foldername+'stable_frac_%dnodes_%dtrainiters_%dnoisereals_raytest.csv' %(res_size, train_time, noise_realizations), stable_frac, delimiter = ',')
-    np.savetxt(foldername+'stable_frac_alpha_%dnodes_%dtrainiters_%dnoisereals_raytest.csv' %(res_size, train_time, noise_realizations), stable_frac_alpha, delimiter = ',')
+        """
+        f = open("noise varying data", "a")
+        now = datetime.now()
+        currenttime = now.strftime("%H:%M:%S")
+        f.write(currenttime)
+        f.write("\n")
+        f.write("noise level: " + str(noise))
+        f.write("\n")
+        f.write("res size: " + str(res_size))
+        f.write("\n")
+        f.write("train time: " + str(train_time))
+        f.write("\n")
+        f.write("max fraction of stable reservoirs: " + str(-1*result_fun))
+        f.write("\n")
+        f.write("optimal alpha: " + str(result_x))
+        f.write("\n")
+        f.write("\n")
+        f.close()
+        """
+
+        np.savetxt(foldername+'stable_frac_%dnodes_%dtrainiters_%dnoisereals_numbatest.csv' %(res_size, train_time, noise_realizations), stable_frac, delimiter = ',')
+        np.savetxt(foldername+'stable_frac_alpha_%dnodes_%dtrainiters_%dnoisereals_numbatest.csv' %(res_size, train_time, noise_realizations), stable_frac_alpha, delimiter = ',')
 
 if __name__ == "__main__":
     main(sys.argv[1:])
+
+
+
+
+
+
+
+
+
+
+
+
+
+

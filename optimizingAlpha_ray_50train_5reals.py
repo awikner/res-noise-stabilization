@@ -1,6 +1,6 @@
 #!/homes/awikner1/anaconda3/envs/reservoir-rls/bin/python -u
 #Assume will be finished in no more than 18 hours
-#SBATCH -t 6:00:00
+#SBATCH -t 12:00:00
 #Launch on 12 cores distributed over as many nodes as needed
 #SBATCH --ntasks=12
 #SBATCH -N 1
@@ -519,40 +519,41 @@ def trainAndTest(alph):
 
 @ray.remote
 def find_stability(noise_values, train_time, res_size, res_per_test, noise_realizations, num_tests, alpha_values):
+    num_init_conds = 5
     stable_frac  = np.zeros(noise_values.size)
-    stable_frac_alpha  = np.zeros(noise_values.size)
-
+    stable_frac_alpha  = np.zeros((num_init_conds, noise_values.size))
     rkTime_test = 400
     split_test  = 2000
     rktest_u_arr_train_nonoise, rktest_u_arr_test = get_test_data(num_tests = num_tests, rkTime = rkTime_test, split = split_test)
+    for j in range(num_init_conds):
+        for i, noise in enumerate(noise_values):
+            np.random.rand(j)
+            ic = np.random.rand(3)*2-1
+            rk = RungeKutta(x0 = ic[0], y0 = ic[1], z0 = 30*ic[2], T = train_time, ttsplit = int(train_time/0.1), noise_scaling = noise)
 
-    for i, noise in enumerate(noise_values):
-        ic = np.random.rand(3)*2-1
-        rk = RungeKutta(x0 = ic[0], y0 = ic[1], z0 = 30*ic[2], T = train_time, ttsplit = int(train_time/0.1), noise_scaling = noise)
-
-        reservoirs = generate_res(res_per_test, rk, res_size = res_size, noise_realizations = noise_realizations)
+            reservoirs = generate_res(res_per_test, rk, res_size = res_size, noise_realizations = noise_realizations)
         #for r in reservoirs:
             #r.data_trstates = 0
             #r.states_trstates = 0
         #    get_states(r, rk, skip = 150)
 
-        min_optim_func = lambda alpha: optim_func(reservoirs, rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests, alpha, rkTime_test, split_test)
-        func_vals = np.zeros(alpha_values.size)
-        for j in range(alpha_values.size):
-            func_vals[j] = min_optim_func(alpha_values[j])
-        result_fun = np.min(func_vals)
-        result_x   = alpha_values[np.argmin(func_vals)]
-        stable_frac[i] = -result_fun
-        stable_frac_alpha[i] = result_x
+            min_optim_func = lambda alpha: optim_func(reservoirs, rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests, alpha, rkTime_test, split_test)
+            func_vals = np.zeros(alpha_values.size)
+            for k in range(alpha_values.size):
+                func_vals[k] = min_optim_func(alpha_values[k])
+            result_fun = np.min(func_vals)
+            result_x   = alpha_values[np.argmin(func_vals)]
+            stable_frac[i] = -result_fun/num_init_conds
+            stable_frac_alpha[j,i] = result_x
 
     return stable_frac, stable_frac_alpha
 
 
 def main(argv):
-    train_time = 500
+    train_time = 50
     res_size = 100
     res_per_test = 200
-    noise_realizations = 1
+    noise_realizations = 5
     num_tests = 50
     num_procs = 12
     ifray = True
@@ -595,7 +596,7 @@ def main(argv):
     stable_frac_alpha = []
     for i in range(num_procs):
         stable_frac.append(results[i][0])
-        stable_frac_alpha.append(results[i][1])
+        stable_frac_alpha.append(results[i][1],axis = 0)
     foldername = '/lustre/awikner1/res-noise-stabilization/'
     # foldername = ''
     """

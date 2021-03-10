@@ -549,7 +549,7 @@ def find_stability(noise_values, train_time, res_size, res_per_test, noise_reali
 
 
 def main(argv):
-    train_time = 500
+    train_time = 300
     res_size = 100
     res_per_test = 200
     noise_realizations = 1
