@@ -559,7 +559,7 @@ def main(argv):
     train_time = 50
     res_size = 100
     res_per_test = 50
-    noise_realizations = 1
+    noise_realizations = 10
     num_tests = 50
     num_trains = 20
     num_procs = 60

@@ -1,6 +1,6 @@
 #!/homes/awikner1/anaconda3/envs/reservoir-rls/bin/python -u
 #Assume will be finished in no more than 18 hours
-#SBATCH -t 3:00:00
+#SBATCH -t 14:00:00
 #Launch on 12 cores distributed over as many nodes as needed
 #SBATCH --ntasks=60
 #Assume need 6 GB/core (6144 MB/core)
@@ -101,7 +101,8 @@ class RungeKutta:
         #noisy training array
         #switch to gaussian
         np.random.seed(noise_seed)
-        noise = np.random.randn(self.u_arr_train[:,0].size, self.u_arr_train[0,:].size)*noise_scaling
+        noise = np.zeros((self.u_arr_train[:,0].size, self.u_arr_train[0,:].size))
+        noise[0,:] = np.ones(noise.shape[1])*noise_scaling
         self.u_arr_train_noise = self.u_arr_train + noise
 
         #plt.plot(self.u_arr_train_noise[0, :500])
@@ -126,7 +127,8 @@ def RungeKuttawrapped(x0 = 2,y0 = 2,z0 = 23, h = 0.01, T = 300, ttsplit = 5000, 
     #noisy training array
     #switch to gaussian
     np.random.seed(noise_seed)
-    noise = np.random.randn(u_arr_train[:,0].size, u_arr_train[0,:].size)*noise_scaling
+    noise = np.zeros((u_arr_train[:,0].size, u_arr_train[0,:].size))
+    noise[0,:] = np.ones(noise.shape[1])*noise_scaling
     u_arr_train_noise = u_arr_train + noise
 
     #plt.plot(self.u_arr_train_noise[0, :500])
@@ -164,27 +166,42 @@ def get_states(res, rk, skip = 150, noise_realizations = 1):
 
 @jit(nopython = True, fastmath = True)
 def get_states_wrapped(u_arr_train, u_arr_train_noise, res_X, Win, W, noise_scaling, skip, noise_realizations):
+    Y_train_0 = u_arr_train[:, skip+1:]
+    X_0       = getXwrapped(u_arr_train, res_X, Win, W)[:, skip+1:(res_X[0].size - 1)]
     if noise_realizations == 1:
-        Y_train = u_arr_train_noise[:, skip+1:]
         X = getXwrapped(u_arr_train_noise, res_X, Win, W)[:, skip+1:(res_X[0].size - 1)]
-        X_train = np.concatenate((np.ones((1, u_arr_train[0].size-(skip+1))), X, u_arr_train_noise[:, skip:-1]), axis = 0)
-        data_trstates = Y_train @ X_train.T
+        X_train = np.concatenate((np.ones((1, u_arr_train[0].size-(skip+1))), X, u_arr_train[:, skip:-1]), axis = 0)
+        data_trstates = Y_train_0 @ X_train.T
         states_trstates = X_train @ X_train.T
     else:
-        data_trstates = np.zeros((3,res_X.shape[0]+4), dtype = np.float64)
-        states_trstates = np.zeros((res_X.shape[0]+4,res_X.shape[0]+4), dtype = np.float64)
+        X_all = np.zeros((X_0.shape[0], X_0.shape[1], noise_realizations))
         for i in range(noise_realizations):
             np.random.seed(i+9)
-            noise = noise_scaling*np.random.randn(u_arr_train.shape[0], u_arr_train.shape[1])
+            noise = np.zeros((u_arr_train.shape[0], u_arr_train.shape[1]))
+            if i < 3:
+                noise[i,:] = np.ones(noise.shape[1])*noise_scaling
+            elif i > 2 and i < 6:
+                noise[i-3,:] = -1*np.ones(noise.shape[1])*noise_scaling
+            else:
+                raise ValueError('Too many noise realizations')
             u_arr_train_noise = u_arr_train + noise
 
-            Y_train = u_arr_train_noise[:, skip+1:]
-
             X = getXwrapped(u_arr_train_noise, res_X, Win, W)[:, skip+1:(res_X[0].size - 1)]
-            X_train = np.concatenate((np.ones((1, u_arr_train[0].size-(skip+1))), X, u_arr_train_noise[:, skip:-1]), axis = 0)
-
-            data_trstates += Y_train @ X_train.T
-            states_trstates += X_train @ X_train.T
+            if i == 0:
+                X_mean = np.zeros(X.shape)
+            X_mean += X/noise_realizations
+            X_all[:,:,i] = X
+        Y_fit = Y_train_0
+        X_fit = X_all[:,:,0] - X_mean + X_0
+        pass_data_temp = u_arr_train[:, skip:-1]
+        pass_data = np.copy(pass_data_temp)
+        for i in range(1,noise_realizations):
+            Y_fit = np.append(Y_fit, Y_train_0, axis = 1)
+            X_fit = np.append(X_fit, X_all[:,:,i] - X_mean + X_0, axis = 1)
+            pass_data = np.append(pass_data, pass_data_temp, axis = 1)
+        X_fit = np.concatenate((np.ones((1, X_fit.shape[1])), X_fit, pass_data), axis = 0)
+        data_trstates = Y_fit @ X_fit.T
+        states_trstates = X_fit @ X_fit.T
     return data_trstates, states_trstates
 
 def trainRRM(res, rk, skip = 150, alpha = 10**-4, noise_realizations = 1):
@@ -508,16 +525,16 @@ def trainAndTest(alph):
     num_res = 10
 
     for i in range(num_res):
-        try:
-            ic = np.random.rand(3)*2-1
-            rk = RungeKutta(x0 = ic[0], y0 = ic[1], z0 = 30*ic[2], T = 500, ttsplit = int(500/0.1), noise_scaling = 0.01)
-            res = Reservoir(rk, rsvr_size = 100, spectral_radius = 0.5, input_weight = 1.0)
+        # try:
+        ic = np.random.rand(3)*2-1
+        rk = RungeKutta(x0 = ic[0], y0 = ic[1], z0 = 30*ic[2], T = 500, ttsplit = int(500/0.1), noise_scaling = 0.01)
+        res = Reservoir(rk, rsvr_size = 100, spectral_radius = 0.5, input_weight = 1.0)
 
-            trainRRM(res, rk, skip = 150, alpha = alph)
+        trainRRM(res, rk, skip = 150, alpha = alph)
 
-            results = np.append(results, test(res, 1, rkTime = 400, split = 2000, showMapError = False, showTrajectories = False, showHist = False))
-        except:
-            print("eigenvalue error occured.")
+        results = np.append(results, test(res, 1, rkTime = 400, split = 2000, showMapError = False, showTrajectories = False, showHist = False))
+        # except:
+            #print("eigenvalue error occured.")
     return -1*np.mean(results)
 
 @ray.remote
@@ -542,24 +559,28 @@ def find_stability(noise, train_seed, train_time, res_size, res_per_test, noise_
         out = min_optim_func(alpha_values[j])
         func_vals[j] = out[0]
         if j==0:
+            variances_0 = out[2]
+            mean_sum_squared_0 = out[1]
+        elif j == 1:
             variances = out[2]
             mean_sum_squared = out[1]
-        elif func_vals[j] < np.min(func_vals[:j]):
+        elif func_vals[j] < np.min(func_vals[1:j]):
             variances = out[2]
             mean_sum_squared = out[1]
-    result_fun = np.min(func_vals)
-    result_x   = alpha_values[np.argmin(func_vals)]
+    stable_frac_0 = -func_vals[0]
+    result_fun = np.min(func_vals[1:])
+    result_x   = alpha_values[np.argmin(func_vals[1:])]
     stable_frac = -result_fun
     stable_frac_alpha = result_x
 
-    return stable_frac, stable_frac_alpha, mean_sum_squared, variances
+    return stable_frac_0, stable_frac, stable_frac_alpha, mean_sum_squared_0, mean_sum_squared, variances_0, variances
 
 
 def main(argv):
     train_time = 50
     res_size = 100
     res_per_test = 50
-    noise_realizations = 1
+    noise_realizations = 3
     num_tests = 50
     num_trains = 20
     num_procs = 60
@@ -588,7 +609,8 @@ def main(argv):
     # noise_realizations = 1
 
     noise_values_array = np.logspace(-3.666666666666, 0, num = 12, base = 10)
-    alpha_values = np.logspace(-8, -2, 13)
+    #alpha_values = np.array([1e-4])
+    alpha_values = np.append(0., np.logspace(-8, -2, 13))
     tn, nt = np.meshgrid(np.arange(num_trains), noise_values_array)
     tn = tn.flatten()
     nt = nt.flatten()
@@ -597,24 +619,32 @@ def main(argv):
     tic = time.perf_counter()
     results = [find_stability.remote(nt[i], tn[i], train_time, \
             res_size, res_per_test, noise_realizations, num_tests, alpha_values) for i in range(tn.size)]
+
     results = ray.get(results)
     toc = time.perf_counter()
     runtime = toc - tic
     print('Runtime with %d cores: %f sec.' %(num_procs, runtime))
 
     stable_frac = []
+    stable_frac_0 = []
     stable_frac_alpha = []
     mean_sum_squared = []
+    mean_sum_squared_0 = []
     variances = []
+    variances_0 = []
     for i in range(tn.size):
-        stable_frac.append(results[i][0])
-        stable_frac_alpha.append(results[i][1])
-        mean_sum_squared.append(results[i][2])
-        variances.append(results[i][3])
+        stable_frac_0.append(results[i][0])
+        stable_frac.append(results[i][1])
+        stable_frac_alpha.append(results[i][2])
+        mean_sum_squared_0.append(results[i][3])
+        mean_sum_squared.append(results[i][4])
+        variances_0.append(results[i][5])
+        variances.append(results[i][6])
     stable_frac = np.array(stable_frac).reshape(noise_values_array.size,-1)
+    stable_frac_0 = np.array(stable_frac_0).reshape(noise_values_array.size,-1)
     stable_frac_alpha = np.array(stable_frac_alpha).reshape(noise_values_array.size,-1)
     foldername = '/lustre/awikner1/res-noise-stabilization/'
-    folder = 'noisetest_%dnodes_%dtrain_%dreals/' % (res_size, train_time, noise_realizations)
+    folder = 'noisetest_%dnodes_%dtrain_%dreals_pert_test2/' % (res_size, train_time, noise_realizations)
     if not os.path.isdir(os.path.join(foldername, folder)):
         os.mkdir(os.path.join(foldername, folder))
 
@@ -655,12 +685,17 @@ def main(argv):
         stable_frac_alpha[i] = result_x
     """
     print('Ray finished')
+    np.savetxt(foldername+folder+'stable_frac_%dnodes_%dtrainiters_%dnoisereals_raytest_noreg.csv' %(res_size, train_time, noise_realizations), stable_frac_0,delimiter = ',')
     np.savetxt(foldername+folder+'stable_frac_%dnodes_%dtrainiters_%dnoisereals_raytest.csv' %(res_size, train_time, noise_realizations), stable_frac, delimiter = ',')
     np.savetxt(foldername+folder+'stable_frac_alpha_%dnodes_%dtrainiters_%dnoisereals_raytest.csv' %(res_size, train_time, noise_realizations), stable_frac_alpha, delimiter = ',')
     noise_values_array = noise_values_array.flatten()
     for i in range(nt.size):
+        np.savetxt(foldername+folder+'mean_sum_squared_%dnodes_%dtrainiters_%dnoisereals_noise%e_test%d_noreg.csv' \
+                 %(res_size, train_time, noise_realizations, nt[i],tn[i]+1), mean_sum_squared_0[i]  , delimiter = ',')
         np.savetxt(foldername+folder+'mean_sum_squared_%dnodes_%dtrainiters_%dnoisereals_noise%e_test%d.csv' \
                 %(res_size, train_time, noise_realizations, nt[i],tn[i]+1), mean_sum_squared[i]  , delimiter = ',')
+        np.savetxt(foldername+folder+'variances_%dnodes_%dtrainiters_%dnoisereals_noise%e_test%d_noreg.csv' \
+              %(res_size, train_time, noise_realizations, nt[i], tn[i]+1), variances_0[i], delimiter = ',')
         np.savetxt(foldername+folder+'variances_%dnodes_%dtrainiters_%dnoisereals_noise%e_test%d.csv' \
              %(res_size, train_time, noise_realizations, nt[i], tn[i]+1), variances[i], delimiter = ',')
 if __name__ == "__main__":

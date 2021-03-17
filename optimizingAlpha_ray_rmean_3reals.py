@@ -1,6 +1,6 @@
 #!/homes/awikner1/anaconda3/envs/reservoir-rls/bin/python -u
 #Assume will be finished in no more than 18 hours
-#SBATCH -t 3:00:00
+#SBATCH -t 14:00:00
 #Launch on 12 cores distributed over as many nodes as needed
 #SBATCH --ntasks=60
 #Assume need 6 GB/core (6144 MB/core)
@@ -165,9 +165,9 @@ def get_states(res, rk, skip = 150, noise_realizations = 1):
 @jit(nopython = True, fastmath = True)
 def get_states_wrapped(u_arr_train, u_arr_train_noise, res_X, Win, W, noise_scaling, skip, noise_realizations):
     if noise_realizations == 1:
-        Y_train = u_arr_train_noise[:, skip+1:]
+        Y_train = u_arr_train[:, skip+1:]
         X = getXwrapped(u_arr_train_noise, res_X, Win, W)[:, skip+1:(res_X[0].size - 1)]
-        X_train = np.concatenate((np.ones((1, u_arr_train[0].size-(skip+1))), X, u_arr_train_noise[:, skip:-1]), axis = 0)
+        X_train = np.concatenate((np.ones((1, u_arr_train[0].size-(skip+1))), X, u_arr_train[:, skip:-1]), axis = 0)
         data_trstates = Y_train @ X_train.T
         states_trstates = X_train @ X_train.T
     else:
@@ -178,13 +178,16 @@ def get_states_wrapped(u_arr_train, u_arr_train_noise, res_X, Win, W, noise_scal
             noise = noise_scaling*np.random.randn(u_arr_train.shape[0], u_arr_train.shape[1])
             u_arr_train_noise = u_arr_train + noise
 
-            Y_train = u_arr_train_noise[:, skip+1:]
+            Y_train = u_arr_train[:, skip+1:]
 
             X = getXwrapped(u_arr_train_noise, res_X, Win, W)[:, skip+1:(res_X[0].size - 1)]
-            X_train = np.concatenate((np.ones((1, u_arr_train[0].size-(skip+1))), X, u_arr_train_noise[:, skip:-1]), axis = 0)
+            X_train = np.concatenate((np.ones((1, u_arr_train[0].size-(skip+1))), X, u_arr_train[:, skip:-1]), axis = 0)
+            if i == 0:
+                X_train_mean = np.zeros(X_train.shape)
+            X_train_mean += X_train/noise_realizations
 
-            data_trstates += Y_train @ X_train.T
-            states_trstates += X_train @ X_train.T
+        data_trstates += Y_train @ X_train_mean.T
+        states_trstates += X_train_mean @ X_train_mean.T
     return data_trstates, states_trstates
 
 def trainRRM(res, rk, skip = 150, alpha = 10**-4, noise_realizations = 1):
@@ -542,24 +545,28 @@ def find_stability(noise, train_seed, train_time, res_size, res_per_test, noise_
         out = min_optim_func(alpha_values[j])
         func_vals[j] = out[0]
         if j==0:
+            variances_0 = out[2]
+            mean_sum_squared_0 = out[1]
+        elif j == 1:
             variances = out[2]
             mean_sum_squared = out[1]
-        elif func_vals[j] < np.min(func_vals[:j]):
+        elif func_vals[j] < np.min(func_vals[1:j]):
             variances = out[2]
             mean_sum_squared = out[1]
-    result_fun = np.min(func_vals)
-    result_x   = alpha_values[np.argmin(func_vals)]
+    stable_frac_0 = -func_vals[0]
+    result_fun = np.min(func_vals[1:])
+    result_x   = alpha_values[np.argmin(func_vals[1:])]
     stable_frac = -result_fun
     stable_frac_alpha = result_x
 
-    return stable_frac, stable_frac_alpha, mean_sum_squared, variances
+    return stable_frac_0, stable_frac, stable_frac_alpha, mean_sum_squared_0, mean_sum_squared, variances_0, variances
 
 
 def main(argv):
     train_time = 50
     res_size = 100
     res_per_test = 50
-    noise_realizations = 1
+    noise_realizations = 3
     num_tests = 50
     num_trains = 20
     num_procs = 60
@@ -588,7 +595,7 @@ def main(argv):
     # noise_realizations = 1
 
     noise_values_array = np.logspace(-3.666666666666, 0, num = 12, base = 10)
-    alpha_values = np.logspace(-8, -2, 13)
+    alpha_values = np.append(0., np.logspace(-8, -2, 13))
     tn, nt = np.meshgrid(np.arange(num_trains), noise_values_array)
     tn = tn.flatten()
     nt = nt.flatten()
@@ -603,18 +610,25 @@ def main(argv):
     print('Runtime with %d cores: %f sec.' %(num_procs, runtime))
 
     stable_frac = []
+    stable_frac_0 = []
     stable_frac_alpha = []
     mean_sum_squared = []
+    mean_sum_squared_0 = []
     variances = []
+    variances_0 = []
     for i in range(tn.size):
-        stable_frac.append(results[i][0])
-        stable_frac_alpha.append(results[i][1])
-        mean_sum_squared.append(results[i][2])
-        variances.append(results[i][3])
+        stable_frac_0.append(results[i][0])
+        stable_frac.append(results[i][1])
+        stable_frac_alpha.append(results[i][2])
+        mean_sum_squared_0.append(results[i][3])
+        mean_sum_squared.append(results[i][4])
+        variances_0.append(results[i][5])
+        variances.append(results[i][6])
     stable_frac = np.array(stable_frac).reshape(noise_values_array.size,-1)
+    stable_frac_0 = np.array(stable_frac_0).reshape(noise_values_array.size,-1)
     stable_frac_alpha = np.array(stable_frac_alpha).reshape(noise_values_array.size,-1)
     foldername = '/lustre/awikner1/res-noise-stabilization/'
-    folder = 'noisetest_%dnodes_%dtrain_%dreals/' % (res_size, train_time, noise_realizations)
+    folder = 'noisetest_%dnodes_%dtrain_%dreals_rmean/' % (res_size, train_time, noise_realizations)
     if not os.path.isdir(os.path.join(foldername, folder)):
         os.mkdir(os.path.join(foldername, folder))
 
@@ -655,12 +669,17 @@ def main(argv):
         stable_frac_alpha[i] = result_x
     """
     print('Ray finished')
+    np.savetxt(foldername+folder+'stable_frac_%dnodes_%dtrainiters_%dnoisereals_raytest_noreg.csv' %(res_size, train_time, noise_realizations), stable_frac_0,delimiter = ',')
     np.savetxt(foldername+folder+'stable_frac_%dnodes_%dtrainiters_%dnoisereals_raytest.csv' %(res_size, train_time, noise_realizations), stable_frac, delimiter = ',')
     np.savetxt(foldername+folder+'stable_frac_alpha_%dnodes_%dtrainiters_%dnoisereals_raytest.csv' %(res_size, train_time, noise_realizations), stable_frac_alpha, delimiter = ',')
     noise_values_array = noise_values_array.flatten()
     for i in range(nt.size):
+        np.savetxt(foldername+folder+'mean_sum_squared_%dnodes_%dtrainiters_%dnoisereals_noise%e_test%d_noreg.csv' \
+                 %(res_size, train_time, noise_realizations, nt[i],tn[i]+1), mean_sum_squared_0[i]  , delimiter = ',')
         np.savetxt(foldername+folder+'mean_sum_squared_%dnodes_%dtrainiters_%dnoisereals_noise%e_test%d.csv' \
                 %(res_size, train_time, noise_realizations, nt[i],tn[i]+1), mean_sum_squared[i]  , delimiter = ',')
+        np.savetxt(foldername+folder+'variances_%dnodes_%dtrainiters_%dnoisereals_noise%e_test%d_noreg.csv' \
+              %(res_size, train_time, noise_realizations, nt[i], tn[i]+1), variances_0[i], delimiter = ',')
         np.savetxt(foldername+folder+'variances_%dnodes_%dtrainiters_%dnoisereals_noise%e_test%d.csv' \
              %(res_size, train_time, noise_realizations, nt[i], tn[i]+1), variances[i], delimiter = ',')
 if __name__ == "__main__":

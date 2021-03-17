@@ -1,8 +1,8 @@
 #!/homes/awikner1/anaconda3/envs/reservoir-rls/bin/python -u
 #Assume will be finished in no more than 18 hours
-#SBATCH -t 3:00:00
+#SBATCH -t 14:00:00
 #Launch on 12 cores distributed over as many nodes as needed
-#SBATCH --ntasks=60
+#SBATCH --ntasks=80
 #Assume need 6 GB/core (6144 MB/core)
 #SBATCH --mem-per-cpu=6144
 #SBATCH --mail-user=awikner1@umd.edu
@@ -80,6 +80,7 @@ class Reservoir:
         """
         self.Win = Win
         self.X = (np.random.rand(rsvr_size, rk.train_length+2)*2 - 1)
+        self.dXdu = np.zeros((rsvr_size, 3, rk.train_length+2))
         self.Wout = np.array([])
 
         self.data_trstates = np.zeros((3,self.X.shape[0]+4), dtype = np.float64)
@@ -135,18 +136,26 @@ def RungeKuttawrapped(x0 = 2,y0 = 2,z0 = 23, h = 0.01, T = 300, ttsplit = 5000, 
     u_arr_test = u_arr[:, ttsplit:]
     return u_arr_train, u_arr_train_noise, u_arr_test, ttsplit, noise_scaling
 
+
+@jit(nopython = True, fastmath = True)
+def getdXdu(W, Win, res_X, res_dXdu, u_training):
+    for i in range(u_training[0].size):
+        res_dXdu[:,:,i+1] = Win[:,1:]/((np.cosh(W @ res_X[:,i] + \
+            (Win @ np.append(1.0, u_training[:,i]))))**2.0).reshape(-1,1)
+    return res_dXdu
+
 def getX(res, rk,x0 = 1,y0 = 1,z0 = 1, noise = False):
     if noise:
         u_training = rk.u_arr_train_noise
     else:
         u_training = rk.u_arr_train
-    res.X = getXwrapped(np.ascontiguousarray(u_training), res.X, res.Win, res.W)
+    res.X, res.dXdu = getXwrapped(np.ascontiguousarray(u_training), res.X, res.dXdu, res.Win, res.W)
 
-    return res.X
+    return res.X, res.dXdu
 #takes a reservoir object res along with initial conditions
 
 @jit(nopython = True, fastmath = True)
-def getXwrapped(u_training, res_X, Win, W):
+def getXwrapped(u_training, res_X, res_dXdu, Win, W):
 
     #loops through every timestep
     for i in range(0, u_training[0].size):
@@ -154,37 +163,40 @@ def getXwrapped(u_training, res_X, Win, W):
         # u = u_training[:,i].reshape(3,1)
         # x = res_X[:,i].reshape(res.rsvr_size,1)
         res_X[:,i+1] = np.tanh(Win @ np.append(1., u_training[:,i])+W @ res_X[:,i])
+    res_dXdu = getdXdu(W, Win, res_X, res_dXdu, u_training)
 
-    return res_X
+    return res_X, res_dXdu
 
 def get_states(res, rk, skip = 150, noise_realizations = 1):
     res.data_trstates, res.states_trstates = get_states_wrapped(\
-        np.ascontiguousarray(rk.u_arr_train), np.ascontiguousarray(rk.u_arr_train_noise), res.X, res.Win, res.W, \
+        np.ascontiguousarray(rk.u_arr_train), np.ascontiguousarray(rk.u_arr_train_noise), res.X, res.dXdu, res.Win, res.W, \
         rk.noise_scaling, skip, noise_realizations)
 
 @jit(nopython = True, fastmath = True)
-def get_states_wrapped(u_arr_train, u_arr_train_noise, res_X, Win, W, noise_scaling, skip, noise_realizations):
-    if noise_realizations == 1:
-        Y_train = u_arr_train_noise[:, skip+1:]
-        X = getXwrapped(u_arr_train_noise, res_X, Win, W)[:, skip+1:(res_X[0].size - 1)]
-        X_train = np.concatenate((np.ones((1, u_arr_train[0].size-(skip+1))), X, u_arr_train_noise[:, skip:-1]), axis = 0)
-        data_trstates = Y_train @ X_train.T
-        states_trstates = X_train @ X_train.T
-    else:
-        data_trstates = np.zeros((3,res_X.shape[0]+4), dtype = np.float64)
-        states_trstates = np.zeros((res_X.shape[0]+4,res_X.shape[0]+4), dtype = np.float64)
-        for i in range(noise_realizations):
-            np.random.seed(i+9)
-            noise = noise_scaling*np.random.randn(u_arr_train.shape[0], u_arr_train.shape[1])
-            u_arr_train_noise = u_arr_train + noise
+def getnoisecorrection(noise, dXdu):
+    corr = np.zeros((dXdu.shape[0],dXdu.shape[0]))
+    M    = noise.shape[1]
+    for i in range(dXdu.shape[2]):
+        corr += dXdu[:,:,i] @ noise @ noise.T @ dXdu[:,:,i].T
+    corr = corr/M
+    return corr
 
-            Y_train = u_arr_train_noise[:, skip+1:]
+@jit(nopython = True, fastmath = True)
+def get_states_wrapped(u_arr_train, u_arr_train_noise, res_X, res_dXdu, Win, W, noise_scaling, skip, noise_realizations):
+    Y_train_0 = u_arr_train[:, skip+1:]
+    X_0, dXdu = getXwrapped(u_arr_train, res_X, res_dXdu, Win, W)
+    X_0  = X_0[:, skip+1:(res_X[0].size - 1)]
+    dXdu = dXdu[:, :, skip+1:(res_X[0].size - 1)]
 
-            X = getXwrapped(u_arr_train_noise, res_X, Win, W)[:, skip+1:(res_X[0].size - 1)]
-            X_train = np.concatenate((np.ones((1, u_arr_train[0].size-(skip+1))), X, u_arr_train_noise[:, skip:-1]), axis = 0)
+    np.random.seed(10)
+    noise = np.random.randn(3,noise_realizations)*noise_scaling
+    lin_noise_correction = getnoisecorrection(noise,dXdu)
 
-            data_trstates += Y_train @ X_train.T
-            states_trstates += X_train @ X_train.T
+    pass_data = u_arr_train[:, skip:u_arr_train.shape[1]-1]
+    X_fit = np.concatenate((np.ones((1, X_0.shape[1])), X_0, pass_data), axis = 0)
+    data_trstates = Y_train_0 @ X_fit.T
+    states_trstates = X_fit @ X_fit.T
+    states_trstates[1:X_0.shape[0]+1,1:X_0.shape[0]+1] = states_trstates[1:X_0.shape[0]+1,1:X_0.shape[0]+1] + lin_noise_correction
     return data_trstates, states_trstates
 
 def trainRRM(res, rk, skip = 150, alpha = 10**-4, noise_realizations = 1):
@@ -369,9 +381,11 @@ def testwrapped(res_X, Win, W, Wout, rktest_u_arr_train_nonoise, rktest_u_arr_te
             RungeKuttawrapped(x0 = ic[0], y0 = ic[1], z0 = 30*ic[2], T = rkTime, ttsplit = split)
         """
         res_X = (np.zeros((res_X.shape[0], split+2))*2 - 1)
+        res_dXdu = np.zeros((res_X.shape[0], 3, split+2))
+
 
         #sets res.X
-        res_X = getXwrapped(np.ascontiguousarray(rktest_u_arr_train_nonoise[:,:,i]), res_X, Win, W)
+        res_X, res_dXdu = getXwrapped(np.ascontiguousarray(rktest_u_arr_train_nonoise[:,:,i]), res_X, res_dXdu, Win, W)
 
         pred = predictwrapped(res_X, Win, W, Wout, x0 = rktest_u_arr_test[0,0,i], y0 = rktest_u_arr_test[1,0,i], z0 = rktest_u_arr_test[2,0,i], steps = (int(rkTime/0.1)-split))
         lorenz_map_x = np.zeros(pred[0].size)
@@ -474,12 +488,12 @@ def generate_res(num_res, rk, res_size, noise_realizations = 1):
     itr = 0
 
     while len(reservoirs) < num_res:
-        try:
-            itr += 1
-            reservoirs.append(Reservoir(rk, rsvr_size = res_size, spectral_radius = 0.5, input_weight = 1.0, res_seed = itr))
-            get_states(reservoirs[-1], rk, skip = 150, noise_realizations = noise_realizations)
-        except:
-            print("eigenvalue error occured.")
+        #try:
+        itr += 1
+        reservoirs.append(Reservoir(rk, rsvr_size = res_size, spectral_radius = 0.5, input_weight = 1.0, res_seed = itr))
+        get_states(reservoirs[-1], rk, skip = 150, noise_realizations = noise_realizations)
+        #except:
+        #    print("eigenvalue error occured.")
     return reservoirs
 
 def optim_func(reservoirs, rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests, alpha, rkTime = 400, split = 2000):
@@ -508,16 +522,16 @@ def trainAndTest(alph):
     num_res = 10
 
     for i in range(num_res):
-        try:
-            ic = np.random.rand(3)*2-1
-            rk = RungeKutta(x0 = ic[0], y0 = ic[1], z0 = 30*ic[2], T = 500, ttsplit = int(500/0.1), noise_scaling = 0.01)
-            res = Reservoir(rk, rsvr_size = 100, spectral_radius = 0.5, input_weight = 1.0)
+        # try:
+        ic = np.random.rand(3)*2-1
+        rk = RungeKutta(x0 = ic[0], y0 = ic[1], z0 = 30*ic[2], T = 500, ttsplit = int(500/0.1), noise_scaling = 0.01)
+        res = Reservoir(rk, rsvr_size = 100, spectral_radius = 0.5, input_weight = 1.0)
 
-            trainRRM(res, rk, skip = 150, alpha = alph)
+        trainRRM(res, rk, skip = 150, alpha = alph)
 
-            results = np.append(results, test(res, 1, rkTime = 400, split = 2000, showMapError = False, showTrajectories = False, showHist = False))
-        except:
-            print("eigenvalue error occured.")
+        results = np.append(results, test(res, 1, rkTime = 400, split = 2000, showMapError = False, showTrajectories = False, showHist = False))
+        # except:
+            #print("eigenvalue error occured.")
     return -1*np.mean(results)
 
 @ray.remote
@@ -542,17 +556,21 @@ def find_stability(noise, train_seed, train_time, res_size, res_per_test, noise_
         out = min_optim_func(alpha_values[j])
         func_vals[j] = out[0]
         if j==0:
+            variances_0 = out[2]
+            mean_sum_squared_0 = out[1]
+        elif j == 1:
             variances = out[2]
             mean_sum_squared = out[1]
-        elif func_vals[j] < np.min(func_vals[:j]):
+        elif func_vals[j] < np.min(func_vals[1:j]):
             variances = out[2]
             mean_sum_squared = out[1]
-    result_fun = np.min(func_vals)
-    result_x   = alpha_values[np.argmin(func_vals)]
+    stable_frac_0 = -func_vals[0]
+    result_fun = np.min(func_vals[1:])
+    result_x   = alpha_values[np.argmin(func_vals[1:])]
     stable_frac = -result_fun
     stable_frac_alpha = result_x
 
-    return stable_frac, stable_frac_alpha, mean_sum_squared, variances
+    return stable_frac_0, stable_frac, stable_frac_alpha, mean_sum_squared_0, mean_sum_squared, variances_0, variances
 
 
 def main(argv):
@@ -562,7 +580,7 @@ def main(argv):
     noise_realizations = 1
     num_tests = 50
     num_trains = 20
-    num_procs = 60
+    num_procs = 80
     ifray = True
     ray.init(num_cpus = num_procs)
 
@@ -588,7 +606,8 @@ def main(argv):
     # noise_realizations = 1
 
     noise_values_array = np.logspace(-3.666666666666, 0, num = 12, base = 10)
-    alpha_values = np.logspace(-8, -2, 13)
+    #alpha_values = np.array([1e-4])
+    alpha_values = np.append(0., np.logspace(-8, -2, 13))
     tn, nt = np.meshgrid(np.arange(num_trains), noise_values_array)
     tn = tn.flatten()
     nt = nt.flatten()
@@ -597,24 +616,32 @@ def main(argv):
     tic = time.perf_counter()
     results = [find_stability.remote(nt[i], tn[i], train_time, \
             res_size, res_per_test, noise_realizations, num_tests, alpha_values) for i in range(tn.size)]
+
     results = ray.get(results)
     toc = time.perf_counter()
     runtime = toc - tic
     print('Runtime with %d cores: %f sec.' %(num_procs, runtime))
 
     stable_frac = []
+    stable_frac_0 = []
     stable_frac_alpha = []
     mean_sum_squared = []
+    mean_sum_squared_0 = []
     variances = []
+    variances_0 = []
     for i in range(tn.size):
-        stable_frac.append(results[i][0])
-        stable_frac_alpha.append(results[i][1])
-        mean_sum_squared.append(results[i][2])
-        variances.append(results[i][3])
+        stable_frac_0.append(results[i][0])
+        stable_frac.append(results[i][1])
+        stable_frac_alpha.append(results[i][2])
+        mean_sum_squared_0.append(results[i][3])
+        mean_sum_squared.append(results[i][4])
+        variances_0.append(results[i][5])
+        variances.append(results[i][6])
     stable_frac = np.array(stable_frac).reshape(noise_values_array.size,-1)
+    stable_frac_0 = np.array(stable_frac_0).reshape(noise_values_array.size,-1)
     stable_frac_alpha = np.array(stable_frac_alpha).reshape(noise_values_array.size,-1)
     foldername = '/lustre/awikner1/res-noise-stabilization/'
-    folder = 'noisetest_%dnodes_%dtrain_%dreals/' % (res_size, train_time, noise_realizations)
+    folder = 'noisetest_%dnodes_%dtrain_%dreals_linear_gaussian/' % (res_size, train_time, noise_realizations)
     if not os.path.isdir(os.path.join(foldername, folder)):
         os.mkdir(os.path.join(foldername, folder))
 
@@ -655,12 +682,17 @@ def main(argv):
         stable_frac_alpha[i] = result_x
     """
     print('Ray finished')
+    np.savetxt(foldername+folder+'stable_frac_%dnodes_%dtrainiters_%dnoisereals_raytest_noreg.csv' %(res_size, train_time, noise_realizations), stable_frac_0,delimiter = ',')
     np.savetxt(foldername+folder+'stable_frac_%dnodes_%dtrainiters_%dnoisereals_raytest.csv' %(res_size, train_time, noise_realizations), stable_frac, delimiter = ',')
     np.savetxt(foldername+folder+'stable_frac_alpha_%dnodes_%dtrainiters_%dnoisereals_raytest.csv' %(res_size, train_time, noise_realizations), stable_frac_alpha, delimiter = ',')
     noise_values_array = noise_values_array.flatten()
     for i in range(nt.size):
+        np.savetxt(foldername+folder+'mean_sum_squared_%dnodes_%dtrainiters_%dnoisereals_noise%e_test%d_noreg.csv' \
+                 %(res_size, train_time, noise_realizations, nt[i],tn[i]+1), mean_sum_squared_0[i]  , delimiter = ',')
         np.savetxt(foldername+folder+'mean_sum_squared_%dnodes_%dtrainiters_%dnoisereals_noise%e_test%d.csv' \
                 %(res_size, train_time, noise_realizations, nt[i],tn[i]+1), mean_sum_squared[i]  , delimiter = ',')
+        np.savetxt(foldername+folder+'variances_%dnodes_%dtrainiters_%dnoisereals_noise%e_test%d_noreg.csv' \
+              %(res_size, train_time, noise_realizations, nt[i], tn[i]+1), variances_0[i], delimiter = ',')
         np.savetxt(foldername+folder+'variances_%dnodes_%dtrainiters_%dnoisereals_noise%e_test%d.csv' \
              %(res_size, train_time, noise_realizations, nt[i], tn[i]+1), variances[i], delimiter = ',')
 if __name__ == "__main__":
