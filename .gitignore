@@ -124,6 +124,11 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
+# Job Run Filtes
+*.log
+*.sh
+
 # Data Files
 *.csv
 *.out
+*.png
