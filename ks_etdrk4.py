@@ -82,7 +82,7 @@ def kursiv_predict(u0, tau = 0.25, N = 64, d = 22, T = 100, params = np.array([[
         new_params = precompute_KS_params(N, d, tau)
     else:
         new_params = params
-    steps = int(T/tau)
+    steps = T
 
     u_arr = np.zeros((N, steps+1))
     u_arr[:,0] = u0

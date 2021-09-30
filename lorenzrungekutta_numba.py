@@ -25,28 +25,28 @@ def dxdt_lorenz(x, sigma = 10., beta = 8/3, rho = 28.):
 @jit(nopython = True, fastmath = True)
 def rk4(x, tau, dxdt):
     # Fourth order Runge-Kutta integrator
-    
+
     k1 = dxdt(x)
     k2 = dxdt(x + k1/2*tau)
     k3 = dxdt(x + k2/2*tau)
     k4 = dxdt(x + tau*k3)
-    
+
     xnext = x + 1/6*tau*(k1+2*k2+2*k3+k4)
     return xnext
 
 @jit(nopython = True, fastmath = True)
-def rungekutta(x0 = 1,y0 = 1,z0 = 1, h = 0.01, T = 100):
-    steps = int(T/h)
+def rungekutta(x0 = 1,y0 = 1,z0 = 1, h = 0.01, T = 100, tau = 0.1):
+    steps = T*int(tau/h)
     output = np.zeros((3,steps+1))
     output[0,0] = x0
     output[1,0] = y0
     output[2,0] = z0
-    
-    #loops from t = 0 to T 
+
+    #loops from t = 0 to T
     for i in range(0, steps):
         output[:,i+1] = rk4(output[:,i],h,dxdt_lorenz)
-        
-    
+
+
     return output
 
 #u = rungekutta(1,1,1)
