@@ -56,13 +56,21 @@ def str_to_int(s):
         result += (ord(v) - 48) * (10 ** (final_index - i))
     return result
 
-@jit(nopython = True, fastmath = True)
+#@jit(nopython = True, fastmath = True)
 def mean_numba_axis1(mat):
 
     res = np.zeros(mat.shape[0])
     for i in range(mat.shape[0]):
         res[i] = np.mean(mat[i])
 
+    return res
+
+#@jit(nopython = True, fastmath = True)
+def sum_numba_axis0(mat):
+
+    res = np.zeros(mat.shape[1])
+    for i in range(mat.shape[1]):
+        res[i] = np.sum(mat[:,i])
     return res
 
 
@@ -146,7 +154,7 @@ class RungeKutta:
         self.u_arr_test = u_arr[:, ttsplit:]
         #size 1001
 
-@jit(nopython = True, fastmath = True)
+#@jit(nopython = True, fastmath = True)
 def RungeKuttawrapped(x0 = 2,y0 = 2,z0 = 23, h = 0.01, tau = 0.1, T = 300, ttsplit = 5000, u0 = 0, system = 'lorenz', params = np.array([[],[]], dtype = np.complex128)):
     if system == 'lorenz':
         int_step = int(tau/h)
@@ -176,6 +184,36 @@ def RungeKuttawrapped(x0 = 2,y0 = 2,z0 = 23, h = 0.01, tau = 0.1, T = 300, ttspl
     u_arr_test = u_arr[:, ttsplit:]
     return u_arr_train, u_arr_test, ttsplit, new_params
 
+#@jit(nopython = True, fastmath = True)
+def RungeKuttawrapped_pred(h = 0.01, tau = 0.1, T = 300, ttsplit = 5000, u0_array = np.array([[],[]], dtype = np.complex128), system = 'lorenz', params = np.array([[],[]], dtype = np.complex128)):
+    if system == 'lorenz':
+        int_step = int(tau/h)
+        u_arr = np.ascontiguousarray(rungekutta_pred(u0_array,h,tau,int_step))
+        # self.train_length = ttsplit
+        # self.noise_scaling = noise_scaling
+
+        u_arr[0] = (u_arr[0] - 0)/7.929788629895004
+        u_arr[1] = (u_arr[1] - 0)/8.9932616136662
+        u_arr[2] = (u_arr[2] - 23.596294463016896)/8.575917849311919
+        new_params = params
+    elif system == 'KS':
+        u_arr, new_params = kursiv_predict_pred(u0_array, tau = tau, T = T, params = params)
+        u_arr = np.ascontiguousarray(u_arr)/(1.1876770355823614)
+    else:
+        raise ValueError
+
+    u_arr_train = u_arr[:, :ttsplit+1]
+    #size 5001
+
+    #noisy training array
+    #switch to gaussian
+
+    #plt.plot(self.u_arr_train_noise[0, :500])
+
+    #u[5000], the 5001st element, is the last in u_arr_train and the first in u_arr_test
+    u_arr_test = u_arr[:, ttsplit:]
+    return u_arr_train, u_arr_test, ttsplit, new_params
+
 def getX(res, rk,x0 = 1,y0 = 1,z0 = 1):
     u_training = rk.u_arr_train
     res.X = getXwrapped(np.ascontiguousarray(u_training), res.X, res.Win, res.W)
@@ -184,7 +222,7 @@ def getX(res, rk,x0 = 1,y0 = 1,z0 = 1):
 #takes a reservoir object res along with initial conditions
 
 
-@jit(nopython = True, fastmath = True)
+#@jit(nopython = True, fastmath = True)
 def getXwrapped(u_training, res_X, Win, W, noisetype = 'none', noise_scaling = 0, noise_realization = 0, traintype = 'normal'):
 
     #loops through every timestep
@@ -296,7 +334,7 @@ def getXwrapped(u_training, res_X, Win, W, noisetype = 'none', noise_scaling = 0
             res_X[:,i+1] = np.tanh(Win @ np.append(1., u_training[:,i])+W @ res_X[:,i])
         return res_X, u_training
 
-@jit(nopython = True, fastmath = True)
+#@jit(nopython = True, fastmath = True)
 def getjacobian(Win, W, Wout, Dn):
     jacsize  = Wout.shape[1]-1
     res_size = Win.shape[0]
@@ -316,7 +354,7 @@ def getjacobian(Win, W, Wout, Dn):
     return jacobian
 
 
-@jit(nopython = True, fastmath = True)
+#@jit(nopython = True, fastmath = True)
 def gen_noise(noise_size, noise_length, noisetype, noise_scaling, noise_realization):
     if 'gaussian' in noisetype:
         np.random.seed(noise_realization+9)
@@ -347,7 +385,7 @@ def get_states(res, rk, noisetype = 'none', noise_scaling = 0, noise_realization
             np.ascontiguousarray(rk.u_arr_train), res.X, res.Win, res.W, \
             skip, noisetype, noise_scaling, noise_realizations, traintype)
 
-@jit(nopython = True, fastmath = True)
+#@jit(nopython = True, fastmath = True)
 def get_states_wrapped(u_arr_train, res_X, Win, W, skip, noisetype = 'none',\
         noise_scaling = 0, noise_realizations = 1, traintype = 'normal', q = 0):
     res_X = np.ascontiguousarray(res_X)
@@ -517,7 +555,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W, skip, noisetype = 'none',\
         states_trstates = np.zeros((n+rsvr_size+1,n+rsvr_size+1), dtype = np.float64)
         return [data_trstates, states_trstates]
 
-@jit(nopython = True, fastmath = True)
+#@jit(nopython = True, fastmath = True)
 def getD(u_arr_train, res_X, Win, W, skip, noisetype = 'none',\
          noise_scaling = 0, noise_realizations = 1, traintype = 'normal'):
     n,d = u_arr_train.shape
@@ -532,7 +570,7 @@ def predict(res, u0,  steps = 1000):
     Y = predictwrapped(res.X, res.Win, res.W, res.Wout, u0, steps)
     return Y
 
-@jit(nopython = True, fastmath = True)
+#@jit(nopython = True, fastmath = True)
 def predictwrapped(res_X, Win, W, Wout, u0, steps):
     Y = np.empty((Win.shape[1]-1, steps + 1))
     X = np.empty((res_X.shape[0], steps + 1))
@@ -553,7 +591,7 @@ def predictwrapped(res_X, Win, W, Wout, u0, steps):
 
     return Y
 
-@jit(nopython = True, fastmath = True)
+#@jit(nopython = True, fastmath = True)
 def get_test_data(tau, num_tests, rkTime, split, system = 'lorenz'):
     np.random.seed(0)
     if system == 'lorenz':
@@ -590,7 +628,7 @@ def test(res, rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests = 100, rk
 
     return stable_count/num_tests, mean_sum_squared, variances, valid_time, preds
 
-@jit(nopython = True, fastmath = True)
+#@jit(nopython = True, fastmath = True)
 def testwrapped(res_X, Win, W, Wout, rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests, rkTime, split, showMapError = True,   showTrajectories = True, showHist = True, system = 'lorenz', tau = 0.1, params = np.array([[],[]], dtype = np.complex128)):
     stable_count = 0
     valid_time = np.zeros(num_tests)
@@ -619,8 +657,6 @@ def testwrapped(res_X, Win, W, Wout, rktest_u_arr_train_nonoise, rktest_u_arr_te
         error = np.zeros(pred[0].size)
         #print(pred.size)
 
-        x2y2z2 = np.zeros(pred.shape[1])
-
         """
         plt.pcolor(pred, vmin = -3, vmax = 3)
         plt.show()
@@ -632,30 +668,20 @@ def testwrapped(res_X, Win, W, Wout, rktest_u_arr_train_nonoise, rktest_u_arr_te
         vt_cutoff = 0.2*np.sqrt(2)
         check_vt = True
         for j in range(1, pred[0].size):
-
-            if system == 'lorenz':
-                rkmap_u_arr_train = RungeKuttawrapped(pred[0][j-1]*7.929788629895004, pred[1][j-1]*8.9932616136662, pred[2][j-1]*8.575917849311919+23.596294463016896, h=0.01, T=1, system = system, params = params, tau = tau)[0]
-            elif system == 'KS':
-                u0 = pred[:,j-1]*(1.1876770355823614)
-                rkmap_u_arr_train = RungeKuttawrapped(0, 0, 0, h=tau, T=1, u0 = u0, system = system, params = params)[0]
             error[j] = np.sqrt(np.mean((pred[:,j]-rktest_u_arr_test[:,j,i])**2.0))
-
-            #EXAMINE!!!
-            # x2error = (pred[0][j]-rkmap_u_arr_train[0][1])**2
-            # y2error = (pred[1][j]-rkmap_u_arr_train[1][1])**2
-            # z2error = (pred[2][j]-rkmap_u_arr_train[2][1])**2
-
-            # x2y2z2 = np.append(x2y2z2, (x2error+y2error+z2error))
-            x2y2z2[j] = np.sum((pred[:,j]-rkmap_u_arr_train[:,1])**2)
 
             if error[j] < vt_cutoff and check_vt:
                 valid_time[i] = j
             else:
                 check_vt = False
-            #if j == valid_time[i]+1:
-            #print(error[:j])
-            # print("Test " + str(i) + " valid time: " + str(j))
-
+        if system == 'lorenz':
+            rkmap_u_arr_train = RungeKuttawrapped_pred(u0_array = np.stack((pred[0]*7.929788629895004,\
+                pred[1]*8.9932616136662, pred[2]*8.575917849311919+23.596294463016896)),\
+                h=0.01, system = system, params = params, tau = tau)[0]
+        elif system == 'KS':
+            u0 = pred*1.1876770355823614
+            rkmap_u_arr_train = RungeKuttawrapped_pred(u0_array = u0, h=tau, T=1, system = system, params = params)[0]
+        x2y2z2 = sum_numba_axis0((pred[:,1:]-rkmap_u_arr_train[:,:-1])**2.0)
         x2y2z2 = x2y2z2/np.sqrt(2.0)
         #print("Mean: " + str(np.mean(pred[0])))
         #print("Variance: " + str(np.var(pred[0])))
