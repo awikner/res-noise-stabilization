@@ -56,7 +56,7 @@ def str_to_int(s):
         result += (ord(v) - 48) * (10 ** (final_index - i))
     return result
 
-#@jit(nopython = True, fastmath = True)
+@jit(nopython = True, fastmath = True)
 def mean_numba_axis1(mat):
 
     res = np.zeros(mat.shape[0])
@@ -145,7 +145,7 @@ class RungeKutta:
         self.u_arr_test = u_arr[:, ttsplit:]
         #size 1001
 
-#@jit(nopython = True, fastmath = True)
+@jit(nopython = True, fastmath = True)
 def RungeKuttawrapped(x0 = 2,y0 = 2,z0 = 23, h = 0.01, T = 300, ttsplit = 5000, u0 = 0, system = 'lorenz', params = np.array([[],[]], dtype = np.complex128)):
     if system == 'lorenz':
         u_arr = np.ascontiguousarray(rungekutta(x0,y0,z0,h,T)[:, ::10])
@@ -182,7 +182,7 @@ def getX(res, rk,x0 = 1,y0 = 1,z0 = 1):
 #takes a reservoir object res along with initial conditions
 
 
-#@jit(nopython = True, fastmath = True)
+@jit(nopython = True, fastmath = True)
 def getXwrapped(u_training, res_X, Win, W, noisetype = 'none', noise_scaling = 0, noise_realization = 0, traintype = 'normal'):
 
     #loops through every timestep
@@ -294,7 +294,7 @@ def getXwrapped(u_training, res_X, Win, W, noisetype = 'none', noise_scaling = 0
             res_X[:,i+1] = np.tanh(Win @ np.append(1., u_training[:,i])+W @ res_X[:,i])
         return res_X, u_training
 
-#@jit(nopython = True, fastmath = True)
+@jit(nopython = True, fastmath = True)
 def getjacobian(Win, W, Wout, Dn):
     jacsize  = Wout.shape[1]-1
     res_size = Win.shape[0]
@@ -314,7 +314,7 @@ def getjacobian(Win, W, Wout, Dn):
     return jacobian
 
 
-#@jit(nopython = True, fastmath = True)
+@jit(nopython = True, fastmath = True)
 def gen_noise(noise_size, noise_length, noisetype, noise_scaling, noise_realization):
     if 'gaussian' in noisetype:
         np.random.seed(noise_realization+9)
@@ -345,7 +345,7 @@ def get_states(res, rk, noisetype = 'none', noise_scaling = 0, noise_realization
             np.ascontiguousarray(rk.u_arr_train), res.X, res.Win, res.W, \
             skip, noisetype, noise_scaling, noise_realizations, traintype)
 
-#@jit(nopython = True, fastmath = True)
+@jit(nopython = True, fastmath = True)
 def get_states_wrapped(u_arr_train, res_X, Win, W, skip, noisetype = 'none',\
         noise_scaling = 0, noise_realizations = 1, traintype = 'normal', q = 0):
     res_X = np.ascontiguousarray(res_X)
@@ -515,7 +515,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W, skip, noisetype = 'none',\
         states_trstates = np.zeros((n+rsvr_size+1,n+rsvr_size+1), dtype = np.float64)
         return [data_trstates, states_trstates]
 
-#@jit(nopython = True, fastmath = True)
+@jit(nopython = True, fastmath = True)
 def getD(u_arr_train, res_X, Win, W, skip, noisetype = 'none',\
          noise_scaling = 0, noise_realizations = 1, traintype = 'normal'):
     n,d = u_arr_train.shape
@@ -530,7 +530,7 @@ def predict(res, u0,  steps = 1000):
     Y = predictwrapped(res.X, res.Win, res.W, res.Wout, u0, steps)
     return Y
 
-#@jit(nopython = True, fastmath = True)
+@jit(nopython = True, fastmath = True)
 def predictwrapped(res_X, Win, W, Wout, u0, steps):
     Y = np.empty((Win.shape[1]-1, steps + 1))
     X = np.empty((res_X.shape[0], steps + 1))
@@ -551,7 +551,7 @@ def predictwrapped(res_X, Win, W, Wout, u0, steps):
 
     return Y
 
-#@jit(nopython = True, fastmath = True)
+@jit(nopython = True, fastmath = True)
 def get_test_data(num_tests, rkTime, split, system = 'lorenz'):
     np.random.seed(0)
     if system == 'lorenz':
@@ -588,7 +588,7 @@ def test(res, rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests = 100, rk
 
     return stable_count/num_tests, mean_sum_squared, variances, valid_time, preds
 
-#@jit(nopython = True, fastmath = True)
+@jit(nopython = True, fastmath = True)
 def testwrapped(res_X, Win, W, Wout, rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests, rkTime, split, showMapError = True,   showTrajectories = True, showHist = True, system = 'lorenz', params = np.array([[],[]], dtype = np.complex128)):
     if system == 'lorenz':
         tau = 0.1
@@ -654,9 +654,9 @@ def testwrapped(res_X, Win, W, Wout, rktest_u_arr_train_nonoise, rktest_u_arr_te
                 valid_time[i] = j
             else:
                 check_vt = False
-            if j == valid_time[i]+1:
-                #print(error[:j])
-                # print("Test " + str(i) + " valid time: " + str(j))
+            #if j == valid_time[i]+1:
+            #print(error[:j])
+            # print("Test " + str(i) + " valid time: " + str(j))
 
         x2y2z2 = x2y2z2/np.sqrt(2.0)
         #print("Mean: " + str(np.mean(pred[0])))
@@ -794,8 +794,8 @@ def get_res_results(itr, rk, res_size, noisetype, noise, noise_realizations, tra
             preds = np.stack((preds, out[4]), axis = 3)
         elif j > 2:
             preds = np.concatenate((preds, out[4].reshape(out[4].shape[0], out[4].shape[1], out[4].shape[2] ,1)), axis = 3)
-        if j > 0:
-            #print(preds.shape)
+        #if j > 0:
+        #print(preds.shape)
     toc = time.perf_counter()
     runtime = toc - tic
     print('Iteration runtime: %f sec.' % runtime)
@@ -929,7 +929,10 @@ def main(argv):
             num_trains = int(arg)
             print(num_trains)
         elif opt == '--savepred':
-            savepred = bool(arg)
+            if arg == 'True':
+                savepred = True
+            elif arg == 'False':
+                savepred = False
             print(savepred)
         elif opt == '--noisetype':
             noisetype = str(arg)
@@ -948,8 +951,8 @@ def main(argv):
 
     noise_values_array = np.logspace(-3.666666666666, 0, num = 12, base = 10)[4:8]
     #noise_values_array = np.array([0,1e-3,1e-2])
-    alpha_values = np.append(0., np.logspace(-8, -1, 15)*noise_realizations)
-    #alpha_values = np.array([0,1e-6,1e-4])
+    #alpha_values = np.append(0., np.logspace(-8, -1, 15)*noise_realizations)
+    alpha_values = np.array([0,1e-6,1e-4])
     tnr, ntr, rtn = np.meshgrid(np.arange(num_trains), noise_values_array, np.arange(res_per_test))
     tnr = tnr.flatten()
     ntr = ntr.flatten()
