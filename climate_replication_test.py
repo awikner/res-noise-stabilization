@@ -677,10 +677,10 @@ def testwrapped(res_X, Win, W, Wout, rktest_u_arr_train_nonoise, rktest_u_arr_te
         if system == 'lorenz':
             rkmap_u_arr_train = RungeKuttawrapped_pred(u0_array = np.stack((pred[0]*7.929788629895004,\
                 pred[1]*8.9932616136662, pred[2]*8.575917849311919+23.596294463016896)),\
-                h=0.01, system = system, params = params, tau = tau)[0]
+                h=0.01, system = system, params = params, tau = tau, ttsplit = pred.shape[1])[0]
         elif system == 'KS':
             u0 = pred*1.1876770355823614
-            rkmap_u_arr_train = RungeKuttawrapped_pred(u0_array = u0, h=tau, T=1, system = system, params = params)[0]
+            rkmap_u_arr_train = RungeKuttawrapped_pred(u0_array = u0, h=tau, T=1, system = system, params = params, ttsplit = pred.shape[1])[0]
         x2y2z2 = sum_numba_axis0((pred[:,1:]-rkmap_u_arr_train[:,:-1])**2.0)
         x2y2z2 = x2y2z2/np.sqrt(2.0)
         #print("Mean: " + str(np.mean(pred[0])))
@@ -989,8 +989,8 @@ def main(argv):
 
     noise_values_array = np.logspace(-3.666666666666, 0, num = 12, base = 10)[4:8]
     #noise_values_array = np.array([0,1e-3,1e-2])
-    alpha_values = np.append(0., np.logspace(-8, -1, 15)*noise_realizations)
-    #alpha_values = np.array([0,1e-6,1e-4])
+    #alpha_values = np.append(0., np.logspace(-8, -1, 15)*noise_realizations)
+    alpha_values = np.array([0,1e-6,1e-4])
     tnr, ntr, rtn = np.meshgrid(np.arange(num_trains), noise_values_array, np.arange(res_per_test))
     tnr = tnr.flatten()
     ntr = ntr.flatten()
