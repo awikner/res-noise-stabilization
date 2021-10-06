@@ -684,7 +684,7 @@ def testwrapped(res_X, Win, W, Wout, rktest_u_arr_train_nonoise, rktest_u_arr_te
             elif system == 'KS':
                 u0 = pred*1.1876770355823614
                 rkmap_u_arr_train = RungeKuttawrapped_pred(u0_array = u0, h=tau, T=1, system = system, params = params, ttsplit = pred.shape[1])[0]
-            print(rkmap_u_arr_train[:,:10])
+            print(rkmap_u_arr_train[0,:10])
             x2y2z2 = sum_numba_axis0((pred[:,1:]-rkmap_u_arr_train[:,:-1])**2.0)
         else:
             x2y2z2 = np.zeros(pred[0].size-1)
@@ -735,6 +735,7 @@ def testwrapped(res_X, Win, W, Wout, rktest_u_arr_train_nonoise, rktest_u_arr_te
 
         max_sum_square[i] = np.max(x2y2z2)
         mean_sum_square[i] = np.mean(x2y2z2)
+        print(mean_sum_square)
         if system ==  'lorenz':
             means[i] = np.mean(pred[0])
             variances[i] = np.var(pred[0])
