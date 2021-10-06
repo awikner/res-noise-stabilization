@@ -640,6 +640,8 @@ def testwrapped(res_X, Win, W, Wout, rktest_u_arr_train_nonoise, rktest_u_arr_te
             elif system == 'KS':
                 u0 = pred[:,j-1]*(1.1876770355823614)
                 rkmap_u_arr_train = RungeKuttawrapped(0, 0, 0, h=tau, T=tau, u0 = u0, system = system, params = params)[0]
+            if j <= 10:
+                print(rkmap_u_arr_train[0,1])
             error[j] = np.sqrt(np.mean((pred[:,j]-rktest_u_arr_test[:,j,i])**2.0))
 
             #EXAMINE!!!
@@ -694,6 +696,7 @@ def testwrapped(res_X, Win, W, Wout, rktest_u_arr_train_nonoise, rktest_u_arr_te
 
         max_sum_square[i] = np.max(x2y2z2)
         mean_sum_square[i] = np.mean(x2y2z2)
+        print(mean_sum_square)
         if system ==  'lorenz':
             means[i] = np.mean(pred[0])
             variances[i] = np.var(pred[0])
@@ -949,7 +952,8 @@ def main(argv):
     # res_per_test = 100
     # noise_realizations = 1
 
-    noise_values_array = np.logspace(-3.666666666666, 0, num = 12, base = 10)[4:8]
+    #noise_values_array = np.logspace(-3.666666666666, 0, num = 12, base = 10)[4:8]
+    noise_values_array = np.array([np.logspace(-3.666666666666, 0, num = 12, base = 10)[5]])
     #noise_values_array = np.array([0,1e-3,1e-2])
     #alpha_values = np.append(0., np.logspace(-8, -1, 15)*noise_realizations)
     alpha_values = np.array([0,1e-6,1e-4])
