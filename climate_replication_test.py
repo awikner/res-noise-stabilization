@@ -659,7 +659,7 @@ def testwrapped(res_X, Win, W, Wout, rktest_u_arr_train_nonoise, rktest_u_arr_te
             #if j == valid_time[i]+1:
             #print(error[:j])
             # print("Test " + str(i) + " valid time: " + str(j))
-
+        x2y2z2 = x2y2z2[1:]
         x2y2z2 = x2y2z2/np.sqrt(2.0)
         #print("Mean: " + str(np.mean(pred[0])))
         #print("Variance: " + str(np.var(pred[0])))
