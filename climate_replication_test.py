@@ -617,6 +617,7 @@ def testwrapped(res_X, Win, W, Wout, rktest_u_arr_train_nonoise, rktest_u_arr_te
         #sets res.X
         res_X, p = getXwrapped(np.ascontiguousarray(rktest_u_arr_train_nonoise[:,:,i]), res_X, Win, W)
         pred = predictwrapped(res_X, Win, W, Wout, u0 = rktest_u_arr_test[:,0,i], steps = (int(rkTime/tau)-split))
+        print(pred[0,:10])
         preds[i] = pred
         error = np.zeros(pred[0].size)
         #print(pred.size)
