@@ -602,6 +602,12 @@ def testwrapped(res_X, Win, W, Wout, rktest_u_arr_train_nonoise, rktest_u_arr_te
     variances = np.zeros(num_tests)
     preds = np.zeros((num_tests, rktest_u_arr_test.shape[0], (int(rkTime/tau)-split)+1))
 
+    print('Win')
+    print(Win[:3,:3])
+    print('A')
+    print(W[:3,:3])
+    print('Wout')
+    print(Wout[:3,:3])
 
     for i in range(num_tests):
 
