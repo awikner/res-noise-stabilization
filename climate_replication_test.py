@@ -785,6 +785,8 @@ def generate_res(itr, rk, res_size, noisetype = 'none', noise_scaling = 0, noise
 
     reservoir = Reservoir(rk, rk.u_arr_train.shape[0], rsvr_size = res_size, \
                 spectral_radius = 0.5, input_weight = 1.0, res_seed = itr)
+    print('Train Data shape: (%d, %d)' % (rk.u_arr_train.shape[0], rk.u_arr_train.shape[1]))
+    print(rk.u_arr_train[-3:,-3:])
     get_states(reservoir, rk, noisetype, noise_scaling, noise_realizations, traintype, skip)
     return reservoir
 
