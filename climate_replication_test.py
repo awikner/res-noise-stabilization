@@ -649,11 +649,17 @@ def testwrapped(res_X, Win, W, Wout, rktest_u_arr_train_nonoise, rktest_u_arr_te
             RungeKuttawrapped(x0 = ic[0], y0 = ic[1], z0 = 30*ic[2], T = rkTime, ttsplit = split)
         """
         res_X = (np.zeros((res_X.shape[0], split+2))*2 - 1)
+        print('Win')
+        print(Win[:3,:3])
+        print('A')
+        print(W[:3,:3])
+        print('Wout')
+        print(Wout[:3,:3])
 
         #sets res.X
         res_X, p = getXwrapped(np.ascontiguousarray(rktest_u_arr_train_nonoise[:,:,i]), res_X, Win, W)
         pred = predictwrapped(res_X, Win, W, Wout, u0 = rktest_u_arr_test[:,0,i], steps = (rkTime-split))
-        #print(pred[0,:10])
+        print(pred[0,:10])
         preds[i] = pred
         error = np.zeros(pred[0].size)
         #print(pred.size)
