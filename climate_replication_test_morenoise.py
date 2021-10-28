@@ -22,13 +22,12 @@ from datetime import datetime
 # from lorenzrungekutta_numba import fz
 import numpy as np
 #from sklearn.linear_model import Ridge
-from scipy.sparse import csr_matrix
+from scipy import sparse
 from scipy.linalg import solve, solve_sylvester
 from scipy.optimize import minimize
 from scipy.sparse.linalg import eigs
 from scipy.stats import wasserstein_distance
 from matplotlib import pyplot as plt
-from csr import CSR
 from numba import jit, njit
 import time
 import cProfile, pstats
@@ -76,16 +75,12 @@ def sum_numba_axis0(mat):
 
 
 class Reservoir:
-    def __init__(self, rk, input_size, rsvr_size = 300, spectral_radius = 0.6, input_weight = 1, leakage = 1.0, win_type = 'full', bias_type = 'old', res_seed = 1):
+    def __init__(self, rk, input_size, rsvr_size = 300, spectral_radius = 0.6, input_weight = 1, leakage = 1.0, Win_type = 'old', res_seed = 1):
         self.rsvr_size = rsvr_size
-        """
         print('Spectral Radius: %0.2f' % spectral_radius)
         print('Input Weight: %0.2f' % input_weight)
         print('Leakage: %0.3f' % leakage)
-        print('Win Type: %s' % win_type)
-        print('Bias type: %s' % bias_type)
-        """
-
+        print('Win type: %s' % Win_type)
         #get spectral radius < 1
         #gets row density = 0.03333
         avg_degree = 10
@@ -103,8 +98,7 @@ class Reservoir:
         max_eig = eigs(unnormalized_W, k = 1, return_eigenvectors = False, maxiter = 10**5)
 
         # self.W = sparse.csr_matrix(spectral_radius/np.abs(max_eig)*unnormalized_W)
-        W_sp    = csr_matrix(np.ascontiguousarray(spectral_radius/np.abs(max_eig[0])*unnormalized_W))
-        self.W  = CSR(W_sp.shape[0], W_sp.shape[1], W_sp.nnz, W_sp.indptr, W_sp.indices, W_sp.data)
+        self.W   = np.ascontiguousarray(spectral_radius/np.abs(max_eig[0])*unnormalized_W)
 
         """
         const_conn = int(rsvr_size*const_frac)
@@ -114,30 +108,26 @@ class Reservoir:
         Win[const_conn + int((rsvr_size-const_conn)/3):const_conn + 2*int((rsvr_size-const_conn)/3), 2] = (np.random.rand(Win[const_conn + int((rsvr_size-const_conn)/3):const_conn + 2*int((rsvr_size-const_conn)/3), 2].size)*2 - 1)*input_weight
         Win[const_conn + 2*int((rsvr_size-const_conn)/3):, 3] = (np.random.rand(Win[const_conn + 2*int((rsvr_size-const_conn)/3):, 3].size)*2 - 1)*input_weight
         """
-        if win_type == 'full':
-            input_vars = np.arange(input_size)
-        elif win_type == 'x':
-            input_vars = np.array([0])
-        if bias_type == 'old':
+        if Win_type == 'old':
             const_frac = 0.15
             const_conn = int(rsvr_size*const_frac)
             Win = np.zeros((rsvr_size, input_size+1))
             Win[:const_conn, 0] = (np.random.rand(Win[:const_conn, 0].size)*2 - 1)*input_weight
-            q = int((rsvr_size-const_conn)//input_vars.size)
-            for i, var in enumerate(input_vars):
-                Win[const_conn+q*i:const_conn+q*(i+1),var+1] = (np.random.rand(q)*2-1)*input_weight
-        elif bias_type == 'new_random':
+            q = int((rsvr_size-const_conn)//input_size)
+            for i in range(input_size):
+                Win[const_conn+q*i:const_conn+q*(i+1),i+1] = (np.random.rand(q)*2-1)*input_weight
+        elif Win_type == 'new_random':
             Win = np.zeros((rsvr_size, input_size+1))
             Win[:,0] = (np.random.rand(rsvr_size)*2-1)*input_weight
-            q = int(rsvr_size//input_vars.size)
-            for i, var in enumerate(input_vars):
-                Win[q*i:q*(i+1),var+1] = (np.random.rand(q)*2-1)*input_weight
-        elif bias_type == 'new_const':
+            q = int(rsvr_size//input_size)
+            for i in range(input_size):
+                Win[q*i:q*(i+1),i+1] = (np.random.rand(q)*2-1)*input_weight
+        elif Win_type == 'new_const':
             Win = np.zeros((rsvr_size, input_size+1))
             Win[:,0] = input_weight
-            q = int(rsvr_size//input_vars.size)
-            for i, var in enumerate(input_vars):
-                Win[q*i:q*(i+1),var+1] = (np.random.rand(q)*2-1)*input_weight
+            q = int(rsvr_size//input_size)
+            for i in range(input_size):
+                Win[q*i:q*(i+1),i+1] = (np.random.rand(q)*2-1)*input_weight
 
 
         # self.Win = sparse.csr_matrix(Win)
@@ -815,11 +805,11 @@ def testwrapped(res_X, Win, W, Wout, leakage, rktest_u_arr_train_nonoise, rktest
 
     return stable_count, mean_sum_square, variances, valid_time, preds
 
-def generate_res(itr, rk, res_size, rho, sigma, leakage, win_type, bias_type, noisetype = 'none', noise_scaling = 0, noise_realizations = 1, traintype = 'normal', skip = 150):
+def generate_res(itr, rk, res_size, rho, sigma, leakage, Win_type, noisetype = 'none', noise_scaling = 0, noise_realizations = 1, traintype = 'normal', skip = 150):
 
 
     reservoir = Reservoir(rk, rk.u_arr_train.shape[0], rsvr_size = res_size, \
-                spectral_radius = rho, input_weight = sigma, leakage = leakage, win_type=win_type, bias_type = bias_type, res_seed = itr)
+                spectral_radius = rho, input_weight = sigma, leakage = leakage, Win_type = Win_type, res_seed = itr)
     #print('Train Data shape: (%d, %d)' % (rk.u_arr_train.shape[0], rk.u_arr_train.shape[1]))
     #print(rk.u_arr_train[-3:,-3:])
     get_states(reservoir, rk, noisetype, noise_scaling, noise_realizations, traintype, skip)
@@ -845,19 +835,19 @@ def optim_func(res, rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests, al
 
     return -1*results, mean_sum_squared, variances, valid_time, preds
 
-def get_res_results(itr, rk, res_size, rho, sigma, leakage, win_type, bias_type, noisetype, noise, noise_realizations, traintype, \
+def get_res_results(itr, rk, res_size, rho, sigma, leakage, Win_type, noisetype, noise, noise_realizations, traintype, \
     rktest_u_arr_train_nonoise,rktest_u_arr_test, num_tests, alpha_values, rkTime_test, split_test, system, tau, params, savepred, debug_mode):
     tic = time.perf_counter()
     print('Starting res %d' % itr)
     if debug_mode:
-        reservoir = generate_res(itr, rk, res_size, rho, sigma, leakage, win_type, bias_type, noisetype, noise, noise_realizations, traintype)
+        reservoir = generate_res(itr, rk, res_size, rho, sigma, leakage, Win_type, noisetype, noise, noise_realizations, traintype)
     else:
         res_states_found = False
         next_itr = 0
         base_itr = np.copy(itr)
         while not res_states_found:
             try:
-                reservoir = generate_res(itr, rk, res_size, rho, sigma, leakage, win_type, bias_type, noisetype, noise, noise_realizations, traintype)
+                reservoir = generate_res(itr, rk, res_size, rho, sigma, leakage, Win_type, noisetype, noise, noise_realizations, traintype)
                 res_states_found = True
             except:
                 itr = (base_itr+1)*1000+next_itr
@@ -947,7 +937,7 @@ def get_res_results(itr, rk, res_size, rho, sigma, leakage, win_type, bias_type,
     return stable_frac_0, stable_frac, mean_sum_squared_0, mean_sum_squared, variances_0, variances, valid_time_0, valid_time, preds
 
 @ray.remote
-def find_stability(noisetype, noise, traintype, train_seed, res_itr, rho, sigma, leakage, win_type, bias_type, train_time, res_size, res_per_test, noise_realizations, num_tests, alpha_values, system, tau, savepred, debug_mode):
+def find_stability(noisetype, noise, traintype, train_seed, res_itr, rho, sigma, leakage, Win_type, train_time, res_size, res_per_test, noise_realizations, num_tests, alpha_values, system, tau, savepred, debug_mode):
     print('Noise: %e' % noise)
     print('Training seed: %d' % train_seed)
     warnings.filterwarnings("ignore", category=NumbaPerformanceWarning)
@@ -965,7 +955,7 @@ def find_stability(noisetype, noise, traintype, train_seed, res_itr, rho, sigma,
         u0 = 0.6*(np.random.rand(64)*2-1)
         rk = RungeKutta(0,0,0, tau = tau, T = train_time, ttsplit = train_time, u0 = u0, system = system, params = params)
 
-    out = get_res_results(res_itr, rk, res_size, rho, sigma, leakage, win_type, bias_type, noisetype, noise, noise_realizations, traintype, rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests, alpha_values, rkTime_test, split_test, system, tau, params, savepred, debug_mode)
+    out = get_res_results(res_itr, rk, res_size, rho, sigma, leakage, Win_type, noisetype, noise, noise_realizations, traintype, rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests, alpha_values, rkTime_test, split_test, system, tau, params, savepred, debug_mode)
     #toc_global = time.perf_counter()
     #print('Total Runtime: %s sec.' % (toc_global - tic_global))
 
@@ -1050,8 +1040,7 @@ def main(argv):
     rho       = 0.5
     sigma     = 1.0
     leakage   = 1.0
-    bias_type  = 'old'
-    win_type  = 'full'
+    Win_type  = 'old'
     debug_mode= False
     ifray = True
     ray.init(address=os.environ["ip_head"])
@@ -1061,7 +1050,7 @@ def main(argv):
         opts, args = getopt.getopt(argv, "T:N:r:", \
                 ['noisetype=','traintype=', 'system=', 'res=',\
                 'tests=','trains=','savepred=', 'tau=', 'rho=',\
-                'sigma=','leakage=','bias_type=', 'debug=', 'win_type='])
+                'sigma=','leakage=','bias_type=', 'debug='])
     except getopt.GetoptError:
         print('Error: Some options not recognized')
         sys.exit(2)
@@ -1088,12 +1077,9 @@ def main(argv):
             tau  = float(arg)
             tau_flag = False
             print('Reservoir timestep: %f' % tau)
-        elif opt == '--win_type':
-            win_type = str(arg)
-            print('Win Type: %s' % win_type)
         elif opt == '--bias_type':
-            bias_type = str(arg)
-            print('Bias Type: %s' % bias_type)
+            Win_type = str(arg)
+            print('Bias Type: %s' % Win_type)
         elif opt == '--res':
             res_per_test = int(arg)
             print('Number of reservoirs: %d' % res_per_test)
@@ -1139,7 +1125,7 @@ def main(argv):
     # res_per_test = 100
     # noise_realizations = 1
 
-    noise_values_array = np.logspace(-3.666666666666, 0, num = 12, base = 10)[4:8]
+    noise_values_array = np.logspace(-3.666666666666, 0, num = 12, base = 10)[0:8]
     #noise_values_array = np.array([np.logspace(-3.666666666666, 0, num = 12, base = 10)[5]])
     #noise_values_array = np.array([0,1e-3,1e-2])
     alpha_values = np.append(0., np.logspace(-8, -1, 15)*noise_realizations)
@@ -1151,7 +1137,7 @@ def main(argv):
     #alpha_values = np.logspace(-8,-2,2)
     print('Starting Ray Computation')
     tic = time.perf_counter()
-    out  = ray.get([find_stability.remote(noisetype, ntr[i], traintype, tnr[i], rtn[i], rho, sigma, leakage, win_type, bias_type, train_time, \
+    out  = ray.get([find_stability.remote(noisetype, ntr[i], traintype, tnr[i], rtn[i], rho, sigma, leakage, Win_type, train_time, \
             res_size, res_per_test, noise_realizations, num_tests, alpha_values, system, tau, savepred, debug_mode) for i in range(tnr.size)])
     results = get_stability_output(np.array(out, dtype = object), ntr, tnr, res_per_test, num_tests, alpha_values, savepred)
     #results = [find_stability(noisetype, ntr[i], traintype, tnr[i], rtn[i], train_time, \
@@ -1197,7 +1183,7 @@ def main(argv):
     mean_valid_time = np.array(mean_valid_time).reshape(noise_values_array.size, -1)
     foldername = '/lustre/awikner1/res-noise-stabilization/'
     top_folder = '%s_noisetest_noisetype_%s_traintype_%s/' % (system, noisetype, traintype)
-    folder = '%s_more_noisetest_%srho%0.1f_sigma%1.1e_leakage%0.1f_win_%s_bias_%s_tau%0.2f_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s/' % (system, predflag, rho, sigma, leakage, win_type, bias_type, tau, res_size, train_time, noise_realizations, noisetype, traintype)
+    folder = '%s_more_noisetest_%srho%0.1f_sigma%1.1e_leakage%0.1f_bias_%s_tau%0.2f_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s/' % (system, predflag, rho, sigma, leakage, Win_type, tau, res_size, train_time, noise_realizations, noisetype, traintype)
     if not os.path.isdir(os.path.join(foldername, top_folder)):
         os.mkdir(os.path.join(foldername, top_folder))
     if not os.path.isdir(os.path.join(os.path.join(foldername, top_folder), folder)):
