@@ -79,9 +79,12 @@ class csc_matrix_numba(object):
         return out
 
     def matrix_dot_left_T(self, mat):
+        print(self.shape)
+        print(mat.shape)
         with objmode(out = 'double[:,:]'):
             out = csc_matrix((self.data,self.indices,self.indptr),\
                  shape = (self.shape[0], self.shape[1])).T.dot(mat).T
+        print(out.shape)
         return out
 
     def mult_vec(self, mat):
@@ -117,13 +120,14 @@ def sum_numba_axis0(mat):
 
 #@jit(nopython = True, fastmath = True)
 def construct_jac_mat_csc(Win, W, rsvr_size, n):
-    with objmode(data = 'double[:]', indices = 'int[:]', indptr = 'int[:]', shape = 'int[:]'):
-        W_conv = csc_matrix((W.data, W.indices, W.indptr), shape = (W.shape[0], W.shape[1])).toarray()
+    with objmode(data = 'double[:]', indices = 'int32[:]', indptr = 'int32[:]', shape = 'int64[:]'):
+        shape_in = W.shape
+        W_conv = csc_matrix((W.data, W.indices, W.indptr), shape = (shape_in[0], shape_in[1])).toarray()
         mat    = csc_matrix(np.concatenate((Win[:,0].reshape(-1,1), W_conv, np.zeros((rsvr_size,n))), axis = 1))
         data   = mat.data
         indices = mat.indices
         indptr = mat.indptr
-        shape = np.array(list(data.shape))
+        shape = np.array(list(mat.shape))
     return csc_matrix_numba(data, indices, indptr, shape)
 
 class Reservoir:
@@ -578,6 +582,8 @@ def get_states_wrapped(u_arr_train, res_X, Win, W, leakage, skip, noisetype = 'n
         for i in range(k):
             D_n[1:,:,i] = np.concatenate((np.diag(D[:,i]) @ Win[:,1:], np.identity(n)), axis = 0)
         for i in range(1,k):
+            print(W_mat.matrix_dot_left_T(np.diag(D[:,i])).shape)
+            print(np.concatenate((np.zeros((1,rsvr_size)), (1-leakage)*np.identity(rsvr_size), np.zeros((rsvr_size, n))), axis = 1).shape)
             E_n[:,:,i-1]  = np.concatenate((np.zeros((1, rsvr_size+n+1)), W_mat.matrix_dot_left_T(np.diag(D[:,i])) + \
                 np.concatenate((np.zeros((1,rsvr_size)), (1-leakage)*np.identity(rsvr_size), np.zeros((rsvr_size, n))), axis = 1),\
                 np.zeros((n, rsvr_size+n+1))), axis = 0)
@@ -591,8 +597,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W, leakage, skip, noisetype = 'n
             for j in range(k):
                 gradient_reg += reg_components[:,:,j] @ reg_components[:,:,j].T
             reg_components[1:,:,k-1] = np.concatenate((np.diag(D[:,i]) @ Win[:,1:], np.identity(n)), axis = 0)
-            E_n[:,:,k-2]  = np.concatenate((np.zeros((1, rsvr_size+n+1)),np.diag(D[:,i]) @ \
-                np.concatenate((np.ascontiguousarray(Win[:,0]).reshape(-1,1), W, np.zeros((rsvr_size,n))), axis = 1) + \
+            E_n[:,:,k-2]  = np.concatenate((np.zeros((1, rsvr_size+n+1)),W_mat.matrix_dot_left_T(np.diag(D[:,i])) + \
                 np.concatenate((np.zeros((1,rsvr_size)), (1-leakage)*np.identity(rsvr_size), np.zeros((rsvr_size, n))), axis = 1),\
                 np.zeros((n, rsvr_size+n+1))), axis = 0)
             for j in range(k-1):
