@@ -79,12 +79,9 @@ class csc_matrix_numba(object):
         return out
 
     def matrix_dot_left_T(self, mat):
-        print(self.shape)
-        print(mat.shape)
         with objmode(out = 'double[:,:]'):
             out = csc_matrix((self.data,self.indices,self.indptr),\
                  shape = (self.shape[0], self.shape[1])).T.dot(mat).T
-        print(out.shape)
         return out
 
     def mult_vec(self, mat):
@@ -101,7 +98,7 @@ def str_to_int(s):
         result += (ord(v) - 48) * (10 ** (final_index - i))
     return result
 
-#@jit(nopython = True, fastmath = True)
+@jit(nopython = True, fastmath = True)
 def mean_numba_axis1(mat):
 
     res = np.zeros(mat.shape[0])
@@ -110,7 +107,7 @@ def mean_numba_axis1(mat):
 
     return res
 
-#@jit(nopython = True, fastmath = True)
+@jit(nopython = True, fastmath = True)
 def sum_numba_axis0(mat):
 
     res = np.zeros(mat.shape[1])
@@ -118,7 +115,7 @@ def sum_numba_axis0(mat):
         res[i] = np.sum(mat[:,i])
     return res
 
-#@jit(nopython = True, fastmath = True)
+@jit(nopython = True, fastmath = True)
 def construct_jac_mat_csc(Win, W, rsvr_size, n):
     with objmode(data = 'double[:]', indices = 'int32[:]', indptr = 'int32[:]', shape = 'int64[:]'):
         shape_in = W.shape
@@ -228,7 +225,7 @@ class RungeKutta:
         self.u_arr_test = u_arr[:, ttsplit:]
         #size 1001
 
-#@jit(nopython = True, fastmath = True)
+@jit(nopython = True, fastmath = True)
 def RungeKuttawrapped(x0 = 2,y0 = 2,z0 = 23, h = 0.01, tau = 0.1, T = 300, ttsplit = 5000, u0 = 0, system = 'lorenz', params = np.array([[],[]], dtype = np.complex128)):
     if system == 'lorenz':
         int_step = int(tau/h)
@@ -258,7 +255,7 @@ def RungeKuttawrapped(x0 = 2,y0 = 2,z0 = 23, h = 0.01, tau = 0.1, T = 300, ttspl
     u_arr_test = u_arr[:, ttsplit:]
     return u_arr_train, u_arr_test, ttsplit, new_params
 
-#@jit(nopython = True, fastmath = True)
+@jit(nopython = True, fastmath = True)
 def RungeKuttawrapped_pred(h = 0.01, tau = 0.1, T = 300, ttsplit = 5000, u0_array = np.array([[],[]], dtype = np.complex128), system = 'lorenz', params = np.array([[],[]], dtype = np.complex128)):
     if system == 'lorenz':
         int_step = int(tau/h)
@@ -296,7 +293,7 @@ def getX(res, rk,x0 = 1,y0 = 1,z0 = 1):
 #takes a reservoir object res along with initial conditions
 
 
-#@jit(nopython = True, fastmath = True)
+@jit(nopython = True, fastmath = True)
 def getXwrapped(u_training, res_X, Win, W, leakage, noisetype = 'none', noise_scaling = 0, noise_realization = 0, traintype = 'normal'):
 
     #loops through every timestep
@@ -412,7 +409,7 @@ def getXwrapped(u_training, res_X, Win, W, leakage, noisetype = 'none', noise_sc
         return res_X, u_training
 
 """
-#@jit(nopython = True, fastmath = True)
+@jit(nopython = True, fastmath = True)
 def getjacobian(Win, W, Wout, Dn):
     jacsize  = Wout.shape[1]-1
     res_size = Win.shape[0]
@@ -432,7 +429,7 @@ def getjacobian(Win, W, Wout, Dn):
     return jacobian
 """
 
-#@jit(nopython = True, fastmath = True)
+@jit(nopython = True, fastmath = True)
 def gen_noise(noise_size, noise_length, noisetype, noise_scaling, noise_realization):
     if 'gaussian' in noisetype:
         np.random.seed(noise_realization+9)
@@ -463,7 +460,7 @@ def get_states(res, rk, noisetype = 'none', noise_scaling = 0, noise_realization
             np.ascontiguousarray(rk.u_arr_train), res.X, res.Win, res.W, res.leakage,\
             skip, noisetype, noise_scaling, noise_realizations, traintype)
 
-#@jit(nopython = True, fastmath = True)
+@jit(nopython = True, fastmath = True)
 def get_states_wrapped(u_arr_train, res_X, Win, W, leakage, skip, noisetype = 'none',\
         noise_scaling = 0, noise_realizations = 1, traintype = 'normal', q = 0):
     res_X = np.ascontiguousarray(res_X)
@@ -579,13 +576,13 @@ def get_states_wrapped(u_arr_train, res_X, Win, W, leakage, skip, noisetype = 'n
         E_n = np.zeros((rsvr_size+n+1, rsvr_size+n+1, k-1))
         reg_components = np.zeros((rsvr_size+n+1, n, k))
         W_mat = construct_jac_mat_csc(Win, W, rsvr_size, n)
+        with objmode(tic = 'double'):
+            tic = time.perf_counter()
         for i in range(k):
             D_n[1:,:,i] = np.concatenate((np.diag(D[:,i]) @ Win[:,1:], np.identity(n)), axis = 0)
         for i in range(1,k):
-            print(W_mat.matrix_dot_left_T(np.diag(D[:,i])).shape)
-            print(np.concatenate((np.zeros((1,rsvr_size)), (1-leakage)*np.identity(rsvr_size), np.zeros((rsvr_size, n))), axis = 1).shape)
             E_n[:,:,i-1]  = np.concatenate((np.zeros((1, rsvr_size+n+1)), W_mat.matrix_dot_left_T(np.diag(D[:,i])) + \
-                np.concatenate((np.zeros((1,rsvr_size)), (1-leakage)*np.identity(rsvr_size), np.zeros((rsvr_size, n))), axis = 1),\
+                np.concatenate((np.zeros((rsvr_size,1)), (1-leakage)*np.identity(rsvr_size), np.zeros((rsvr_size, n))), axis = 1),\
                 np.zeros((n, rsvr_size+n+1))), axis = 0)
         reg_components[:,:,k-1] = D_n[:,:,-1]
         for i in range(k-1):
@@ -598,10 +595,17 @@ def get_states_wrapped(u_arr_train, res_X, Win, W, leakage, skip, noisetype = 'n
                 gradient_reg += reg_components[:,:,j] @ reg_components[:,:,j].T
             reg_components[1:,:,k-1] = np.concatenate((np.diag(D[:,i]) @ Win[:,1:], np.identity(n)), axis = 0)
             E_n[:,:,k-2]  = np.concatenate((np.zeros((1, rsvr_size+n+1)),W_mat.matrix_dot_left_T(np.diag(D[:,i])) + \
-                np.concatenate((np.zeros((1,rsvr_size)), (1-leakage)*np.identity(rsvr_size), np.zeros((rsvr_size, n))), axis = 1),\
+                np.concatenate((np.zeros((rsvr_size,1)), (1-leakage)*np.identity(rsvr_size), np.zeros((rsvr_size, n))), axis = 1),\
                 np.zeros((n, rsvr_size+n+1))), axis = 0)
             for j in range(k-1):
                 reg_components[:,:,j] = E_n[:,:,k-2] @ reg_components[:,:,j]
+            if i % 50 == 0:
+                with objmode(toc = 'double'):
+                    toc = time.perf_counter()
+                runtime = toc - tic
+                tic = toc
+                print('50 Iter Runtime: ')
+                print(runtime)
         for j in range(k):
             gradient_reg += reg_components[:,:,j] @ reg_components[:,:,j].T
 
@@ -638,7 +642,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W, leakage, skip, noisetype = 'n
         states_trstates = np.zeros((n+rsvr_size+1,n+rsvr_size+1), dtype = np.float64)
         return [data_trstates, states_trstates]
 
-#@jit(nopython = True, fastmath = True)
+@jit(nopython = True, fastmath = True)
 def getD(u_arr_train, res_X, Win, W, leakage, skip, noisetype = 'none',\
          noise_scaling = 0, noise_realizations = 1, traintype = 'normal'):
     n,d = u_arr_train.shape
@@ -653,7 +657,7 @@ def predict(res, u0,  steps = 1000):
     Y = predictwrapped(res.X, res.Win, res.W, res.Wout, res.leakage, u0, steps)
     return Y
 
-#@jit(nopython = True, fastmath = True)
+@jit(nopython = True, fastmath = True)
 def predictwrapped(res_X, Win, W, Wout, leakage, u0, steps):
     Y = np.empty((Win.shape[1]-1, steps + 1))
     X = np.empty((res_X.shape[0], steps + 1))
@@ -674,7 +678,7 @@ def predictwrapped(res_X, Win, W, Wout, leakage, u0, steps):
 
     return Y
 
-#@jit(nopython = True, fastmath = True)
+@jit(nopython = True, fastmath = True)
 def get_test_data(tau, num_tests, rkTime, split, system = 'lorenz'):
     np.random.seed(0)
     if system == 'lorenz':
@@ -711,7 +715,7 @@ def test(res, rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests = 100, rk
 
     return stable_count/num_tests, mean_sum_squared, variances, valid_time, preds
 
-#@jit(nopython = True, fastmath = True)
+@jit(nopython = True, fastmath = True)
 def testwrapped(res_X, Win, W, Wout, leakage, rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests, rkTime, split, showMapError = True,   showTrajectories = True, showHist = True, system = 'lorenz', tau = 0.1, params = np.array([[],[]], dtype = np.complex128)):
     stable_count = 0
     valid_time = np.zeros(num_tests)
