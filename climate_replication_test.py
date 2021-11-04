@@ -28,7 +28,6 @@ from scipy.optimize import minimize
 from scipy.sparse.linalg import eigs
 from scipy.stats import wasserstein_distance
 from matplotlib import pyplot as plt
-from csr import CSR
 from numba import jit, njit
 import time
 import cProfile, pstats
@@ -103,8 +102,7 @@ class Reservoir:
         max_eig = eigs(unnormalized_W, k = 1, return_eigenvectors = False, maxiter = 10**5)
 
         # self.W = sparse.csr_matrix(spectral_radius/np.abs(max_eig)*unnormalized_W)
-        W_sp    = csr_matrix(np.ascontiguousarray(spectral_radius/np.abs(max_eig[0])*unnormalized_W))
-        self.W  = CSR(W_sp.shape[0], W_sp.shape[1], W_sp.nnz, W_sp.indptr, W_sp.indices, W_sp.data)
+        self.W    = np.ascontiguousarray(spectral_radius/np.abs(max_eig[0])*unnormalized_W)
 
         """
         const_conn = int(rsvr_size*const_frac)
@@ -523,7 +521,15 @@ def get_states_wrapped(u_arr_train, res_X, Win, W, leakage, skip, noisetype = 'n
         return [data_trstates, states_trstates]
     elif 'gradientk' in traintype:
         k = str_to_int(traintype.replace('gradientk',''))
+        print('Getting res states...')
+        with objmode(tic = 'double'):
+            tic = time.perf_counter()
         X, D = getXwrapped(u_arr_train, res_X, Win, W, leakage, noisetype, noise_scaling, 1, traintype)
+        with objmode(toc = 'double'):
+            toc = time.perf_counter()
+        runtime_getx = toc - tic
+        print('Runtime to get res states: ')
+        print(runtime_getx)
         X = X[:, skip+1:(res_d - 1)]
         D = D[:, skip+1:(res_d - 1)]
         X_train = np.concatenate((np.ones((1, d-(skip+1))), X, u_arr_train[:, skip:-1]), axis = 0)
@@ -531,29 +537,46 @@ def get_states_wrapped(u_arr_train, res_X, Win, W, leakage, skip, noisetype = 'n
         D_n = np.zeros((rsvr_size+n+1, n, k))
         E_n = np.zeros((rsvr_size+n+1, rsvr_size+n+1, k-1))
         reg_components = np.zeros((rsvr_size+n+1, n, k))
+        print('Starting grad calc...')
+        with objmode(tic = 'double'):
+            tic = time.perf_counter()
         for i in range(k):
             D_n[1:,:,i] = np.concatenate((np.diag(D[:,i]) @ Win[:,1:], np.identity(n)), axis = 0)
         for i in range(1,k):
             E_n[:,:,i-1]  = np.concatenate((np.zeros((1, rsvr_size+n+1)),np.diag(D[:,i]) @ \
                 np.concatenate((np.ascontiguousarray(Win[:,0]).reshape(-1,1), W, np.zeros((rsvr_size,n))), axis = 1) + \
-                np.concatenate((np.zeros((1,rsvr_size)), (1-leakage)*np.identity(rsvr_size), np.zeros((rsvr_size, n))), axis = 1),\
+                np.concatenate((np.zeros((rsvr_size,1)), (1-leakage)*np.identity(rsvr_size), np.zeros((rsvr_size, n))), axis = 1),\
                 np.zeros((n, rsvr_size+n+1))), axis = 0)
         reg_components[:,:,k-1] = D_n[:,:,-1]
         for i in range(k-1):
             reg_components[:,:,i] = D_n[:,:,i]
             for j in range(i,k-1):
                 reg_components[:,:,i] = E_n[:,:,j] @ reg_components[:,:,i]
-
+        with objmode(toc = 'double'):
+            toc = time.perf_counter()
+        runtime_getx = toc - tic
+        print('Runtime to get first grad iter: ')
+        print(runtime_getx)
+        with objmode(tic = 'double'):
+            tic = time.perf_counter()
         for i in range(k, X.shape[1]):
             for j in range(k):
                 gradient_reg += reg_components[:,:,j] @ reg_components[:,:,j].T
             reg_components[1:,:,k-1] = np.concatenate((np.diag(D[:,i]) @ Win[:,1:], np.identity(n)), axis = 0)
             E_n[:,:,k-2]  = np.concatenate((np.zeros((1, rsvr_size+n+1)),np.diag(D[:,i]) @ \
                 np.concatenate((np.ascontiguousarray(Win[:,0]).reshape(-1,1), W, np.zeros((rsvr_size,n))), axis = 1) + \
-                np.concatenate((np.zeros((1,rsvr_size)), (1-leakage)*np.identity(rsvr_size), np.zeros((rsvr_size, n))), axis = 1),\
+                np.concatenate((np.zeros((rsvr_size,1)), (1-leakage)*np.identity(rsvr_size), np.zeros((rsvr_size, n))), axis = 1),\
                 np.zeros((n, rsvr_size+n+1))), axis = 0)
             for j in range(k-1):
                 reg_components[:,:,j] = E_n[:,:,k-2] @ reg_components[:,:,j]
+            if k % 1 == 0:
+                with objmode(toc = 'double'):
+                    toc = time.perf_counter()
+                runtime = toc - tic
+                tic = toc
+                print('1 Iter Runtime: ')
+                print(runtime)
+
         for j in range(k):
             gradient_reg += reg_components[:,:,j] @ reg_components[:,:,j].T
 
@@ -946,7 +969,7 @@ def get_res_results(itr, rk, res_size, rho, sigma, leakage, win_type, bias_type,
 
     return stable_frac_0, stable_frac, mean_sum_squared_0, mean_sum_squared, variances_0, variances, valid_time_0, valid_time, preds
 
-@ray.remote
+#@ray.remote
 def find_stability(noisetype, noise, traintype, train_seed, res_itr, rho, sigma, leakage, win_type, bias_type, train_time, res_size, res_per_test, noise_realizations, num_tests, alpha_values, system, tau, savepred, debug_mode):
     print('Noise: %e' % noise)
     print('Training seed: %d' % train_seed)
@@ -1054,7 +1077,7 @@ def main(argv):
     win_type  = 'full'
     debug_mode= False
     ifray = True
-    ray.init(address=os.environ["ip_head"])
+    #ray.init(address=os.environ["ip_head"])
     tau_flag = True
 
     try:
@@ -1142,8 +1165,8 @@ def main(argv):
     noise_values_array = np.logspace(-3.666666666666, 0, num = 12, base = 10)[4:8]
     #noise_values_array = np.array([np.logspace(-3.666666666666, 0, num = 12, base = 10)[5]])
     #noise_values_array = np.array([0,1e-3,1e-2])
-    alpha_values = np.append(0., np.logspace(-8, -1, 15)*noise_realizations)
-    #alpha_values = np.array([0,1e-6,1e-4])
+    #alpha_values = np.append(0., np.logspace(-8, -1, 15)*noise_realizations)
+    alpha_values = np.array([0,1e-6,1e-4])
     tnr, ntr, rtn = np.meshgrid(np.arange(num_trains), noise_values_array, np.arange(res_per_test))
     tnr = tnr.flatten()
     ntr = ntr.flatten()
@@ -1151,8 +1174,10 @@ def main(argv):
     #alpha_values = np.logspace(-8,-2,2)
     print('Starting Ray Computation')
     tic = time.perf_counter()
-    out  = ray.get([find_stability.remote(noisetype, ntr[i], traintype, tnr[i], rtn[i], rho, sigma, leakage, win_type, bias_type, train_time, \
-            res_size, res_per_test, noise_realizations, num_tests, alpha_values, system, tau, savepred, debug_mode) for i in range(tnr.size)])
+    #out  = ray.get([find_stability.remote(noisetype, ntr[i], traintype, tnr[i], rtn[i], rho, sigma, leakage, win_type, bias_type, train_time, \
+    #        res_size, res_per_test, noise_realizations, num_tests, alpha_values, system, tau, savepred, debug_mode) for i in range(tnr.size)])
+    out  = [find_stability(noisetype, ntr[i], traintype, tnr[i], rtn[i], rho, sigma, leakage, win_type,       bias_type, train_time, \
+             res_size, res_per_test, noise_realizations, num_tests, alpha_values, system, tau, savepred, debug_mode) for i    in range(tnr.size)]
     results = get_stability_output(np.array(out, dtype = object), ntr, tnr, res_per_test, num_tests, alpha_values, savepred)
     #results = [find_stability(noisetype, ntr[i], traintype, tnr[i], rtn[i], train_time, \
     #        res_size, res_per_test, noise_realizations, num_tests, alpha_values, system, tic) for i in range(tnr.size)]
