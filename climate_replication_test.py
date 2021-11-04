@@ -576,14 +576,13 @@ def get_states_wrapped(u_arr_train, res_X, Win, W, leakage, skip, noisetype = 'n
         E_n = np.zeros((rsvr_size+n+1, rsvr_size+n+1, k-1))
         reg_components = np.zeros((rsvr_size+n+1, n, k))
         W_mat = construct_jac_mat_csc(Win, W, rsvr_size, n)
+        leakage_mat = np.concatenate((np.zeros((rsvr_size,1)), (1-leakage)*np.identity(rsvr_size), np.zeros((rsvr_size, n))), axis = 1)
         with objmode(tic = 'double'):
             tic = time.perf_counter()
         for i in range(k):
             D_n[1:,:,i] = np.concatenate((np.diag(D[:,i]) @ Win[:,1:], np.identity(n)), axis = 0)
         for i in range(1,k):
-            E_n[:,:,i-1]  = np.concatenate((np.zeros((1, rsvr_size+n+1)), W_mat.matrix_dot_left_T(np.diag(D[:,i])) + \
-                np.concatenate((np.zeros((rsvr_size,1)), (1-leakage)*np.identity(rsvr_size), np.zeros((rsvr_size, n))), axis = 1),\
-                np.zeros((n, rsvr_size+n+1))), axis = 0)
+            E_n[1:rsvr_size+1,:,i-1]  = W_mat.matrix_dot_left_T(np.diag(D[:,i])) + leakage_mat
         reg_components[:,:,k-1] = D_n[:,:,-1]
         for i in range(k-1):
             reg_components[:,:,i] = D_n[:,:,i]
@@ -594,9 +593,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W, leakage, skip, noisetype = 'n
             for j in range(k):
                 gradient_reg += reg_components[:,:,j] @ reg_components[:,:,j].T
             reg_components[1:,:,k-1] = np.concatenate((np.diag(D[:,i]) @ Win[:,1:], np.identity(n)), axis = 0)
-            E_n[:,:,k-2]  = np.concatenate((np.zeros((1, rsvr_size+n+1)),W_mat.matrix_dot_left_T(np.diag(D[:,i])) + \
-                np.concatenate((np.zeros((rsvr_size,1)), (1-leakage)*np.identity(rsvr_size), np.zeros((rsvr_size, n))), axis = 1),\
-                np.zeros((n, rsvr_size+n+1))), axis = 0)
+            E_n[1:rsvr_size+1,:,k-2] = W_mat.matrix_dot_left_T(np.diag(D[:,i])) + leakage_mat
             for j in range(k-1):
                 reg_components[:,:,j] = E_n[:,:,k-2] @ reg_components[:,:,j]
             if i % 50 == 0:
