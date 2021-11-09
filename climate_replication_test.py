@@ -501,7 +501,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
         X_train = np.concatenate((np.ones((1, d-(skip+1))), X, u_arr_train[:, skip:-1]), axis = 0)
         gradient_reg = np.zeros((rsvr_size+n, rsvr_size+n))
         for i in range(X.shape[1]):
-            D_n = np.concatenate((np.diag(D[:,i]) @ Win[:,1:], np.identity(n)), axis = 0)
+            D_n = np.concatenate((matrix_diag_mult(D[:,i], Win[:,1:]), np.identity(n)), axis = 0)
             gradient_reg += D_n @ D_n.T
         data_trstates = Y_train @ X_train.T
         states_trstates = X_train @ X_train.T
@@ -515,10 +515,10 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
         gradient_reg = np.zeros((rsvr_size+n+1, rsvr_size+n+1))
         W_mat_data, W_mat_indices, W_mat_indptr, W_mat_shape = construct_jac_mat_csc(Win, W_data, W_indices, W_indptr, W_shape, rsvr_size, n)
         for i in range(X.shape[1]):
-            D_n  = np.concatenate((np.diag(D[:,i]) @ Win[:,1:], np.identity(n)), axis = 0)
+            D_n  = np.concatenate((matrix_diag_mult(D[:,i], Win[:,1:]), np.identity(n)), axis = 0)
             gradient_reg[1:,1:] += D_n @ D_n.T
         for i in range(1, X.shape[1]):
-            D_n2 = np.concatenate((np.zeros((1,n)), np.diag(D[:,i-1]) @ Win[:,1:], np.identity(n)), axis = 0)
+            D_n2 = np.concatenate((np.zeros((1,n)), matrix_diag_mult(D[:,i-1], Win[:,1:]), np.identity(n)), axis = 0)
             E_n  = np.concatenate((np.zeros((1, rsvr_size+n+1)),matrix_dot_left_T(W_mat_data, W_mat_indices, W_mat_indptr, W_mat_shape, np.diag(D[:,i])) + \
                 np.concatenate((np.zeros((1,rsvr_size)), (1-leakage)*np.identity(rsvr_size), np.zeros((rsvr_size, n))), axis = 1),\
                 np.zeros((n, rsvr_size+n+1))), axis = 0)
@@ -536,7 +536,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
         gradient_reg = np.zeros((rsvr_size+n+1, rsvr_size+n+1))
         W_mat_data, W_mat_indices, W_mat_indptr, W_mat_shape = construct_jac_mat_csc(Win, W_data, W_indices, W_indptr, W_shape, rsvr_size, n)
         for i in range(1, X.shape[1]):
-            D_n2 = np.concatenate((np.zeros((1,n)), np.diag(D[:,i-1]) @ Win[:,1:], np.identity(n)), axis = 0)
+            D_n2 = np.concatenate((np.zeros((1,n)), matrix_diag_mult(D[:,i-1], Win[:,1:]), np.identity(n)), axis = 0)
             E_n  = np.concatenate((np.zeros((1, rsvr_size+n+1)),matrix_dot_left_T(W_mat_data, W_mat_indices, W_mat_indptr, W_mat_shape, np.diag(D[:,i])) + \
                 np.concatenate((np.zeros((1,rsvr_size)), (1-leakage)*np.identity(rsvr_size), np.zeros((rsvr_size, n))), axis = 1),\
                 np.zeros((n, rsvr_size+n+1))), axis = 0)
@@ -563,24 +563,24 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
             tic = time.perf_counter()
         """
         for i in range(k):
-            D_n[1:rsvr_size+1,:,i] = np.diag(D[:,i]) @ Win[:,1:]
+            D_n[1:rsvr_size+1,:,i] = matrix_diag_mult(D[:,i], Win[:,1:])
             D_n[rsvr_size+1:,:,i] = np.identity(n)
         for i in range(1,k):
-            E_n[1:rsvr_size+1,:,i-1]  = matrix_dot_left_T(W_mat_data, W_mat_indices, W_mat_indptr, W_mat_shape, np.diag(D[:,i])) + leakage_mat
+            E_n[1:rsvr_size+1,:,i-1]  = matrix_diag_sparse_mult_add(D[:,i], W_mat_data, W_mat_indices, W_mat_indptr, W_mat_shape, leakage_mat)
         reg_components[:,:,k-1] = D_n[:,:,-1]
         for i in range(k-1):
             reg_components[:,:,i] = D_n[:,:,i]
             for j in range(i,k-1):
-                reg_components[:,:,i] = E_n[:,:,j] @ reg_components[:,:,i]
+                reg_components[:,:,i] = matrix_sparse_mult(E_n[:,:,j], reg_components[:,:,i])
 
         for i in range(k, X.shape[1]):
             for j in range(k):
                 gradient_reg += reg_components[:,:,j] @ reg_components[:,:,j].T
-            reg_components[1:rsvr_size+1,:,k-1] = np.diag(D[:,i]) @ Win[:,1:]
+            reg_components[1:rsvr_size+1,:,k-1] = matrix_diag_mult(D[:,i], Win[:,1:])
             reg_components[1+rsvr_size:,:,k-1] = np.identity(n)
-            E_n[1:rsvr_size+1,:,k-2] = matrix_dot_left_T(W_mat_data, W_mat_indices, W_mat_indptr, W_mat_shape, np.diag(D[:,i])) + leakage_mat
+            E_n[1:rsvr_size+1,:,k-2] = matrix_diag_sparse_mult_add(D[:,i], W_mat_data, W_mat_indices, W_mat_indptr, W_mat_shape, leakage_mat)
             for j in range(k-1):
-                reg_components[:,:,j] = E_n[:,:,k-2] @ reg_components[:,:,j]
+                reg_components[:,:,j] = matrix_sparse_mult(E_n[:,:,k-2], reg_components[:,:,j])
             """
             if i % 50 == 0:
                 with objmode(toc = 'double'):
@@ -1197,7 +1197,7 @@ def main(argv):
     alpha_values = np.append(0., np.logspace(-8, -1, 15)*noise_realizations)
     #alpha_values = np.array([0,1e-6,1e-4])
     if traintype in ['gradient1','gradient2','gradient12'] or 'gradientk' in traintype:
-        tr, rt = np.meshgrid(np.arange(num_tests), np.arange(res_per_test))
+        tr, rt = np.meshgrid(np.arange(num_trains), np.arange(res_per_test))
         tr     = tr.flatten()
         rt     = rt.flatten()
         print('Starting Ray Computation')

@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.sparse import csc_matrix, diags
+from scipy.sparse import csc_matrix, diags, csr_matrix
 from numba import jit, objmode
 
 #def create_csc_matrix(data, indices, indptr, shape):
@@ -16,6 +16,19 @@ def matrix_dot_left_T(data, indices, indptr, shape, mat):
 def matrix_diag_mult(dmat, b):
     with objmode(out = 'double[:,:]'):
         out = diags(dmat).dot(b)
+    return out
+
+@jit(nopython = True, fastmath = True)
+def matrix_sparse_mult(sp, mat):
+    with objmode(out = 'double[:,:]'):
+        out = csc_matrix(sp).dot(mat)
+    return out
+
+@jit(nopython = True, fastmath = True)
+def matrix_diag_sparse_mult_add(diag_mat, data, indices, indptr, shape, add_mat):
+    with objmode(out = 'double[:,:]'):
+        out_sp = diags(diag_mat).dot(csc_matrix((data, indices, indptr), shape = (shape[0], shape[1]))) + csr_matrix(add_mat)
+        out    = out_sp.toarray()
     return out
 
 @jit(nopython = True, fastmath = True)
