@@ -93,18 +93,19 @@ def kursiv_forecast_pred(u, params):
 
 
 @jit(nopython = True, fastmath = True)
-def kursiv_predict(u0, tau = 0.25, N = 64, d = 22, T = 100, params = np.array([[],[]], dtype = np.complex128)):
+def kursiv_predict(u0, tau = 0.25, N = 64, d = 22, T = 100, params = np.array([[],[]], dtype = np.complex128), int_steps = 1):
     if params.size == 0:
         new_params = precompute_KS_params(N, d, tau)
     else:
         new_params = params
-    steps = T
+    steps = T*int_steps
 
-    u_arr = np.zeros((N, steps+1))
+
+    u_arr = np.zeros((N, steps+int_steps))
     u_arr[:,0] = u0
-    for i in range(steps):
+    for i in range(steps+int_steps-1):
         u_arr[:,i+1] = kursiv_forecast(u_arr[:,i], new_params)
-    return u_arr, new_params
+    return np.ascontiguousarray(u_arr[:,::int_steps]), new_params
 
 @jit(nopython = True, fastmath = True)
 def kursiv_predict_pred(u0_array, tau = 0.25, N = 64, d = 22, T = 100, params = np.array([[],[]], dtype = np.complex128)):

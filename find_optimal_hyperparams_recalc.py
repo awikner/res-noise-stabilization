@@ -110,6 +110,7 @@ def main(argv):
         for i, (rho, sigma, leakage) in enumerate(zip(rhos_mat, sigmas_mat, leakages_mat)):
             folder = '%s_more_noisetest_rho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s/' % (system, rho,    sigma, leakage, win_type, bias_type, tau, res_size, train_time, noise_realizations, noisetype, traintype)
             folder_new = '%s_more_noisetest_rho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s/' % (system, rho,sigma, leakage, win_type, bias_type, tau,res_size, train_time, noise_realizations, noisetype, traintype)
+
             filename_sf = 'stable_frac_%dnodes_%dtrainiters_%dnoisereals_raytest.csv' % (res_size, train_time, noise_realizations)
             filename_sf_reg = 'stable_frac_alpha_%dnodes_%dtrainiters_%dnoisereals_raytest.csv' % (res_size, train_time, noise_realizations)
             noisevals_loop = noisevals
@@ -151,7 +152,7 @@ def main(argv):
                 best_reg_vt, temp = mode(stable_frac_alpha[max_noise_itr_vt])
                 #print(count_elems(stable_frac_alpha[max_noise_itr]))
                 best_folder_vt  = folder_new
-    """
+
     print('Best Valid Time: %f' % best_valid_time)
     print('Best Spectral Radius: %f' % best_rho_vt)
     print('Best Input Weight: %f' % best_sigma_vt)
@@ -159,7 +160,6 @@ def main(argv):
     print('Best Noise Magnitude: %e' % best_noise_vt)
     print('Best Regularization: %e' % best_reg_vt)
     print(best_folder_vt[:-1])
-    """
 
     best_stable_frac_rho = np.zeros(rhos.size)
     best_sigma_rho       = np.zeros(rhos.size)

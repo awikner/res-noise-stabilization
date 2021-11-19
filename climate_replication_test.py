@@ -75,36 +75,57 @@ def sum_numba_axis0(mat):
     for i in range(mat.shape[1]):
         res[i] = np.sum(mat[:,i])
     return res
-"""
-def create_csc_matrix(data, indices, indptr, shape):
-    return csc_matrix((data, indices, indptr), shape = (shape[0], shape[1]))
-
-@jit(nopython = True)
-def matrix_dot_left_T(data, indices, indptr, shape, mat):
-    with objmode(out = 'double[:,:]'):
-        csc = create_csc_matrix(data, indices, indptr, shape)
-        out = csc.T.dot(mat).T
-    return out
 
 @jit(nopython = True, fastmath = True)
-def mult_vec(data, indices, indptr, shape, mat):
-    out = np.zeros(shape[0])
-    for i in range(mat.size):
-        for k in range(indptr[i], indptr[i+1]):
-            out[indices[k]] += data[k] * mat[i]
-    return out
+def wasserstein_distance_empirical(measured_samples, true_samples):
+    if np.any(np.isnan(measured_samples)):
+        return np.NAN
+    if np.any(np.isinf(measured_samples)):
+        return np.inf
+    measured_samples.sort()
+    true_samples.sort()
+    n, m, n_inv, m_inv = (measured_samples.size, true_samples.size, 1/measured_samples.size, 1/true_samples.size)
+    n_itr = 0; m_itr = 0; measured_cdf = 0; true_cdf = 0; wass_dist = 0
+    if measured_samples[n_itr] < true_samples[m_itr]:
+        prev_sample = measured_samples[n_itr]
+        measured_cdf += n_inv
+        n_itr +=1
+    elif true_samples[m_itr] < measured_samples[n_itr]:
+        prev_sample = true_samples[m_itr]
+        true_cdf += m_inv
+        m_itr += 1
+    else:
+        prev_sample = true_samples[m_itr]
+        measured_cdf += n_inv; true_cdf += m_inv
+        n_itr +=1; m_itr += 1
+    while n_itr < n and m_itr < m:
+        if measured_samples[n_itr] < true_samples[m_itr]:
+            wass_dist += np.abs((measured_cdf - true_cdf)*(measured_samples[n_itr]-prev_sample))
+            prev_sample = measured_samples[n_itr]
+            measured_cdf += n_inv
+            n_itr += 1
+        elif true_samples[m_itr] < measured_samples[n_itr]:
+            wass_dist += np.abs((measured_cdf - true_cdf)*(true_samples[m_itr]-prev_sample))
+            prev_sample = true_samples[m_itr]
+            true_cdf += m_inv
+            m_itr += 1
+        else:
+            wass_dist += np.abs((measured_cdf - true_cdf)*(true_samples[m_itr]-prev_sample))
+            prev_sample = true_samples[m_itr]
+            measured_cdf += n_inv; true_cdf += m_inv
+            n_itr +=1; m_itr += 1
+    if n_itr == n:
+        for itr in range(m_itr, m):
+            wass_dist += np.abs((1.0- true_cdf)*(true_samples[itr] - prev_sample))
+            prev_sample = true_samples[itr]
+            true_cdf += m_inv
+    else:
+        for itr in range(n_itr, n):
+            wass_dist += np.abs((measured_cdf - 1.0)*(measured_samples[itr] - prev_sample))
+            prev_sample = measured_samples[itr]
+            measured_cdf += n_inv
 
-@jit(nopython = True, fastmath = True)
-def construct_jac_mat_csc(Win, data_in, indices_in, indptr_in, shape_in, rsvr_size, n):
-    with objmode(data = 'double[:]', indices = 'int32[:]', indptr = 'int32[:]', shape = 'int64[:]'):
-        W_conv = csc_matrix((data_in, indices_in, indptr_in), shape = (shape_in[0], shape_in[1])).toarray()
-        mat    = csc_matrix(np.concatenate((Win[:,0].reshape(-1,1), W_conv, np.zeros((rsvr_size,n))), axis = 1))
-        data   = mat.data
-        indices = mat.indices
-        indptr = mat.indptr
-        shape = np.array(list(mat.shape))
-    return data, indices, indptr, shape
-"""
+    return wass_dist
 
 class Reservoir:
     def __init__(self, rk, input_size, rsvr_size = 300, spectral_radius = 0.6, input_weight = 1, leakage = 1.0, win_type = 'full', bias_type = 'old', res_seed = 1):
@@ -156,12 +177,18 @@ class Reservoir:
             q = int(rsvr_size//input_vars.size)
             for i, var in enumerate(input_vars):
                 Win[q*i:q*(i+1),var+1] = (np.random.rand(q)*2-1)*input_weight
+            leftover_nodes = rsvr_size - q*input_vars.size
+            var = input_vars[np.random.randint(input_vars.size, size = leftover_nodes)]
+            Win[rsvr_size-leftover_nodes:,var+1] = (np.random.rand(leftover_nodes)*2-1)*input_weight
         elif bias_type == 'new_const':
             Win = np.zeros((rsvr_size, input_size+1))
             Win[:,0] = input_weight
             q = int(rsvr_size//input_vars.size)
             for i, var in enumerate(input_vars):
                 Win[q*i:q*(i+1),var+1] = (np.random.rand(q)*2-1)*input_weight
+            leftover_nodes = rsvr_size - q*input_vars.size
+            var = input_vars[np.random.randint(input_vars.size, size = leftover_nodes)]
+            Win[rsvr_size-leftover_nodes:,var+1] = (np.random.rand(leftover_nodes)*2-1)*input_weight
 
 
         # self.Win = sparse.csr_matrix(Win)
@@ -184,7 +211,14 @@ class RungeKutta:
             self.params = params
 
         elif system == 'KS':
-            u_arr, self.params = kursiv_predict(u0, tau = tau, T = T, params = params)
+            if tau <= 0.25:
+                u_arr, self.params = kursiv_predict(u0, tau = tau, T = T, params = params)
+            else:
+                tau_in = 0.25
+                if not tau % tau_in == 0.0:
+                    raise ValueError()
+                int_steps = int(tau/tau_in)
+                u_arr, self.params = kursiv_predict(u0, tau = tau_in, T = T, params = params, int_steps = int_steps)
             self.input_size = u_arr.shape[0]
             u_arr = np.ascontiguousarray(u_arr)/(1.1876770355823614)
         else:
@@ -218,7 +252,15 @@ def RungeKuttawrapped(x0 = 2,y0 = 2,z0 = 23, h = 0.01, tau = 0.1, T = 300, ttspl
         u_arr[2] = (u_arr[2] - 23.596294463016896)/8.575917849311919
         new_params = params
     elif system == 'KS':
-        u_arr, new_params = kursiv_predict(u0, tau = tau, T = T, params = params)
+        if tau <= 0.25:
+            u_arr, new_params = kursiv_predict(u0, tau = tau, T = T, params = params)
+        else:
+            tau_in = 0.25
+            if not tau % tau_in == 0.0:
+                raise ValueError()
+            int_steps = int(tau/tau_in)
+            u_arr, new_params = kursiv_predict(u0, tau = tau_in, T = T, params = params, int_steps = int_steps)
+
         u_arr = np.ascontiguousarray(u_arr)/(1.1876770355823614)
     else:
         raise ValueError
@@ -691,12 +733,12 @@ def get_test_data(tau, num_tests, rkTime, split, system = 'lorenz'):
 
 def test(res, rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests = 100, rkTime = 1000, split = 3000, showMapError = False, showTrajectories = False, showHist = False, system = 'lorenz', params = np.array([[],[]], dtype = np.complex128)):
     # tic = time.perf_counter()
-    stable_count, mean_sum_squared, variances, valid_time, preds = testwrapped(res.X, res.Win, res.W_data, res.W_indices, res.W_indptr, res.W_shape, res.Wout, res.leakage, rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests, rkTime, split, showMapError, showTrajectories, showHist, system, params = params)
+    stable_count, mean_sum_squared, variances, valid_time, preds, wass_dist = testwrapped(res.X, res.Win, res.W_data, res.W_indices, res.W_indptr, res.W_shape, res.Wout, res.leakage, rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests, rkTime, split, showMapError, showTrajectories, showHist, system, params = params)
     # toc = time.perf_counter()
     # runtime = toc - tic
     # print("Test " + str(i) + " valid time: " + str(j))
 
-    return stable_count/num_tests, mean_sum_squared, variances, valid_time, preds
+    return stable_count/num_tests, mean_sum_squared, variances, valid_time, preds, wass_dist
 
 @jit(nopython = True, fastmath = True)
 def testwrapped(res_X, Win, W_data, W_indices, W_indptr, W_shape, Wout, leakage, rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests, rkTime, split, showMapError = True,   showTrajectories = True, showHist = True, system = 'lorenz', tau = 0.1, params = np.array([[],[]], dtype = np.complex128)):
@@ -706,6 +748,7 @@ def testwrapped(res_X, Win, W_data, W_indices, W_indptr, W_shape, Wout, leakage,
     mean_sum_square = np.zeros(num_tests)
     means = np.zeros(num_tests)
     variances = np.zeros(num_tests)
+    wass_dist = np.zeros(num_tests)
     preds = np.zeros((num_tests, rktest_u_arr_test.shape[0], (rkTime-split)+1))
 
     #print(num_tests)
@@ -732,6 +775,7 @@ def testwrapped(res_X, Win, W_data, W_indices, W_indptr, W_shape, Wout, leakage,
         #print(pred[0,:10])
         preds[i] = pred
         error = np.zeros(pred[0].size)
+        wass_dist[i] = wasserstein_distance_empirical(pred.flatten(), rktest_u_arr_test[:,:,i].flatten())
         #print(pred.size)
 
         """
@@ -848,7 +892,7 @@ def testwrapped(res_X, Win, W_data, W_indices, W_indptr, W_shape, Wout, leakage,
     """
 
 
-    return stable_count, mean_sum_square, variances, valid_time, preds
+    return stable_count, mean_sum_square, variances, valid_time, preds, wass_dist
 
 def generate_res(itr, rk, res_size, rho, sigma, leakage, win_type, bias_type, noisetype = 'none', noise_scaling = 0, noise_realizations = 1, traintype = 'normal', skip = 150):
 
@@ -865,6 +909,9 @@ def optim_func(res, noise, rktest_u_arr_train_nonoise, rktest_u_arr_test, num_te
     #try:
     idenmat = np.identity(res.rsvr_size+1+rktest_u_arr_train_nonoise.shape[0])*alpha
     if traintype not in ['sylvester','sylvester_wD']:
+        #print('Noise mag: %e' % noise)
+        #print('Gradient reg:')
+        #print(res.gradient_reg[:5,:5])
         res.Wout = np.transpose(solve(np.transpose(res.states_trstates + noise**2.0*res.gradient_reg+idenmat),np.transpose(res.data_trstates)))
     else:
         res.Wout = solve_sylvester(res.left_mat, res.states_trstates+idenmat, res.data_trstates)
@@ -875,13 +922,14 @@ def optim_func(res, noise, rktest_u_arr_train_nonoise, rktest_u_arr_test, num_te
     mean_sum_squared = out[1]
     valid_time = out[3]
     preds = out[4]
+    wass_dist = out[5]
     #except:
         #print("eigenvalue error occured.")
 
-    return -1*results, mean_sum_squared, variances, valid_time, preds
+    return -1*results, mean_sum_squared, variances, valid_time, preds, wass_dist
 
 def get_res_results(itr, rk, res_size, rho, sigma, leakage, win_type, bias_type, noisetype, noise, noise_realizations, traintype, \
-    rktest_u_arr_train_nonoise,rktest_u_arr_test, num_tests, alpha_values, rkTime_test, split_test, system, tau, params, savepred, debug_mode):
+    rktest_u_arr_train_nonoise,rktest_u_arr_test, num_tests, alpha_values, rkTime_test, split_test, system, tau, params, savepred, debug_mode, train_seed):
     tic = time.perf_counter()
     print('Starting res %d' % itr)
     if debug_mode:
@@ -905,16 +953,17 @@ def get_res_results(itr, rk, res_size, rho, sigma, leakage, win_type, bias_type,
     #r.states_trstates = 0
     #    get_states(r, rk, skip = 150)
 
-    stable_frac   = np.zeros((alpha_values.size-1))
-    mean_sum_squared   = np.zeros((num_tests, alpha_values.size-1))
-    variances          = np.zeros((num_tests, alpha_values.size-1))
-    valid_time         = np.zeros((num_tests, alpha_values.size-1))
     final_out = []
     if not isinstance(noise, np.ndarray):
         noise_array = np.array([noise])
     else:
         noise_array = noise
     for noise in noise_array:
+        stable_frac   = np.zeros((alpha_values.size-1))
+        mean_sum_squared   = np.zeros((num_tests, alpha_values.size-1))
+        variances          = np.zeros((num_tests, alpha_values.size-1))
+        valid_time         = np.zeros((num_tests, alpha_values.size-1))
+        wass_dist          = np.zeros((num_tests, alpha_values.size-1))
         noise_tic = time.perf_counter()
         min_optim_func = lambda alpha: optim_func(reservoir, noise, rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests, alpha, rkTime_test, split_test, traintype, system, params)
         func_vals = np.zeros(alpha_values.size)
@@ -927,11 +976,13 @@ def get_res_results(itr, rk, res_size, rho, sigma, leakage, win_type, bias_type,
                     variances_0   = out[2]
                     mean_sum_squared_0 = out[1]
                     valid_time_0 = out[3]
+                    wass_dist_0       = out[5]
                 else:
                     stable_frac[j-1] = out[0]
                     variances[:,j-1] = out[2]
                     mean_sum_squared[:,j-1] = out[1]
                     valid_time[:,j-1] = out[3]
+                    wass_dist[:,j-1] = out[5]
                 if savepred:
                     if j == 1:
                         preds = out[4]
@@ -947,11 +998,13 @@ def get_res_results(itr, rk, res_size, rho, sigma, leakage, win_type, bias_type,
                         variances_0   = out[2]
                         mean_sum_squared_0 = out[1]
                         valid_time_0 = out[3]
+                        wass_dist_0 = out[5]
                     else:
                         stable_frac[j-1] = out[0]
                         variances[:,j-1] = out[2]
                         mean_sum_squared[:,j-1] = out[1]
                         valid_time[:,j-1] = out[3]
+                        wass_dist[:,j-1] = out[5]
                     if savepred:
                         if j == 1:
                             preds = out[4]
@@ -966,11 +1019,13 @@ def get_res_results(itr, rk, res_size, rho, sigma, leakage, win_type, bias_type,
                         variances_0   = np.zeros(num_tests)
                         mean_sum_squared_0 = np.zeros(num_tests)
                         valid_time_0 = np.zeros(num_tests)
+                        wass_dist_0 = np.zeros(num_tests)
                     else:
                         stable_frac[j-1] = 0.0
                         variances[:,j-1] = np.zeros(num_tests)
                         mean_sum_squared[:,j-1] = np.zeros(num_tests)
                         valid_time[:,j-1] = np.zeros(num_tests)
+                        wass_dist[:,j-1] = np.zeros(num_tests)
                     if savepred:
                         pred_out = np.zeros((num_tests, rktest_u_arr_test.shape[0], (rkTime_test-split_test)+1))
                         if j == 1:
@@ -982,13 +1037,12 @@ def get_res_results(itr, rk, res_size, rho, sigma, leakage, win_type, bias_type,
         if not savepred:
             preds = np.empty((1,1,1,1), dtype = np.complex128)
 
-        final_out.append((stable_frac_0, stable_frac, mean_sum_squared_0, mean_sum_squared, variances_0, variances,         valid_time_0, valid_time, preds))
+        final_out.append((np.copy(stable_frac_0), np.copy(stable_frac), np.copy(mean_sum_squared_0), np.copy(mean_sum_squared), np.copy(variances_0), np.copy(variances),  np.copy(valid_time_0), np.copy(valid_time), np.copy(preds), train_seed, noise, itr, np.copy(wass_dist_0), np.copy(wass_dist)))
         noise_toc = time.perf_counter()
         print('Noise test time: %f sec.' % (noise_toc - noise_tic))
     toc = time.perf_counter()
     runtime = toc - tic
     print('Iteration runtime: %f sec.' % runtime)
-
     return final_out
 
 @ray.remote
@@ -1005,9 +1059,14 @@ def find_stability(noisetype, noise, traintype, train_seed, res_itr, rho, sigma,
     warnings.filterwarnings("ignore", category=NumbaPerformanceWarning)
     if system == 'lorenz':
         rkTime_test = 4000
+        split_test = 2000
     elif system == 'KS':
-        rkTime_test = 18000
-    split_test  = 2000
+        time_mult = 0.25/tau
+        rkTime_test = int(18000*time_mult)
+        split_test = int(2000*time_mult)
+
+        #rkTime_test = 3000
+    #split_test  = 2000
     rktest_u_arr_train_nonoise, rktest_u_arr_test, params = get_test_data(tau = tau, num_tests = num_tests, rkTime = rkTime_test, split = split_test, system = system)
     np.random.seed(train_seed)
     if system == 'lorenz':
@@ -1017,51 +1076,74 @@ def find_stability(noisetype, noise, traintype, train_seed, res_itr, rho, sigma,
         u0 = 0.6*(np.random.rand(64)*2-1)
         rk = RungeKutta(0,0,0, tau = tau, T = train_time, ttsplit = train_time, u0 = u0, system = system, params = params)
 
-    out = get_res_results(res_itr, rk, res_size, rho, sigma, leakage, win_type, bias_type, noisetype, noise, noise_realizations, traintype, rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests, alpha_values, rkTime_test, split_test, system, tau, params, savepred, debug_mode)
+    out = get_res_results(res_itr, rk, res_size, rho, sigma, leakage, win_type, bias_type, noisetype, noise, noise_realizations, traintype, rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests, alpha_values, rkTime_test, split_test, system, tau, params, savepred, debug_mode, train_seed)
     #toc_global = time.perf_counter()
     #print('Total Runtime: %s sec.' % (toc_global - tic_global))
 
 
     return out
 
-def get_stability_output(out_full, noise_indices, train_indices, res_per_test, num_tests, alpha_values, savepred):
+def get_stability_output(out_full, noise_indices, train_indices, res_per_test, num_tests, alpha_values, savepred, metric = 'mss_var'):
     noise_vals = np.unique(noise_indices)
     train_vals = np.unique(train_indices)
     tn, nt = np.meshgrid(train_vals, noise_vals)
     tn = tn.flatten()
     nt = nt.flatten()
     results = []
-    for k in range(tn.size):
-        out = out_full[(tn[k] == train_indices) & (nt[k] == noise_indices)]
-        stable_frac_0 = np.zeros(res_per_test)
-        stable_frac   = np.zeros((res_per_test, alpha_values.size-1))
-        mean_sum_squared_0 = np.zeros((res_per_test, num_tests))
-        mean_sum_squared   = np.zeros((res_per_test, num_tests, alpha_values.size-1))
-        variances_0        = np.zeros((res_per_test, num_tests))
-        variances          = np.zeros((res_per_test, num_tests, alpha_values.size-1))
-        valid_time_0       = np.zeros((res_per_test, num_tests))
-        valid_time         = np.zeros((res_per_test, num_tests, alpha_values.size-1))
-        for i in range(res_per_test):
-            stable_frac_0[i] = out[i][0]
-            stable_frac[i,:]   = out[i][1]
-            mean_sum_squared_0[i] = out[i][2]
-            mean_sum_squared[i,:,:] = out[i][3]
-            variances_0[i]   = out[i][4]
-            variances[i,:,:] = out[i][5]
-            valid_time_0[i]  = out[i][6]
-            valid_time[i,:,:]= out[i][7]
 
+    stable_frac_0 = np.zeros((train_vals.size, noise_vals.size, res_per_test))
+    stable_frac   = np.zeros((train_vals.size, noise_vals.size, res_per_test, alpha_values.size-1))
+    mean_sum_squared_0 = np.zeros((train_vals.size, noise_vals.size,res_per_test, num_tests))
+    mean_sum_squared   = np.zeros((train_vals.size, noise_vals.size,res_per_test, num_tests, alpha_values.size-1))
+    variances_0        = np.zeros((train_vals.size, noise_vals.size,res_per_test, num_tests))
+    variances          = np.zeros((train_vals.size, noise_vals.size,res_per_test, num_tests, alpha_values.size-1))
+    valid_time_0       = np.zeros((train_vals.size, noise_vals.size,res_per_test, num_tests))
+    valid_time         = np.zeros((train_vals.size, noise_vals.size,res_per_test, num_tests, alpha_values.size-1))
+    wass_dist_0       = np.zeros((train_vals.size, noise_vals.size,res_per_test, num_tests))
+    wass_dist         = np.zeros((train_vals.size, noise_vals.size,res_per_test, num_tests, alpha_values.size-1))
+
+    for k, train in enumerate(train_vals):
+        for j, noise in enumerate(noise_vals):
+            out = out_full[(train == train_indices) & (noise == noise_indices)]
+            for i in range(res_per_test):
+                stable_frac_0[k,j,i] = out[i][0]
+                stable_frac[k,j,i,:]   = out[i][1]
+                mean_sum_squared_0[k,j,i] = out[i][2]
+                mean_sum_squared[k,j,i,:,:] = out[i][3]
+                variances_0[k,j,i]   = out[i][4]
+                variances[k,j,i,:,:] = out[i][5]
+                valid_time_0[k,j,i]  = out[i][6]
+                valid_time[k,j,i,:,:]= out[i][7]
+                wass_dist_0[k,j,i]   = out[i][12]
+                wass_dist[k,j,i,:,:] = out[i][13]
+
+    best_stable_frac = np.zeros((train_vals.size, noise_vals.size, res_per_test))
+    best_mean_sum_squared = np.zeros((train_vals.size, noise_vals.size, res_per_test, num_tests))
+    best_variances = np.zeros((train_vals.size, noise_vals.size, res_per_test, num_tests))
+    best_valid_time = np.zeros((train_vals.size, noise_vals.size, res_per_test, num_tests))
+    best_wass_dist  = np.zeros((train_vals.size, noise_vals.size, res_per_test, num_tests))
+    stable_frac_alpha = np.zeros(noise_vals.size)
+    best_j = np.zeros(noise_vals.size)
+    for i, noise in enumerate(noise_vals):
         best_alpha_val = 0
         for j in range(1,alpha_values.size):
-            if np.mean(stable_frac[:,j-1]) <= best_alpha_val:
-
-                best_alpha_val = np.mean(stable_frac[:,j-1])
-                best_stable_frac = -stable_frac[:,j-1]
-                best_variances   = variances[:,:,j-1]
-                best_mean_sum_squared = mean_sum_squared[:,:,j-1]
-                best_valid_time  = valid_time[:,:,j-1]
-                stable_frac_alpha = alpha_values[j]
-                best_j = j
+            if metric == 'mss_var':
+                metric_flag = np.mean(stable_frac[:,i,:,j-1]) <= best_alpha_val
+            elif metric == 'wass_dist':
+                metric_flag = np.mean(wass_dist[:,i,:,:,j-1]) >= best_alpha_val
+            if metric_flag:
+                if metric == 'mss_var':
+                    best_alpha_val = np.mean(stable_frac[:,i,:,j-1])
+                elif metric == 'wass_dist':
+                    best_alpha_val = np.mean(wass_dist[:,i,:,:,j-1])
+                best_stable_frac[:,i] = -stable_frac[:,i,:,j-1]
+                best_variances[:,i]   = variances[:,i,:,:,j-1]
+                best_mean_sum_squared[:,i] = mean_sum_squared[:,i,:,:,j-1]
+                best_valid_time[:,i]  = valid_time[:,i,:,:,j-1]
+                best_wass_dist[:,i]   = wass_dist[:,i,:,:,j-1]
+                stable_frac_alpha[i] = alpha_values[j]
+                best_j[i] = j
+    for k in range(tn.size):
         if savepred:
             for i in range(res_per_test):
                 if i == 0:
@@ -1073,13 +1155,19 @@ def get_stability_output(out_full, noise_indices, train_indices, res_per_test, n
             if res_per_test == 1:
                 preds = preds.reshape(1,preds.shape[0], preds.shape[1], preds.shape[2], preds.shape[3])
 
-            best_preds = preds[:,:,:,:,best_j-1]
+            best_preds = preds[:,:,:,:,best_j[nt[k] == noise_vals]-1]
         else:
             best_preds = np.empty((1,1,1,1), dtype = np.complex128)
 
 
-
-        result = (stable_frac_0, best_stable_frac, stable_frac_alpha, mean_sum_squared_0, best_mean_sum_squared, variances_0, best_variances, valid_time_0, best_valid_time, best_preds)
+        train_idx = np.where(tn[k] == train_vals)[0][0]
+        noise_idx = np.where(nt[k] == noise_vals)[0][0]
+        result = (stable_frac_0[train_idx,noise_idx], best_stable_frac[train_idx,noise_idx],\
+            stable_frac_alpha[noise_idx], mean_sum_squared_0[train_idx,noise_idx], \
+            best_mean_sum_squared[train_idx,noise_idx], variances_0[train_idx,noise_idx],\
+            best_variances[train_idx,noise_idx], valid_time_0[train_idx,noise_idx],\
+            best_valid_time[train_idx,noise_idx], best_preds, wass_dist_0[train_idx,noise_idx],\
+            best_wass_dist[train_idx,noise_idx])
 
         results.append(result)
 
@@ -1191,8 +1279,8 @@ def main(argv):
     # res_per_test = 100
     # noise_realizations = 1
 
-    noise_values_array = np.logspace(-3.666666666666, 0, num = 12, base = 10)[4:8]
-    #noise_values_array = np.array([np.logspace(-3.666666666666, 0, num = 12, base = 10)[5]])
+    noise_values_array = np.logspace(-4, 0, num = 13, base = 10)[5:9]
+    #noise_values_array = np.array([np.logspace(-4, 0, num = 13, base = 10)[6]])
     #noise_values_array = np.array([0,1e-3,1e-2])
     alpha_values = np.append(0., np.logspace(-8, -1, 15)*noise_realizations)
     #alpha_values = np.array([0,1e-6,1e-4])
@@ -1206,10 +1294,31 @@ def main(argv):
             tr[i], rt[i], rho, sigma, leakage, win_type, bias_type, train_time, \
             res_size, res_per_test, noise_realizations, num_tests, alpha_values,\
             system, tau, savepred, debug_mode) for i in range(tr.size)])
+        #print('Ray out len: %d' % len(out_base))
+        #print('Out elem len: %d' % len(out_base[0]))
+
         tnr, ntr, rtn = np.meshgrid(np.arange(num_trains), noise_values_array, np.arange(res_per_test))
         tnr = tnr.flatten()
         ntr = ntr.flatten()
         rtn = rtn.flatten()
+        out = np.zeros(tnr.size, dtype = object)
+        itr = 0
+        train_i = []
+        noise_i = []
+        res_i   = []
+        for i in range(len(out_base)):
+            for j in range(len(out_base[i])):
+                out[itr] = out_base[i][j]
+                train_i.append(out[itr][9])
+                noise_i.append(out[itr][10])
+                res_i.append(out[itr][11])
+                itr += 1
+        final_out = []
+        for train, noise, res in zip(tnr, ntr, rtn):
+            idx = np.where(np.logical_and(np.logical_and(train_i == train, noise_i == noise), res_i == res))[0][0]
+            final_out.append(out[idx])
+
+        out = np.array(final_out, dtype = object)
     else:
         tnr, ntr, rtn = np.meshgrid(np.arange(num_trains), noise_values_array, np.arange(res_per_test))
         tnr = tnr.flatten()
@@ -1221,14 +1330,15 @@ def main(argv):
             tnr[i], rtn[i], rho, sigma, leakage, win_type, bias_type, train_time, \
             res_size, res_per_test, noise_realizations, num_tests, alpha_values,\
             system, tau, savepred, debug_mode) for i in range(tnr.size)])
-    out = []
-    for i in range(len(out_base)):
-        for j in range(len(out_base[i])):
-            out.append(out_base[i][j])
+        out = []
+        for i in range(len(out_base)):
+            for j in range(len(out_base[i])):
+                out.append(out_base[i][j])
+        out = np.array(out, dtype = object)
 
         #out = [find_stability(noisetype, ntr[i], traintype, tnr[i], rtn[i], rho, sigma, leakage, win_type, bias_type, train_time, \
         #         res_size, res_per_test, noise_realizations, num_tests, alpha_values, system, tau, savepred, debug_mode) for i in range(tnr.size)]
-    results = get_stability_output(np.array(out, dtype = object), ntr, tnr, res_per_test, num_tests, alpha_values, savepred)
+    results = get_stability_output(out, ntr, tnr, res_per_test, num_tests, alpha_values, savepred)
 
     tn, nt= np.meshgrid(np.arange(num_trains), noise_values_array)
     tn = tn.flatten()
@@ -1246,6 +1356,8 @@ def main(argv):
     mean_sum_squared_0 = []
     variances          = []
     variances_0        = []
+    wass_dist          = []
+    wass_dist_0        = []
     valid_time_0       = []
     valid_time         = []
     mean_valid_time    = []
@@ -1260,6 +1372,8 @@ def main(argv):
         valid_time_0.append(results[i][7])
         valid_time.append(results[i][8])
         mean_valid_time.append(np.mean(valid_time[-1]))
+        wass_dist_0.append(results[i][10])
+        wass_dist.append(results[i][11])
     if savepred:
         preds = []
         for i in range(tn.size):
@@ -1270,7 +1384,7 @@ def main(argv):
     mean_valid_time = np.array(mean_valid_time).reshape(noise_values_array.size, -1)
     foldername = '/lustre/awikner1/res-noise-stabilization/'
     top_folder = '%s_noisetest_noisetype_%s_traintype_%s/' % (system, noisetype, traintype)
-    folder = '%s_more_noisetest_%srho%0.1f_sigma%1.1e_leakage%0.1f_win_%s_bias_%s_tau%0.2f_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s/' % (system, predflag, rho, sigma, leakage, win_type, bias_type, tau, res_size, train_time, noise_realizations, noisetype, traintype)
+    folder = '%s_more_noisetest_%srho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s/' % (system, predflag, rho, sigma, leakage, win_type, bias_type, tau, res_size, train_time, noise_realizations, noisetype, traintype)
     if not os.path.isdir(os.path.join(foldername, top_folder)):
         os.mkdir(os.path.join(foldername, top_folder))
     if not os.path.isdir(os.path.join(os.path.join(foldername, top_folder), folder)):
@@ -1296,6 +1410,10 @@ def main(argv):
             %(res_size, train_time, noise_realizations, nt[i], tn[i]+1), valid_time_0[i], delimiter = ',')
         np.savetxt(foldername+top_folder+folder+'valid_time_%dnodes_%dtrainiters_%dnoisereals_noise%e_test%d.csv' \
             %(res_size, train_time, noise_realizations, nt[i], tn[i]+1), valid_time[i], delimiter = ',')
+        np.savetxt(foldername+top_folder+folder+'wass_dist_%dnodes_%dtrainiters_%dnoisereals_noise%e_test%d_noreg.csv' \
+            %(res_size, train_time, noise_realizations, nt[i], tn[i]+1), wass_dist_0[i], delimiter = ',')
+        np.savetxt(foldername+top_folder+folder+'wass_dist_%dnodes_%dtrainiters_%dnoisereals_noise%e_test%d.csv' \
+            %(res_size, train_time, noise_realizations, nt[i], tn[i]+1), wass_dist[i], delimiter = ',')
     if savepred:
         r_test, test_r = np.meshgrid(np.arange(0, res_per_test), np.arange(0, num_tests))
         r_test = r_test.flatten()

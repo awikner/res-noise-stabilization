@@ -19,6 +19,7 @@ COMMAND_PLACEHOLDER = "${COMMAND_PLACEHOLDER}"
 GIVEN_NODE = "${GIVEN_NODE}"
 LOAD_ENV = "${LOAD_ENV}"
 RUNTIME = "${RUNTIME}"
+ACCOUNT = "${ACCOUNT}"
 MEMORY  = "${MEMORY}"
 CPUS    = "${CPUS}"
 PARTITION = "${PARTITION}"
@@ -32,6 +33,12 @@ if __name__ == "__main__":
         type=str,
         default="15:00",
         help="Total runtime for the function.")
+    parser.add_argument(
+        "--account",
+        "-A",
+        type=str,
+        default="physics-hi",
+        help="Account to charge cluster time to.")
     parser.add_argument(
         "--exp-name",
         type=str,
@@ -106,6 +113,7 @@ if __name__ == "__main__":
     text = text.replace(LOAD_ENV, str(args.load_env))
     text = text.replace(GIVEN_NODE, node_info)
     text = text.replace(RUNTIME, args.runtime)
+    text = text.replace(ACCOUNT, args.account)
     text = text.replace(MEMORY, memory)
     text = text.replace(CPUS, str(args.cpus_per_node))
     text = text.replace(SCRATCH, str(args.tmp))
