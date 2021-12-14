@@ -18,21 +18,26 @@ sigmas_mat   = sigmas_mat.flatten()
 leakages_mat = leakages_mat.flatten()
 
 #noisetypes = ['none']
-noisetypes = ['gaussian']*3
-traintypes = ['normal']*3
 #traintypes = ['gradientk%d' % k for k in np.arange(1,11)]
-nos        = [1]*3
-res_sizes  = [175,300,300]
-trainlens  = [4250,2250,4250]
-win_types  = ['full']*3
+res_sizes_base  = [300, 400]
+trainlens_base  = [5000,7000]
+res_sizes, trainlens = np.meshgrid(res_sizes_base, trainlens_base)
+res_sizes = res_sizes.flatten()
+trainlens = trainlens.flatten()
+noisetypes = ['gaussian']*trainlens.size
+traintypes = ['normal']*trainlens.size
+win_types  = ['full']*trainlens.size
+nos        = [1]*trainlens.size
 system    = 'KS'
 
 bias_type = 'new_random'
-
 for noisetype, res_size, win_type, traintype, no, trainlen in zip(noisetypes, res_sizes, win_types, traintypes, nos, trainlens):
-    for rho, sigma, leakage in zip(rhos_mat, sigmas_mat, leakages_mat):
+
+    for rho, sigma, leakage in zip(rhos, sigmas, leakages):
+        timestr = '%d:00:00' % ((int((trainlen-3000)/2000)+2)*2)
+        print(timestr)
         testname = '%s_%s_%s_%d_%dnodes_rho%0.1f_sigma%0.1e_leakage%0.1f' % (system, traintype, noisetype, res_size, no, rho, sigma, leakage)
-        os.system('python slurm-launch.py --exp-name %s --command "python -u climate_replication_test.py --savepred=True --system=%s --noisetype=%s --traintype=%s -r %d --rho=%f --sigma=%f --leakage=%f --win_type=%s --bias_type=%s --tau=%f -N %d -T %d --res=4 --tests=5 --trains=4 --debug=False" --num-nodes 4 --load-env "conda activate  reservoir-rls" -t 30:00 -A physics' % (testname, system, noisetype, traintype, no, rho, sigma, leakage, win_type, bias_type, tau, res_size, trainlen))
+        os.system('python slurm-launch.py --exp-name %s --command "python -u climate_replication_test.py --savepred=False --system=%s --noisetype=%s --traintype=%s -r %d --rho=%f --sigma=%f --leakage=%f --win_type=%s --bias_type=%s --tau=%f -N %d -T %d --res=25 --tests=10 --trains=25 --debug=False" --num-nodes 8 --load-env "conda activate  reservoir-rls" -t %s' % (testname, system, noisetype, traintype, no, rho, sigma, leakage, win_type, bias_type, tau, res_size, trainlen, timestr))
         time.sleep(1)
 
 

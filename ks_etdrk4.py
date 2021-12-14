@@ -71,8 +71,8 @@ def kursiv_forecast(u, params):
         Nb = params[6]*fft(np.real(ifft(b))**2.0)
         c  = params[1]*a + params[2]*(2*Nb - Nv)
         Nc = params[6]*fft(np.real(ifft(c))**2.0)
-        v  = params[0]*v + Nv*params[3] + 2*(Na+Nb)*params[4] + Nc*params[5]
-        unext = np.real(ifft(v))
+        vnext  = params[0]*v + Nv*params[3] + 2*(Na+Nb)*params[4] + Nc*params[5]
+        unext = np.real(ifft(vnext))
     return unext
 
 @jit(nopython = True, fastmath = True)
