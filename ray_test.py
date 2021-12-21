@@ -11,7 +11,7 @@
 import ray
 import time
 
-ray.init(num_cpus = 80)
+ray.init(num_cpus = 20)
 
 @ray.remote
 def f(i):
