@@ -284,10 +284,11 @@ def RungeKuttawrapped(x0=2, y0=2, z0=23, h=0.01, tau=0.1, T=300, ttsplit=5000, u
         else:
             tau_in = 0.25
             if not tau % tau_in == 0.0:
-                raise ValueError()
-            int_steps = int(tau/tau_in)
-            u_arr, new_params = kursiv_predict(
-                u0, tau=tau_in, T=T, params=params, int_steps=int_steps)
+                u_arr, new_params = kursiv_predict(u0, tau=tau, T=T, params=params)
+            else:
+                int_steps = int(tau/tau_in)
+                u_arr, new_params = kursiv_predict(
+                    u0, tau=tau_in, T=T, params=params, int_steps=int_steps)
 
         u_arr = np.ascontiguousarray(u_arr)/(1.1876770355823614)
     else:
@@ -945,10 +946,10 @@ def get_test_data(test_stream, tau, num_tests, rkTime, split, system='lorenz'):
     return rktest_u_arr_train_nonoise, rktest_u_arr_test, params
 
 
-def test(res, noise_in, rktest_u_arr_train_nonoise, rktest_u_arr_test, true_trajectory, true_pmap_max, num_tests=100, rkTime=1000, split=3000, showMapError=False, showTrajectories=False, showHist=False, system='lorenz', params=np.array([[], []], dtype=np.complex128)):
+def test(res, noise_in, rktest_u_arr_train_nonoise, rktest_u_arr_test, true_pmap_max, num_tests=100, rkTime=1000, split=3000, showMapError=False, showTrajectories=False, showHist=False, system='lorenz', params=np.array([[], []], dtype=np.complex128)):
     # tic = time.perf_counter()
     stable_count, mean_sum_squared, variances, valid_time, preds, wass_dist, pmap_max, pmap_max_wass_dist = testwrapped(
-        res.X, res.Win, res.W_data, res.W_indices, res.W_indptr, res.W_shape, res.Wout, res.leakage, rktest_u_arr_train_nonoise, rktest_u_arr_test, true_trajectory, true_pmap_max, num_tests, rkTime, split, noise_in,  showMapError, showTrajectories, showHist, system, params=params)
+        res.X, res.Win, res.W_data, res.W_indices, res.W_indptr, res.W_shape, res.Wout, res.leakage, rktest_u_arr_train_nonoise, rktest_u_arr_test,   true_pmap_max, num_tests, rkTime, split, noise_in,  showMapError, showTrajectories, showHist, system, params=params)
     # toc = time.perf_counter()
     # runtime = toc - tic
     # print("Test " + str(i) + " valid time: " + str(j))
@@ -957,7 +958,7 @@ def test(res, noise_in, rktest_u_arr_train_nonoise, rktest_u_arr_test, true_traj
 
 
 @jit(nopython=True, fastmath=True)
-def testwrapped(res_X, Win, W_data, W_indices, W_indptr, W_shape, Wout, leakage, rktest_u_arr_train_nonoise, rktest_u_arr_test, true_trajectory, true_pmap_max, num_tests, rkTime, split, noise_in, showMapError=True,   showTrajectories=True, showHist=True, system='lorenz', tau=0.1, params=np.array([[], []], dtype=np.complex128)):
+def testwrapped(res_X, Win, W_data, W_indices, W_indptr, W_shape, Wout, leakage, rktest_u_arr_train_nonoise, rktest_u_arr_test,   true_pmap_max, num_tests, rkTime, split, noise_in, showMapError=True,   showTrajectories=True, showHist=True, system='lorenz', tau=0.1, params=np.array([[], []], dtype=np.complex128)):
     stable_count = 0
     valid_time = np.zeros(num_tests)
     max_sum_square = np.zeros(num_tests)
@@ -1012,8 +1013,7 @@ def testwrapped(res_X, Win, W_data, W_indices, W_indptr, W_shape, Wout, leakage,
             else:
                 pred_pmap_max_all = np.append(
                     pred_pmap_max_all, pred_pmap_max[j])
-        pmap_max_wass_dist[i] = wasserstein_distance_empirical(
-            pred_pmap_max_all, true_pmap_max)
+        pmap_max_wass_dist[i] = wasserstein_distance_empirical(pred_pmap_max_all, true_pmap_max)
 
         # print(pred.size)
 
@@ -1113,7 +1113,7 @@ def testwrapped(res_X, Win, W_data, W_indices, W_indptr, W_shape, Wout, leakage,
         # print('Map error: ', mean_sum_square[i])
         # print('Variance: ', variances[i])
         # print('True Variance: ', np.var(rktest_u_arr_test))
-        if mean_sum_square[i] < 0.01 and 0.95 < variances[i] and variances[i] < 1.1:
+        if mean_sum_square[i] < 5e-3 and 0.9 < variances[i] and variances[i] < 1.1:
             stable_count += 1
             # print("stable")
             # print()
@@ -1156,7 +1156,7 @@ def generate_res(res_gen, rk, res_size, rho, sigma, leakage, win_type, bias_type
     return reservoir, noise_in
 
 
-def optim_func(res, noise_in, noise, rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests, alpha, true_trajectory, true_pmap_max, rkTime=400, split=2000, traintype='normal', system='lorenz', params=np.array([[], []], dtype=np.complex128)):
+def optim_func(res, noise_in, noise, rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests, alpha,   true_pmap_max, rkTime=400, split=2000, traintype='normal', system='lorenz', params=np.array([[], []], dtype=np.complex128)):
 
     # try:
     idenmat = np.identity(
@@ -1170,7 +1170,7 @@ def optim_func(res, noise_in, noise, rktest_u_arr_train_nonoise, rktest_u_arr_te
     else:
         res.Wout = solve_sylvester(
             res.left_mat, res.states_trstates+idenmat, res.data_trstates)
-    out = test(res, noise_in, rktest_u_arr_train_nonoise, rktest_u_arr_test, true_trajectory, true_pmap_max, num_tests=num_tests, rkTime=rkTime, split=split,
+    out = test(res, noise_in, rktest_u_arr_train_nonoise, rktest_u_arr_test,   true_pmap_max, num_tests=num_tests, rkTime=rkTime, split=split,
         showMapError=True, showTrajectories=True, showHist=True, system=system, params=params)
     results = out[0]
     variances = out[2]
@@ -1187,7 +1187,7 @@ def optim_func(res, noise_in, noise, rktest_u_arr_train_nonoise, rktest_u_arr_te
 
 
 def get_res_results(itr, res_gen, rk, res_size, rho, sigma, leakage, win_type, bias_type, noisetype, noise, noise_realizations, noise_stream, traintype,
-    rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests, alpha_values, rkTime_test, split_test, system, tau, params, savepred, debug_mode, train_seed, true_trajectory, true_pmap_max):
+    rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests, alpha_values, rkTime_test, split_test, system, tau, params, savepred, debug_mode, train_seed,   true_pmap_max):
     tic = time.perf_counter()
     print('Starting res %d' % itr)
     reservoir, noise_in = generate_res(res_gen, rk, res_size, rho, sigma, leakage,
@@ -1215,7 +1215,7 @@ def get_res_results(itr, res_gen, rk, res_size, rho, sigma, leakage, win_type, b
         pmap_max_wass_dist = np.zeros((num_tests, alpha_values.size-1))
         noise_tic = time.perf_counter()
         min_optim_func = lambda alpha: optim_func(reservoir, noise_in[0], noise, rktest_u_arr_train_nonoise, rktest_u_arr_test,
-                                                  num_tests, alpha, true_trajectory, true_pmap_max, rkTime_test, split_test, traintype, system, params)
+                                                  num_tests, alpha,   true_pmap_max, rkTime_test, split_test, traintype, system, params)
         func_vals = np.zeros(alpha_values.size)
         for j in range(alpha_values.size):
             print('Regularization: ', alpha_values[j])
@@ -1343,17 +1343,17 @@ def find_stability(noisetype, noise, traintype, train_seed, train_gen, res_itr, 
         rk = RungeKutta(0, 0, 0, tau=tau, T=train_time,
                         ttsplit=train_time, u0=u0, system=system, params=params)
 
-    true_filename = foldername + \
-        '%s_tau%0.2f_true_trajectory.csv' % (system, tau)
+    #true_filename = foldername + \
+    #    '%s_tau%0.2f_true_trajectory.csv' % (system, tau)
     true_pmap_max_filename = foldername + \
         '%s_tau%0.2f_true_pmap_max.csv' % (system, tau)
-    true_trajectory = np.loadtxt(true_filename, delimiter=',')
+    #true_trajectory = np.loadtxt(true_filename, delimiter=',')
     true_pmap_max = np.loadtxt(true_pmap_max_filename, delimiter=',')
     print('Snippet of true poincare map:')
     print(true_pmap_max[:5])
 
     out = get_res_results(res_itr, res_gen, rk, res_size, rho, sigma, leakage, win_type, bias_type, noisetype, noise, noise_realizations, noise_stream, traintype, rktest_u_arr_train_nonoise,
-                          rktest_u_arr_test, num_tests, alpha_values, rkTime_test, split_test, system, tau, params, savepred, debug_mode, train_seed, true_trajectory, true_pmap_max)
+                          rktest_u_arr_test, num_tests, alpha_values, rkTime_test, split_test, system, tau, params, savepred, debug_mode, train_seed,   true_pmap_max)
     # toc_global = time.perf_counter()
     # print('Total Runtime: %s sec.' % (toc_global - tic_global))
 
@@ -1510,7 +1510,6 @@ def main(argv):
     noise_realizations = 1
     num_tests = 10
     num_trains = 25
-
     traintype = 'normal'
     noisetype = 'gaussian'
     system = 'KS'
