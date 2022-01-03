@@ -946,10 +946,10 @@ def get_test_data(test_stream, tau, num_tests, rkTime, split, system='lorenz'):
     return rktest_u_arr_train_nonoise, rktest_u_arr_test, params
 
 
-def test(res, noise_in, rktest_u_arr_train_nonoise, rktest_u_arr_test, true_pmap_max, num_tests=100, rkTime=1000, split=3000, showMapError=False, showTrajectories=False, showHist=False, system='lorenz', params=np.array([[], []], dtype=np.complex128)):
+def test(res, noise_in, rktest_u_arr_train_nonoise, rktest_u_arr_test, true_pmap_max, num_tests=100, rkTime=1000, split=3000, showMapError=False, showTrajectories=False, showHist=False, system='lorenz', params=np.array([[], []], dtype=np.complex128), pmap=False):
     # tic = time.perf_counter()
     stable_count, mean_sum_squared, variances, valid_time, preds, wass_dist, pmap_max, pmap_max_wass_dist = testwrapped(
-        res.X, res.Win, res.W_data, res.W_indices, res.W_indptr, res.W_shape, res.Wout, res.leakage, rktest_u_arr_train_nonoise, rktest_u_arr_test,   true_pmap_max, num_tests, rkTime, split, noise_in,  showMapError, showTrajectories, showHist, system, params=params)
+        res.X, res.Win, res.W_data, res.W_indices, res.W_indptr, res.W_shape, res.Wout, res.leakage, rktest_u_arr_train_nonoise, rktest_u_arr_test,   true_pmap_max, num_tests, rkTime, split, noise_in,  showMapError, showTrajectories, showHist, system, params=params, pmap=pmap)
     # toc = time.perf_counter()
     # runtime = toc - tic
     # print("Test " + str(i) + " valid time: " + str(j))
@@ -958,7 +958,7 @@ def test(res, noise_in, rktest_u_arr_train_nonoise, rktest_u_arr_test, true_pmap
 
 
 @jit(nopython=True, fastmath=True)
-def testwrapped(res_X, Win, W_data, W_indices, W_indptr, W_shape, Wout, leakage, rktest_u_arr_train_nonoise, rktest_u_arr_test,   true_pmap_max, num_tests, rkTime, split, noise_in, showMapError=True,   showTrajectories=True, showHist=True, system='lorenz', tau=0.1, params=np.array([[], []], dtype=np.complex128)):
+def testwrapped(res_X, Win, W_data, W_indices, W_indptr, W_shape, Wout, leakage, rktest_u_arr_train_nonoise, rktest_u_arr_test,   true_pmap_max, num_tests, rkTime, split, noise_in, showMapError=True,   showTrajectories=True, showHist=True, system='lorenz', tau=0.1, params=np.array([[], []], dtype=np.complex128), pmap=False):
     stable_count = 0
     valid_time = np.zeros(num_tests)
     max_sum_square = np.zeros(num_tests)
@@ -996,24 +996,28 @@ def testwrapped(res_X, Win, W_data, W_indices, W_indptr, W_shape, Wout, leakage,
                               Wout, leakage, u0=rktest_u_arr_test[:, 0, i], steps=(rkTime-split))
         preds[i] = pred
         error = np.zeros(pred[0].size)
-        if system == 'lorenz':
-            calc_pred = np.stack((pred[0]*7.929788629895004,
+        if pmap:
+            if system == 'lorenz':
+                calc_pred = np.stack((pred[0]*7.929788629895004,
                      pred[1]*8.9932616136662, pred[2]*8.575917849311919+23.596294463016896))
-            # wass_dist[i] = wasserstein_distance_empirical(calc_pred.flatten(), true_trajectory.flatten())
-            pred_pmap_max = poincare_max(calc_pred, np.arange(pred.shape[0]))
-        elif system == 'KS':
-            # wass_dist[i] = wasserstein_distance_empirical(pred.flatten()*1.1876770355823614, true_trajectory.flatten())
-            pred_pmap_max = poincare_max(
-                pred*1.1876770355823614, np.arange(pred.shape[0]))
+                # wass_dist[i] = wasserstein_distance_empirical(calc_pred.flatten(), true_trajectory.flatten())
+                pred_pmap_max = poincare_max(calc_pred, np.arange(pred.shape[0]))
+            elif system == 'KS':
+                # wass_dist[i] = wasserstein_distance_empirical(pred.flatten()*1.1876770355823614, true_trajectory.flatten())
+                 pred_pmap_max = poincare_max(
+                    pred*1.1876770355823614, np.arange(pred.shape[0]))
 
-        pmap_max.append(pred_pmap_max)
-        for j in range(rktest_u_arr_test.shape[0]):
-            if j == 0:
-                pred_pmap_max_all = pred_pmap_max[j]
-            else:
-                pred_pmap_max_all = np.append(
-                    pred_pmap_max_all, pred_pmap_max[j])
-        pmap_max_wass_dist[i] = wasserstein_distance_empirical(pred_pmap_max_all, true_pmap_max)
+            pmap_max.append(pred_pmap_max)
+            for j in range(rktest_u_arr_test.shape[0]):
+                if j == 0:
+                    pred_pmap_max_all = pred_pmap_max[j]
+                else:
+                    pred_pmap_max_all = np.append(
+                        pred_pmap_max_all, pred_pmap_max[j])
+            pmap_max_wass_dist[i] = wasserstein_distance_empirical(pred_pmap_max_all, true_pmap_max)
+        else:
+            pmap_max_wass_dist[i] = np.nan
+            pmap_max.append([np.nan])
 
         # print(pred.size)
 
@@ -1156,7 +1160,7 @@ def generate_res(res_gen, rk, res_size, rho, sigma, leakage, win_type, bias_type
     return reservoir, noise_in
 
 
-def optim_func(res, noise_in, noise, rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests, alpha,   true_pmap_max, rkTime=400, split=2000, traintype='normal', system='lorenz', params=np.array([[], []], dtype=np.complex128)):
+def optim_func(res, noise_in, noise, rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests, alpha,   true_pmap_max, rkTime=400, split=2000, traintype='normal', system='lorenz', params=np.array([[], []], dtype=np.complex128), pmap = False):
 
     # try:
     idenmat = np.identity(
@@ -1171,7 +1175,7 @@ def optim_func(res, noise_in, noise, rktest_u_arr_train_nonoise, rktest_u_arr_te
         res.Wout = solve_sylvester(
             res.left_mat, res.states_trstates+idenmat, res.data_trstates)
     out = test(res, noise_in, rktest_u_arr_train_nonoise, rktest_u_arr_test,   true_pmap_max, num_tests=num_tests, rkTime=rkTime, split=split,
-        showMapError=True, showTrajectories=True, showHist=True, system=system, params=params)
+        showMapError=True, showTrajectories=True, showHist=True, system=system, params=params, pmap = pmap)
     results = out[0]
     variances = out[2]
     mean_sum_squared = out[1]
@@ -1187,7 +1191,7 @@ def optim_func(res, noise_in, noise, rktest_u_arr_train_nonoise, rktest_u_arr_te
 
 
 def get_res_results(itr, res_gen, rk, res_size, rho, sigma, leakage, win_type, bias_type, noisetype, noise, noise_realizations, noise_stream, traintype,
-    rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests, alpha_values, rkTime_test, split_test, system, tau, params, savepred, debug_mode, train_seed,   true_pmap_max):
+    rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests, alpha_values, rkTime_test, split_test, system, tau, params, savepred, debug_mode, train_seed,   true_pmap_max, pmap):
     tic = time.perf_counter()
     print('Starting res %d' % itr)
     reservoir, noise_in = generate_res(res_gen, rk, res_size, rho, sigma, leakage,
@@ -1215,7 +1219,7 @@ def get_res_results(itr, res_gen, rk, res_size, rho, sigma, leakage, win_type, b
         pmap_max_wass_dist = np.zeros((num_tests, alpha_values.size-1))
         noise_tic = time.perf_counter()
         min_optim_func = lambda alpha: optim_func(reservoir, noise_in[0], noise, rktest_u_arr_train_nonoise, rktest_u_arr_test,
-                                                  num_tests, alpha,   true_pmap_max, rkTime_test, split_test, traintype, system, params)
+                                                  num_tests, alpha,   true_pmap_max, rkTime_test, split_test, traintype, system, params, pmap)
         func_vals = np.zeros(alpha_values.size)
         for j in range(alpha_values.size):
             print('Regularization: ', alpha_values[j])
@@ -1269,7 +1273,8 @@ def get_res_results(itr, res_gen, rk, res_size, rho, sigma, leakage, win_type, b
                             preds = np.concatenate((preds, out[4].reshape(
                                 out[4].shape[0], out[4].shape[1], out[4].shape[2], 1)), axis=3)
                 except:
-                    print('Training unsucessful for alpha ' + alpha_values[j])
+                    print('Training unsucessful for alpha:')
+                    print(alpha_values[j])
                     if j == 0:
                         stable_frac_0 = 0.0
                         variances_0 = np.zeros(num_tests)
@@ -1308,7 +1313,7 @@ def get_res_results(itr, res_gen, rk, res_size, rho, sigma, leakage, win_type, b
 
 
 @ray.remote
-def find_stability(noisetype, noise, traintype, train_seed, train_gen, res_itr, res_gen, test_stream, noise_stream, rho, sigma, leakage, win_type, bias_type, train_time, res_size, res_per_test, noise_realizations, num_tests, alpha_values, system, tau, savepred, debug_mode, foldername):
+def find_stability(noisetype, noise, traintype, train_seed, train_gen, res_itr, res_gen, test_stream, noise_stream, rho, sigma, leakage, win_type, bias_type, train_time, res_size, res_per_test, noise_realizations, num_tests, alpha_values, system, tau, savepred, debug_mode, foldername, pmap):
     import warnings
     warnings.filterwarnings("ignore")
     if isinstance(noise, np.ndarray):
@@ -1353,7 +1358,7 @@ def find_stability(noisetype, noise, traintype, train_seed, train_gen, res_itr, 
     print(true_pmap_max[:5])
 
     out = get_res_results(res_itr, res_gen, rk, res_size, rho, sigma, leakage, win_type, bias_type, noisetype, noise, noise_realizations, noise_stream, traintype, rktest_u_arr_train_nonoise,
-                          rktest_u_arr_test, num_tests, alpha_values, rkTime_test, split_test, system, tau, params, savepred, debug_mode, train_seed,   true_pmap_max)
+                          rktest_u_arr_test, num_tests, alpha_values, rkTime_test, split_test, system, tau, params, savepred, debug_mode, train_seed,   true_pmap_max, pmap)
     # toc_global = time.perf_counter()
     # print('Total Runtime: %s sec.' % (toc_global - tic_global))
 
@@ -1520,6 +1525,7 @@ def main(argv):
     bias_type = 'old'
     win_type = 'full'
     debug_mode = False
+    pmap = False
     machine = 'deepthought2'
     ifray = True
     tau_flag = True
@@ -1530,7 +1536,7 @@ def main(argv):
                 ['noisetype=', 'traintype=', 'system=', 'res=',
                 'tests=', 'trains=', 'savepred=', 'tau=', 'rho=',
                 'sigma=', 'leakage=', 'bias_type=', 'debug=', 'win_type=',
-                'machine=', 'num_cpus='])
+                'machine=', 'num_cpus=', 'pmap='])
     except getopt.GetoptError:
         print('Error: Some options not recognized')
         sys.exit(2)
@@ -1544,6 +1550,14 @@ def main(argv):
         elif opt == '-r':
             noise_realizations = int(arg)
             print('Noise Realizations: %d' % noise_realizations)
+        elif opt == '--pmap':
+            pmap_in = str(arg)
+            if pmap_in == 'True':
+                pmap = True
+            elif pmap_in == 'False':
+                pmap = False
+            else:
+                raise ValueError
         elif opt == '--machine':
             machine = str(arg)
             if not machine == 'skynet' and not machine == 'deepthought2':
@@ -1653,7 +1667,7 @@ def main(argv):
             tr[i], train_streams[tr[i]], rt[i], res_streams[rt[i]], test_streams, noise_streams, rho, sigma, \
             leakage, win_type, bias_type, train_time, \
             res_size, res_per_test, noise_realizations, num_tests, alpha_values,\
-            system, tau, savepred, debug_mode, foldername) for i in range(tr.size)])
+            system, tau, savepred, debug_mode, foldername, pmap) for i in range(tr.size)])
         # print('Ray out len: %d' % len(out_base))
         # print('Out elem len: %d' % len(out_base[0]))
 
@@ -1696,7 +1710,7 @@ def main(argv):
             tnr[i], train_streams[tnr[i]], rtn[i], res_streams[rtn[i]], test_streams, noise_streams, \
             rho, sigma, leakage, win_type, bias_type, train_time, \
             res_size, res_per_test, noise_realizations, num_tests, alpha_values,\
-            system, tau, savepred, debug_mode, foldername) for i in range(tnr.size)])
+            system, tau, savepred, debug_mode, foldername, pmap) for i in range(tnr.size)])
         out = []
         for i in range(len(out_base)):
             for j in range(len(out_base[i])):
@@ -1780,12 +1794,15 @@ def main(argv):
             %(res_size, train_time, noise_realizations, nt[i], tn[i]+1), valid_time_0[i], delimiter = ',')
         np.savetxt(foldername+top_folder+folder+'valid_time_%dnodes_%dtrainiters_%dnoisereals_noise%e_test%d.csv' \
             %(res_size, train_time, noise_realizations, nt[i], tn[i]+1), valid_time[i], delimiter = ',')
+        """
         np.savetxt(foldername+top_folder+folder+'wass_dist_%dnodes_%dtrainiters_%dnoisereals_noise%e_test%d_noreg.csv' \
             %(res_size, train_time, noise_realizations, nt[i], tn[i]+1), wass_dist_0[i], delimiter = ',')
         np.savetxt(foldername+top_folder+folder+'wass_dist_%dnodes_%dtrainiters_%dnoisereals_noise%e_test%d.csv' \
             %(res_size, train_time, noise_realizations, nt[i], tn[i]+1), wass_dist[i], delimiter = ',')
-        np.savetxt(foldername+top_folder+folder+'pmap_max_wass_dist_%dnodes_%dtrainiters_%dnoisereals_noise%e_test%d.csv' \
-            %(res_size, train_time, noise_realizations, nt[i], tn[i]+1), pmap_max_wass_dist[i], delimiter = ',')
+        """
+        if pmap:
+            np.savetxt(foldername+top_folder+folder+'pmap_max_wass_dist_%dnodes_%dtrainiters_%dnoisereals_noise%e_test%d.csv' \
+                %(res_size, train_time, noise_realizations, nt[i], tn[i]+1), pmap_max_wass_dist[i], delimiter = ',')
     if savepred:
         r_test, test_r = np.meshgrid(np.arange(0, res_per_test), np.arange(0, num_tests))
         r_test = r_test.flatten()
