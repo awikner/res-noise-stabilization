@@ -18,9 +18,10 @@ leakages_mat = leakages_mat.flatten()
 
 #noisetypes = ['none']
 #traintypes = ['gradientk%d' % k for k in np.arange(1,11)]
-taus       = [0.125, 0.375]
+res_sizes  =np.array([194,195,259,260])
+taus       = [0.25]*res_sizes.size
 nos        = [1]*len(taus)
-res_sizes  = [300]*len(taus)
+#res_sizes  = [300]*len(taus)
 trainlens  = [4250]*len(taus)
 noisetypes = ['gaussian']*len(taus)
 traintypes = ['normal']*len(taus)
@@ -31,10 +32,10 @@ bias_type = 'new_random'
 for noisetype, res_size, win_type, traintype, no, trainlen, tau in zip(noisetypes, res_sizes, win_types, traintypes, nos, trainlens, taus):
 
     for rho, sigma, leakage in zip(rhos, sigmas, leakages):
-        testname = '%s_%s_%s_%d_%dnodes_rho%0.1f_sigma%0.1e_leakage%0.1f_tau%0.3f' % (system, traintype, noisetype, res_size, no, rho, sigma, leakage, tau)
-        os.system('python -u climate_replication_test.py --savepred=False --system=%s --noisetype=%s --traintype=%s -r %d --rho=%f --sigma=%f --leakage=%f --win_type=%s --bias_type=%s --tau=%f -N %d -T %d --res=25 --tests=10 --trains=25 --debug=False --machine=skynet --num_cpus=32 > %s.log' % (system, noisetype, traintype, no, rho, sigma, leakage, win_type, bias_type, tau, res_size, trainlen, testname))
+        testname = '%s_%s_%s_%d_%dnodes_%dtrain_rho%0.1f_sigma%0.1e_leakage%0.1f_tau%0.3f' % (system, traintype, noisetype, no, res_size, trainlen, rho, sigma, leakage, tau)
+        os.system('python slurm-launch.py --exp-name %s --command "python -u climate_replication_test.py --savepred=False --system=%s --noisetype=%s --traintype=%s -r %d --rho=%f --sigma=%f --leakage=%f --win_type=%s --bias_type=%s --tau=%f -N %d -T %d --res=40 --tests=10 --trains=40 --debug=False" --num-nodes 8 --load-env "conda activate  reservoir-rls" -t 4:00:00' % (testname, system, noisetype, traintype, no,  rho, sigma, leakage, win_type, bias_type, tau, res_size, trainlen))
+        #os.system('python -u climate_replication_test.py --savepred=False --system=%s --noisetype=%s --traintype=%s -r %d --rho=%f --sigma=%f --leakage=%f --win_type=%s --bias_type=%s --tau=%f -N %d -T %d --res=25 --tests=10 --trains=25 --debug=False --machine=skynet --num_cpus=32 > %s.log' % (system, noisetype, traintype, no, rho, sigma, leakage, win_type, bias_type, tau, res_size, trainlen, testname))
 
-        print('Finished job: %s' % testname)
         time.sleep(1)
 
 
