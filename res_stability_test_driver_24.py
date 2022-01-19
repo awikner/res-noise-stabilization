@@ -36,11 +36,8 @@ for noisetype, res_size, win_type, traintype, no, trainlen, tau, leakage in zip(
 
     for rho, sigma in zip(rhos, sigmas):
         testname = '%s_%s_%s_%d_%dnodes_%dtrain_rho%0.1f_sigma%0.1e_leakage%0.1f_tau%0.3f' % (system, traintype, noisetype, no, res_size, trainlen, rho, sigma, leakage, tau)
-        os.system('python slurm-launch.py --exp-name %s --command "python -u climate_replication_test.py --savepred=False --system=%s --noisetype=%s --traintype=%s -r %d --rho=%f --sigma=%f --leakage=%f --win_type=%s --bias_type=%s --tau=%f -N %d -T %d --res=4 --tests=5 --trains=4 --debug=True --metric=mss_var --returnall=True" --num-nodes 4 --load-env "conda activate  reservoir-rls" -t 15:00 -p debug -A physics' % (testname, system, noisetype, traintype, no,  rho, sigma, leakage, win_type, bias_type, tau, res_size, trainlen))
+        os.system('python slurm-launch.py --exp-name %s --command "python -u climate_replication_test.py --savepred=False --system=%s --noisetype=%s --traintype=%s -r %d --rho=%f --sigma=%f --leakage=%f --win_type=%s --bias_type=%s --tau=%f -N %d -T %d --res=4 --tests=5 --trains=4 --debug=True --metric=mss_var --returnall=True" --num-nodes 8 --load-env "conda activate  reservoir-rls" -t 8:00:00 -A physics' % (testname, system, noisetype, traintype, no,  rho, sigma, leakage, win_type, bias_type, tau, res_size, trainlen))
         #os.system('python -u climate_replication_test.py --savepred=False --system=%s --noisetype=%s --traintype=%s -r %d --rho=%f --sigma=%f --leakage=%f --win_type=%s --bias_type=%s --tau=%f -N %d -T %d --res=25 --tests=10 --trains=25 --debug=False --machine=skynet --num_cpus=32 > %s.log' % (system, noisetype, traintype, no, rho, sigma, leakage, win_type, bias_type, tau, res_size, trainlen, testname))
-        itr += 1
         time.sleep(1)
-        if itr % 5 == 0:
-            time.sleep(1200)
 
 

@@ -176,8 +176,10 @@ class Reservoir:
             spectral_radius/np.abs(max_eig[0])*unnormalized_W))
         self.W_data, self.W_indices, self.W_indptr, self.W_shape = \
                 (W_sp.data, W_sp.indices, W_sp.indptr, np.array(list(W_sp.shape)))
+        """
         print('Adjacency matrix section:')
         print(self.W_data[:4])
+        """
 
         if win_type == 'full':
             input_vars = np.arange(input_size)
@@ -233,9 +235,10 @@ class Reservoir:
         self.X = (res_gen.random((rsvr_size, rk.train_length+2))*2 - 1)
         self.Wout = np.array([])
         self.leakage = leakage
+        """
         print('Win Section:')
         print(Win[:3,:3])
-
+        """
 
 class RungeKutta:
     def __init__(self, x0=2, y0=2, z0=23, h=0.01, tau=0.1, T=300, ttsplit=5000, u0=0, system='lorenz', params=np.array([[], []], dtype=np.complex128)):
@@ -719,10 +722,12 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
                 unsynced_inbound_data, inbound_data[crossing_points[-1]+sync_len:])
             Y_train = Y_train[:, unsynced_inbound_data]
             X_train = X_train[:, unsynced_inbound_data]
+            """
             print('Bounded training data shape:')
             print(Y_train.shape)
             print(np.max(Y_train[0]))
             print(np.min(Y_train[0]))
+            """
         data_trstates += Y_train @ X_train.T
         states_trstates += X_train @ X_train.T
         return [data_trstates, states_trstates, gradient_reg]
@@ -952,8 +957,10 @@ def get_test_data(test_stream, tau, num_tests, rkTime, split, system='lorenz'):
         (u_arr_test.shape[0], u_arr_test.shape[1], num_tests))
     rktest_u_arr_train_nonoise[:, :, 0] = u_arr_train_nonoise
     rktest_u_arr_test[:, :, 0] = u_arr_test
+    """
     print('Test data %d' % 0)
     print(rktest_u_arr_test[-3:,-3:,0])
+    """
     for i in range(1, num_tests):
         # np.random.seed(i)
         if system == 'lorenz':
@@ -964,8 +971,10 @@ def get_test_data(test_stream, tau, num_tests, rkTime, split, system='lorenz'):
             u0 = (test_stream[i].random(64)*2-1)*0.6
         rktest_u_arr_train_nonoise[:, :, i], rktest_u_arr_test[:, :, i], p, params = RungeKuttawrapped(x0=ic[0],
              y0=ic[1], z0=30*ic[2], T=rkTime, ttsplit=split, u0=u0, system=system, params=params)
+        """
         print('Test data %d' % i)
         print(rktest_u_arr_test[-3:,-3:,i])
+        """
 
     return rktest_u_arr_train_nonoise, rktest_u_arr_test, params
 
@@ -1018,9 +1027,11 @@ def testwrapped(res_X, Win, W_data, W_indices, W_indptr, W_shape, Wout, leakage,
             rktest_u_arr_train_nonoise[:, :, i]), res_X, Win, W_data, W_indices, W_indptr, W_shape, leakage, noise_in)
         pred = predictwrapped(res_X, Win, W_data, W_indices, W_indptr, W_shape,
                               Wout, leakage, u0=rktest_u_arr_test[:, 0, i], steps=(rkTime-split))
+        """
         with objmode():
             print('Test %d pred:' % i)
         print(pred[-3:,-3:])
+        """
         preds[i] = pred
         error = np.zeros(pred[0].size)
         if pmap:
@@ -1413,8 +1424,10 @@ def find_stability_serial(*args):
 def get_stability_output(out_full, noise_indices, train_indices, res_per_test, num_tests, alpha_values, savepred, metric = 'mss_var', return_all = False):#metric='pmap_max_wass_dist'):
     noise_vals = np.unique(noise_indices)
     train_vals = np.unique(train_indices)
+    """
     print(train_vals)
     print(noise_vals)
+    """
     tn, nt = np.meshgrid(train_vals, noise_vals)
     tn = tn.flatten()
     nt = nt.flatten()
@@ -1568,10 +1581,12 @@ def get_stability_output(out_full, noise_indices, train_indices, res_per_test, n
                 # print(preds.shape)
                 # print(noise_idx)
                 best_preds = preds[:, :, :, :, int(best_j[noise_idx])-1]
+                """
                 print('Training index: %d' % tn[k])
                 print('Noise index: %e' % nt[k])
                 print('End of best pred:')
                 print(best_preds[:,:,-1,-1])
+                """
             else:
                 best_preds = np.empty((1, 1, 1, 1), dtype=np.complex128)
 
@@ -1814,9 +1829,9 @@ def main(argv):
         for i in range(len(out_base)):
             for j in range(len(out_base[i])):
                 out[itr] = out_base[i][j]
-                train_i.append(out[itr][9])
-                noise_i.append(out[itr][10])
-                res_i.append(out[itr][11])
+                train_i.append(out[itr][11])
+                noise_i.append(out[itr][12])
+                res_i.append(out[itr][13])
                 itr += 1
         final_out = []
         for train, noise, res in zip(tnr, ntr, rtn):
@@ -1875,7 +1890,8 @@ def main(argv):
         # out = [find_stability(noisetype, ntr[i], traintype, tnr[i], rtn[i], rho, sigma, leakage, win_type, bias_type, train_time, \
         #         res_size, res_per_test, noise_realizations, num_tests, alpha_values, system, tau, savepred, debug_mode) for i in range(tnr.size)]
     results = get_stability_output(out, ntr, tnr, res_per_test, num_tests, alpha_values, savepred, metric, return_all)
-    print(len(results[0]))
+
+    # print(len(results[0]))
     ray.shutdown()
     toc = time.perf_counter()
     runtime = toc - tic
