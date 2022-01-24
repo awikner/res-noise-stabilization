@@ -639,6 +639,18 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
             data_trstates += Y_train @ X_train.T
             states_trstates += X_train @ X_train.T
         return [data_trstates, states_trstates, gradient_reg]
+    elif traintype in ['rmeanq','rmeanqres1','rmeanqres2']:
+        data_trstates = np.zeros((n, rsvr_size+1+n), dtype=np.float64)
+        states_trstates = np.zeros(
+            (n+rsvr_size+1, n+rsvr_size+1), dtype=np.float64)
+        for i in range(noise_realizations):
+            X, u_arr_train_noise = getXwrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_shape, leakage, noise[i], noisetype,noise_scaling, i, traintype)
+            X = X[:, skip+1:(res_d - 1)]
+            X_train = np.ascontiguousarray(np.concatenate(
+                (np.ones((1, d-(skip+1))), X, u_arr_train_noise[:, skip:-1]), axis=0))
+            data_trstates += Y_train @ X_train.T
+            states_trstates += X_train @ X_train.T
+        return [data_trstates, states_trstates, gradient_reg]
     elif traintype in ['rmean', 'rmeanres1', 'rmeanres2']:
         for i in range(noise_realizations):
             X, u_arr_train_noise = getXwrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_shape, leakage, noise[i], noisetype,
@@ -802,6 +814,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
         return [data_trstates, states_trstates, gradient_reg]
     elif 'gradientk' in traintype:
         k = str_to_int(traintype.replace('gradientk', ''))
+        print(k)
         X, D = getXwrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr,
                            W_shape, leakage, noise[0], noisetype, noise_scaling, 1, traintype)
         X = X[:, skip+1:(res_d - 1)]

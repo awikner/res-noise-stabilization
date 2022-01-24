@@ -4,13 +4,13 @@ import time
 from itertools import product
 #from itertools import enumerate
 #rhos = np.array([0.1, 0.3, 0.5, 0.7])
-rhos = np.array([0.1])
+rhos = np.array([0.5])
 #sigmas = np.array([0.5, 1.0, 1.5, 2.0])
-sigmas = np.array([0.5])
+sigmas = np.array([1.0])
 #sigmas  = np.array([0.1,0.2,0.3,0.4])
 #leakages = np.array([0.5,0.625,0.75,0.875,1.0])
 #leakages = np.array([0.25, 0.5, 0.75, 1.0])
-leakages = np.array([0.6])
+leakages = np.array([1.0])
 rhos_mat, sigmas_mat, leakages_mat = np.meshgrid(rhos, sigmas, leakages)
 rhos_mat     = rhos_mat.flatten()
 sigmas_mat   = sigmas_mat.flatten()
@@ -18,18 +18,21 @@ leakages_mat = leakages_mat.flatten()
 
 #noisetypes = ['none']
 #traintypes = ['gradientk%d' % k for k in np.arange(1,11)]
-#traintypes = ['gradientk%d' % i for i in range(1,5)]
-traintypes = []
+traintypes = ['gradientk%d' % i for i in range(1,5)]
+#traintypes = []
 traintypes.extend(['rplusq']*4)
+traintypes.append('rplusq')
 print(traintypes)
 taus       = [0.25]*len(traintypes)
-nos        = [10]*len(taus)
-res_sizes  = [200]*len(taus)
-trainlens  = [4250]*len(taus)
-#noisetypes = ['none']*4
-noisetypes = []
+nos        = [1]*4
+nos.extend([10]*5)
+res_sizes  = [500]*len(taus)
+trainlens  = [9150]*len(taus)
+noisetypes = ['none']*4
+#noisetypes = []
 noisetypes.extend(['gaussian_onestep'])
 noisetypes.extend(['gaussian%dstep' % k for k in range(2,5)])
+noisetypes.append('gaussian')
 print(noisetypes)
 #traintypes = ['normal']*len(taus)
 win_types  = ['full']*len(taus)
