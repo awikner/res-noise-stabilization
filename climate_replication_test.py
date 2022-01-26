@@ -18,25 +18,17 @@ import getopt
 import os
 
 from datetime import datetime
-# from lorenzrungekutta_numba import fx
-# from lorenzrungekutta_numba import fy
-# from lorenzrungekutta_numba import fz
 import numpy as np
-# from sklearn.linear_model import Ridge
 from scipy.linalg import solve, solve_sylvester
-from scipy.optimize import minimize
 from scipy.sparse.linalg import eigs
-from scipy.stats import wasserstein_distance
 from matplotlib import pyplot as plt
 from numba import jit, njit, objmode
 from numba.experimental import jitclass
 from numba.types import int32, int64, double
 import time
-import cProfile
-import pstats
 
+"""
 import pkg_resources
-import os
 installed_packages = pkg_resources.working_set
 installed_packages_list = sorted(
     ["%s==%s" % (i.key, i.version) for i in installed_packages])
@@ -45,12 +37,13 @@ if (True in isray):
     print('Ray installed')
 else:
     os.system('pip install -r -U ray')
+"""
 
 sys.path.append('/h/awikner/res-noise-stabilization/')
-from lorenzrungekutta_numba import *
-from ks_etdrk4 import *
-from csc_mult import *
-from poincare_max import *
+from helpers.lorenzrungekutta_numba import *
+from helpers.ks_etdrk4 import *
+from helpers.csc_mult import *
+from helpers.poincare_max import *
 
 warnings.filterwarnings("ignore", category=NumbaPerformanceWarning)
 
@@ -1999,7 +1992,7 @@ def main(argv):
     tn = tn.flatten()
     nt = nt.flatten()
 
-    top_folder = '%s_noisetest_noisetype_%s_traintype_%s/' % (system, noisetype, traintype)
+    top_folder = 'Data/%s_noisetest_noisetype_%s_traintype_%s/' % (system, noisetype, traintype)
     folder = '%s_more_noisetest_%srho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s/' % (system,          predflag, rho, sigma, leakage, win_type, bias_type, tau, res_size, train_time, noise_realizations, noisetype, traintype)
     if not os.path.isdir(os.path.join(foldername, top_folder)):
         os.mkdir(os.path.join(foldername, top_folder))
