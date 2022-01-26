@@ -8,11 +8,7 @@
 # SBATCH --mail-user=awikner1@umd.edu
 # SBATCH --mail-type=BEGIN
 # SBATCH --mail-type=END
-"""
-Created on Wed Jun  3 12:57:49 2020
 
-@author: josephharvey
-"""
 from numba.core.errors import NumbaPerformanceWarning
 import warnings
 from itertools import product
@@ -58,9 +54,9 @@ from poincare_max import *
 
 warnings.filterwarnings("ignore", category=NumbaPerformanceWarning)
 
-
 @njit
 def str_to_int(s):
+    # Converts a string to an int in numba compiled functions
     final_index, result = len(s) - 1, 0
     for i, v in enumerate(s):
         result += (ord(v) - 48) * (10 ** (final_index - i))
@@ -69,7 +65,7 @@ def str_to_int(s):
 
 @jit(nopython=True, fastmath=True)
 def mean_numba_axis1(mat):
-
+    # Computes the mean over axis 1 in numba compiled functions
     res = np.zeros(mat.shape[0])
     for i in range(mat.shape[0]):
         res[i] = np.mean(mat[i])
@@ -79,7 +75,7 @@ def mean_numba_axis1(mat):
 
 @jit(nopython=True, fastmath=True)
 def sum_numba_axis0(mat):
-
+    # Computes the sum over axis 0 in numba compiled functions
     res = np.zeros(mat.shape[1])
     for i in range(mat.shape[1]):
         res[i] = np.sum(mat[:, i])
@@ -88,6 +84,7 @@ def sum_numba_axis0(mat):
 
 @jit(nopython=True, fastmath=True)
 def wasserstein_distance_empirical(measured_samples, true_samples):
+    # Computes the wasserstein distance between the empirical CDFs of the two input sets of samples. Faster than scipy.
     if np.any(np.isnan(measured_samples)):
         return np.NAN
     if np.any(np.isinf(measured_samples)):
@@ -145,7 +142,8 @@ def wasserstein_distance_empirical(measured_samples, true_samples):
 
 
 class Reservoir:
-    def __init__(self, rk, res_gen, input_size, rsvr_size=300, spectral_radius=0.6, input_weight=1, leakage=1.0, win_type='full', bias_type='old'):
+    def __init__(self, rk, res_gen, input_size, rsvr_size=300, spectral_radius=0.6, input_weight=1, leakage=1.0, win_type='full', bias_type='old', avg_degree = 10):
+        # Define class for storing reservoir layers generated from input parameters and an input random number generator
         self.rsvr_size = rsvr_size
         """
         print('Spectral Radius: %0.2f' % spectral_radius)
@@ -155,13 +153,7 @@ class Reservoir:
         print('Bias type: %s' % bias_type)
         """
 
-        # get spectral radius < 1
-        # gets row density = 0.03333
-        avg_degree = 10
         density = avg_degree/rsvr_size
-        # np.random.seed(res_seed)
-        # unnormalized_W = sparse.random(rsvr_size, rsvr_size, density).todense()*2-1
-
         unnormalized_W = (res_gen.random((rsvr_size, rsvr_size))*2 - 1)
         for i in range(unnormalized_W[:, 0].size):
             for j in range(unnormalized_W[0].size):
@@ -171,7 +163,6 @@ class Reservoir:
         max_eig = eigs(unnormalized_W, k=1,
                        return_eigenvectors=False, maxiter=10**5)
 
-        # self.W = sparse.csr_matrix(spectral_radius/np.abs(max_eig)*unnormalized_W)
         W_sp = csc_matrix(np.ascontiguousarray(
             spectral_radius/np.abs(max_eig[0])*unnormalized_W))
         self.W_data, self.W_indices, self.W_indptr, self.W_shape = \
@@ -229,7 +220,6 @@ class Reservoir:
             Win[rsvr_size-leftover_nodes:, var +
                 1] = (res_gen.random(leftover_nodes)*2-1)*input_weight
 
-        # self.Win = sparse.csr_matrix(Win)
         self.Win = np.ascontiguousarray(Win)
 
         self.X = (res_gen.random((rsvr_size, rk.train_length+2))*2 - 1)
@@ -242,6 +232,7 @@ class Reservoir:
 
 class RungeKutta:
     def __init__(self, x0=2, y0=2, z0=23, h=0.01, tau=0.1, T=300, ttsplit=5000, u0=0, system='lorenz', params=np.array([[], []], dtype=np.complex128)):
+        # Class for obtaining training and testing dynamical system time series data
         if system == 'lorenz':
             int_step = int(tau/h)
             u_arr = np.ascontiguousarray(rungekutta(
@@ -254,18 +245,6 @@ class RungeKutta:
             self.params = params
 
         elif system == 'KS':
-            """
-            if tau <= 0.25:
-                u_arr, self.params = kursiv_predict(
-                    u0, tau=tau, T=T, params=params)
-            else:
-                tau_in = 0.25
-                if not tau % tau_in == 0.0:
-                    raise ValueError()
-                int_steps = int(tau/tau_in)
-                u_arr, self.params = kursiv_predict(
-                    u0, tau=tau_in, T=T, params=params, int_steps=int_steps)
-            """
             u_arr, self.params = kursiv_predict(u0, tau=tau, T=T, params=params)
             self.input_size = u_arr.shape[0]
             u_arr = np.ascontiguousarray(u_arr)/(1.1876770355823614)
@@ -274,43 +253,25 @@ class RungeKutta:
 
         self.train_length = ttsplit
         self.u_arr_train = u_arr[:, :ttsplit+1]
-        # size 5001
 
-        # noisy training array
-        # switch to gaussian
-
-        # plt.plot(self.u_arr_train_noise[0, :500])
-
-        # u[5000], the 5001st element, is the last in u_arr_train and the first in u_arr_test
+        # u[ttsplit], the (ttsplit + 1)st element, is the last in u_arr_train and the first in u_arr_test
         self.u_arr_test = u_arr[:, ttsplit:]
-        # size 1001
 
 
 @jit(nopython=True, fastmath=True)
 def RungeKuttawrapped(x0=2, y0=2, z0=23, h=0.01, tau=0.1, T=300, ttsplit=5000, u0=0, system='lorenz', params=np.array([[], []], dtype=np.complex128)):
+    # Numba function for obtaining training and testing dynamical system time series data
     if system == 'lorenz':
         int_step = int(tau/h)
         u_arr = np.ascontiguousarray(rungekutta(
             x0, y0, z0, h, T, tau)[:, ::int_step])
-        # self.train_length = ttsplit
-        # self.noise_scaling = noise_scaling
 
         u_arr[0] = (u_arr[0] - 0)/7.929788629895004
         u_arr[1] = (u_arr[1] - 0)/8.9932616136662
         u_arr[2] = (u_arr[2] - 23.596294463016896)/8.575917849311919
         new_params = params
     elif system == 'KS':
-        if tau <= 0.25:
-            u_arr, new_params = kursiv_predict(u0, tau=tau, T=T, params=params)
-        else:
-            tau_in = 0.25
-            if not tau % tau_in == 0.0:
-                u_arr, new_params = kursiv_predict(u0, tau=tau, T=T, params=params)
-            else:
-                int_steps = int(tau/tau_in)
-                u_arr, new_params = kursiv_predict(
-                    u0, tau=tau_in, T=T, params=params, int_steps=int_steps)
-
+        u_arr, new_params = kursiv_predict(u0, tau=tau, T=T, params=params)
         u_arr = np.ascontiguousarray(u_arr)/(1.1876770355823614)
     else:
         raise ValueError
