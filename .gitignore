@@ -126,7 +126,6 @@ dmypy.json
 
 # Job Run Filtes
 *.log
-*.sh
 
 # Data Files
 *.csv
@@ -139,3 +138,13 @@ dmypy.json
 
 # Other Files
 *.nfs*
+restats
+
+# Folders
+log_files/
+bash_scripts/
+cython_test/
+tests/
+Data/
+plots/
+hyperparameter_optimization/

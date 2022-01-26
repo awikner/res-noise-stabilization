@@ -124,7 +124,7 @@ if __name__ == "__main__":
         "RUNNABLE!")
 
     # ===== Save the script =====
-    script_file = "{}.sh".format(job_name)
+    script_file = "bash_scripts/{}.sh".format(job_name)
     with open(script_file, "w") as f:
         f.write(text)
 
@@ -133,5 +133,5 @@ if __name__ == "__main__":
     subprocess.Popen(["sbatch", script_file])
     print(
         "Job submitted! Script file is at: <{}>. Log file is at: <{}>".format(
-            script_file, "{}.log".format(job_name)))
+            script_file, "log_files/{}.log".format(job_name)))
     sys.exit(0)
