@@ -277,26 +277,19 @@ def RungeKuttawrapped(x0=2, y0=2, z0=23, h=0.01, tau=0.1, T=300, ttsplit=5000, u
         raise ValueError
 
     u_arr_train = u_arr[:, :ttsplit+1]
-    # size 5001
-
-    # noisy training array
-    # switch to gaussian
-
-    # plt.plot(self.u_arr_train_noise[0, :500])
-
-    # u[5000], the 5001st element, is the last in u_arr_train and the first in u_arr_test
+    # u[ttsplit], the (ttsplit+1)st element, is the last in u_arr_train and the first in u_arr_test
     u_arr_test = u_arr[:, ttsplit:]
     return u_arr_train, u_arr_test, ttsplit, new_params
 
 
 @jit(nopython=True, fastmath=True)
 def RungeKuttawrapped_pred(h=0.01, tau=0.1, T=300, ttsplit=5000, u0_array=np.array([[], []], dtype=np.complex128), system='lorenz', params=np.array([[], []], dtype=np.complex128)):
+    # Numba function for obtaining training and testing dynamical system time series data for a set of initial conditions.
+    # This is used during test to compute the map error instead of a for loop over the entire prediction period.
     if system == 'lorenz':
         int_step = int(tau/h)
         u_arr = np.ascontiguousarray(
             rungekutta_pred(u0_array, h, tau, int_step))
-        # self.train_length = ttsplit
-        # self.noise_scaling = noise_scaling
 
         u_arr[0] = (u_arr[0] - 0)/7.929788629895004
         u_arr[1] = (u_arr[1] - 0)/8.9932616136662
@@ -310,31 +303,24 @@ def RungeKuttawrapped_pred(h=0.01, tau=0.1, T=300, ttsplit=5000, u0_array=np.arr
         raise ValueError
 
     u_arr_train = u_arr[:, :ttsplit+1]
-    # size 5001
-
-    # noisy training array
-    # switch to gaussian
-
-    # plt.plot(self.u_arr_train_noise[0, :500])
-
-    # u[5000], the 5001st element, is the last in u_arr_train and the first in u_arr_test
+    # u[ttsplit], the (ttsplit+1)st element, is the last in u_arr_train and the first in u_arr_test
     u_arr_test = u_arr[:, ttsplit:]
     return u_arr_train, u_arr_test, ttsplit, new_params
 
-
 def getX(res, rk, x0=1, y0=1, z0=1):
+    # Function to obtain reservoir states when in python interpreter. Calls getXwrapped.
     u_training = rk.u_arr_train
     res.X = getXwrapped(np.ascontiguousarray(u_training), res.X, res.Win,
                         res.W_data, res.W_indices, res.W_indptr, res.W_shape, res.leakage)
 
     return res.X
-# takes a reservoir object res along with initial conditions
-
 
 @jit(nopython=True, fastmath=True)
 def getXwrapped(u_training, res_X, Win, W_data, W_indices, W_indptr, W_shape, leakage, noise, noisetype='none', noise_scaling=0, noise_realization=0, traintype='normal'):
+    # Numba compatible function for obtaining reservoir states using various types of noise.
+    # Generally returns an array of reservoir states and the noiseless training data used as input.
+    # If traintype is gradient, this function instead returns the resevoir states and the reservoir states derivatives.
 
-    # loops through every timestep
     if noisetype in ['gaussian', 'perturbation']:
         if traintype in ['normal', 'rmean', 'rplusq','rmeanq','rqmean','rq'] or 'confined' in traintype:
             # noise = gen_noise(u_training.shape[0], u_training.shape[1], noisetype, noise_scaling, noise_gen, noise_realization)
@@ -492,6 +478,7 @@ def getjacobian(Win, W, Wout, Dn):
 
 
 def gen_noise_driver(data_shape, res_shape, traintype, noisetype, noise_scaling, noise_stream, noise_realizations):
+    # Generates an array of noise states for a given noise type, number of noise realizations, and array of random number generators
     if noisetype in ['gaussian', 'perturbation']:
         if traintype in ['normal', 'rmean', 'rplusq','rmeanq','rqmean','rq'] or 'confined' in traintype:
             noise = gen_noise(data_shape[0], data_shape[1], noisetype,
@@ -538,9 +525,8 @@ def gen_noise_driver(data_shape, res_shape, traintype, noisetype, noise_scaling,
         raise ValueError
     return noise
 
-
-# @jit(nopython = True, fastmath = True)
 def gen_noise(noise_size, noise_length, noisetype, noise_scaling, noise_stream, noise_realizations):
+    # Generates an array of noise vectors
     noise = np.zeros((noise_realizations, noise_size, noise_length))
     if 'gaussian' in noisetype:
         for i in range(noise_realizations):
@@ -562,19 +548,20 @@ def gen_noise(noise_size, noise_length, noisetype, noise_scaling, noise_stream, 
 
 def get_states(res, rk, noise, noisetype='none', noise_scaling=0, noise_realizations=1,
         traintype='normal', skip=150):
+    # Obtains the matrices used to train the reservoir using either linear regression or a sylvester equation
+    # (in the case of Sylvester or Sylvester_wD training types)
+    # Calls the numba compatible wrapped function
     if traintype == 'getD':
         Dn = getD(np.ascontiguousarray(rk.u_arr_train), res.X, res.Win, res.W_data, res.W_indices, res.W_indptr, res.W_shape, res.leakage,
             skip, noise, noisetype, noise_scaling, noise_realizations, traintype)
         return Dn
-    elif traintype not in ['sylvester', 'sylvester_wD']:
-        res.data_trstates, res.states_trstates, res.gradient_reg = get_states_wrapped(
-            np.ascontiguousarray(
-                rk.u_arr_train), res.X, res.Win, res.W_data, res.W_indices, res.W_indptr, res.W_shape, res.leakage,
+    elif traintype in ['sylvester', 'sylvester_wD']:
+        res.data_trstates, res.states_trstates, res.left_mat = get_states_wrapped(
+            np.ascontiguousarray(rk.u_arr_train), res.X, res.Win, res.W_data, res.W_indices, res.W_indptr, res.W_shape, res.leakage,
             skip, noise, noisetype, noise_scaling, noise_realizations, traintype)
     else:
-        res.data_trstates, res.states_trstates, res.left_mat = get_states_wrapped(
-            np.ascontiguousarray(
-                rk.u_arr_train), res.X, res.Win, res.W_data, res.W_indices, res.W_indptr, res.W_shape, res.leakage,
+        res.data_trstates, res.states_trstates, res.gradient_reg = get_states_wrapped(
+            np.ascontiguousarray(rk.u_arr_train), res.X, res.Win, res.W_data, res.W_indices, res.W_indptr, res.W_shape, res.leakage,
             skip, noise, noisetype, noise_scaling, noise_realizations, traintype)
 
 
