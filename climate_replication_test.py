@@ -568,6 +568,8 @@ def get_states(res, rk, noise, noisetype='none', noise_scaling=0, noise_realizat
 @jit(nopython=True, fastmath=True)
 def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_shape, leakage, skip, noise, noisetype='none',
         noise_scaling=0, noise_realizations=1, traintype='normal', q=0):
+    # Numba compatible function to obtain the matrices used to train the reservoir using either linear regression or a sylvester equation.
+    # The type of matrices depends on the traintype, number of noise realizations, and noisetype
     res_X = np.ascontiguousarray(res_X)
     u_arr_train = np.ascontiguousarray(u_arr_train)
     n, d = u_arr_train.shape
@@ -747,6 +749,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
         states_trstates += X_train @ X_train.T
         return [data_trstates, states_trstates, gradient_reg]
     elif traintype == 'gradient':
+        # Training using only the input jacobian (linearized 1-step noise)
         X, D = getXwrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr,
                            W_shape, leakage, noise[0], noisetype, noise_scaling, 1, traintype)
         X = X[:, skip+1:(res_d - 1)]
@@ -764,6 +767,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
         states_trstates = X_train @ X_train.T
         return [data_trstates, states_trstates, gradient_reg]
     elif traintype == 'gradient12':
+        # Training using the input and reservoir jacobian (linearized 2-step noise)
         X, D = getXwrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr,
                            W_shape, leakage, noise[0], noisetype, noise_scaling, 1, traintype)
         X = X[:, skip+1:(res_d - 1)]
@@ -828,6 +832,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
         states_trstates = X_train @ X_train.T
         return [data_trstates, states_trstates, gradient_reg]
     elif traintype == 'gradient2':
+        # Linearized 2-step noise with no 1-step noise
         X, D = getXwrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr,
                            W_shape, leakage, noise[0], noisetype, noise_scaling, 1, traintype)
         X = X[:, skip+1:(res_d - 1)]
@@ -850,6 +855,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
         states_trstates = X_train @ X_train.T
         return [data_trstates, states_trstates, gradient_reg]
     elif 'gradientk' in traintype:
+        # Linearized k-step noise
         k = str_to_int(traintype.replace('gradientk', ''))
         #print(k)
         X, D = getXwrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr,
@@ -948,6 +954,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
         states_trstates = X_train @ X_train.T
         return [data_trstates, states_trstates, gradient_reg]
     elif traintype == 'sylvester':
+        # Sylvester regularization w/o derivative
         X, p = getXwrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr,
                            W_shape, leakage, noise[i], noisetype, noise_scaling, 1, traintype)
         X = np.ascontiguousarray(X[:, skip+1:(res_d - 1)])
@@ -962,6 +969,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
             (Win[:, 1:].T @ Win[:, 1:])
         return [data_trstates, states_trstates, left_mat]
     elif traintype == 'sylvester_wD':
+        # Sylvester regularization with derivative
         X, D = getXwrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr,
                            W_shape, leakage, noise[i], noisetype, noise_scaling, 1, traintype)
         X = X[:, skip+1:(res_d - 1)]
@@ -980,6 +988,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
         states_trstates = X_train @ X_train.T
         return [data_trstates, states_trstates, left_mat]
     else:
+        # Noiseless training
         data_trstates = np.zeros((n, rsvr_size+1+n), dtype=np.float64)
         states_trstates = np.zeros(
             (n+rsvr_size+1, n+rsvr_size+1), dtype=np.float64)
@@ -1000,6 +1009,7 @@ def getD(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_shape, leakage,
 
 
 def predict(res, u0,  steps=1000):
+    # Wrapper for the prediction function
     Y = predictwrapped(res.X, res.Win, res.W_data, res.W_indices,
                        res.W_indptr, res.W_shape, res.Wout, res.leakage, u0, steps)
     return Y
@@ -1007,6 +1017,7 @@ def predict(res, u0,  steps=1000):
 
 @jit(nopython=True, fastmath=True)
 def predictwrapped(res_X, Win, W_data, W_indices, W_indptr, W_shape, Wout, leakage, u0, steps):
+    # Numba compatible prediction function
     Y = np.empty((Win.shape[1]-1, steps + 1))
     X = np.empty((res_X.shape[0], steps + 1))
 
@@ -1014,22 +1025,15 @@ def predictwrapped(res_X, Win, W_data, W_indices, W_indptr, W_shape, Wout, leaka
     X[:, 0] = res_X[:, -2]
 
     for i in range(0, steps):
-        # y_in = Y[:,i].reshape(3,1)
-        # x_prev = X[:,i].reshape(res.rsvr_size,1)
         X[:, i+1] = (1-leakage)*X[:, i] + leakage*np.tanh(Win @ np.append(1.,
                      Y[:, i]) + mult_vec(W_data, W_indices, W_indptr, W_shape, X[:, i]))
-        # X = np.concatenate((X, x_current), axis = 1)
         Y[:, i+1] = Wout @ np.concatenate((np.array([1.]), X[:, i+1], Y[:, i]))
-        # y_out = np.matmul(res.Wout, x_current)
-        # Y[:,i+1] = y_out
 
     return Y
 
-# @jit(nopython = True, fastmath = True)
-
-
 def get_test_data(test_stream, tau, num_tests, rkTime, split, system='lorenz'):
-    # np.random.seed(0)
+    # Function for obtaining test data sets used to validate reservoir performance
+    # Uses an array of random number generators
     if system == 'lorenz':
         ic = test_stream[0].random(3)*2-1
         u0 = np.zeros(64)
@@ -1067,6 +1071,8 @@ def get_test_data(test_stream, tau, num_tests, rkTime, split, system='lorenz'):
 
 
 def test(res, noise_in, rktest_u_arr_train_nonoise, rktest_u_arr_test, true_pmap_max, num_tests=100, rkTime=1000, split=3000, showMapError=False, showTrajectories=False, showHist=False, system='lorenz', params=np.array([[], []], dtype=np.complex128), pmap=False):
+    # Wrapper function for the numba compatible test function.
+
     # tic = time.perf_counter()
     stable_count, mean_sum_squared, max_sum_squared, variances, valid_time, preds, wass_dist, pmap_max, pmap_max_wass_dist = testwrapped(
         res.X, res.Win, res.W_data, res.W_indices, res.W_indptr, res.W_shape, res.Wout, res.leakage, rktest_u_arr_train_nonoise, rktest_u_arr_test,   true_pmap_max, num_tests, rkTime, split, noise_in,  showMapError, showTrajectories, showHist, system, params=params, pmap=pmap)
@@ -1079,6 +1085,7 @@ def test(res, noise_in, rktest_u_arr_train_nonoise, rktest_u_arr_test, true_pmap
 
 @jit(nopython=True, fastmath=True)
 def testwrapped(res_X, Win, W_data, W_indices, W_indptr, W_shape, Wout, leakage, rktest_u_arr_train_nonoise, rktest_u_arr_test,   true_pmap_max, num_tests, rkTime, split, noise_in, showMapError=True,   showTrajectories=True, showHist=True, system='lorenz', tau=0.1, params=np.array([[], []], dtype=np.complex128), pmap=False):
+    # Numba compatable function for testing trained reservoir performance against true system time series
     stable_count = 0
     valid_time = np.zeros(num_tests)
     max_sum_square = np.zeros(num_tests)
@@ -1094,13 +1101,6 @@ def testwrapped(res_X, Win, W_data, W_indices, W_indptr, W_shape, Wout, leakage,
     for i in range(num_tests):
         with objmode(test_tic='double'):
             test_tic = time.perf_counter()
-        """
-        np.random.seed(i)
-        ic = np.random.rand(3)*2-1
-        u_arr_train, u_arr_train_nonoise, u_arr_test, train_length, noise_scaling = \
-            RungeKuttawrapped(x0 = ic[0], y0 = ic[1],
-                              z0 = 30*ic[2], T = rkTime, ttsplit = split)
-        """
         res_X = (np.zeros((res_X.shape[0], split+2))*2 - 1)
         # print('Win')
         # print(Win[:3,:3])
@@ -1232,7 +1232,6 @@ def testwrapped(res_X, Win, W_data, W_indices, W_indptr, W_shape, Wout, leakage,
 
         max_sum_square[i] = np.max(x2y2z2)
         mean_sum_square[i] = np.mean(x2y2z2)
-        # print(mean_sum_square)
         if system == 'lorenz':
             means[i] = np.mean(pred[0])
             variances[i] = np.var(pred[0])
@@ -1272,6 +1271,7 @@ def testwrapped(res_X, Win, W_data, W_indices, W_indptr, W_shape, Wout, leakage,
 
 
 def generate_res(res_gen, rk, res_size, rho, sigma, leakage, win_type, bias_type, noise_stream, noisetype='none', noise_scaling=0, noise_realizations=1, traintype='normal', skip=150):
+    # Function for generating a reservoir and obtaining matrices used for training the reservoir
     reservoir = Reservoir(rk, res_gen, rk.u_arr_train.shape[0], rsvr_size=res_size,
                 spectral_radius=rho, input_weight=sigma, leakage=leakage, win_type=win_type, bias_type=bias_type)
     # print('Train Data shape: (%d, %d)' % (rk.u_arr_train.shape[0], rk.u_arr_train.shape[1]))
@@ -1280,15 +1280,15 @@ def generate_res(res_gen, rk, res_size, rho, sigma, leakage, win_type, bias_type
     res_shape = reservoir.X.shape
     noise_in = gen_noise_driver(data_shape, res_shape, traintype,
                                 noisetype, noise_scaling, noise_stream, noise_realizations)
-    print(noise_in.shape)
+    # print(noise_in.shape)
     get_states(reservoir, rk, noise_in, noisetype, noise_scaling,
                noise_realizations, traintype, skip)
     return reservoir, noise_in
 
 
 def optim_func(res, noise_in, noise, rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests, alpha,   true_pmap_max, rkTime=400, split=2000, traintype='normal', system='lorenz', params=np.array([[], []], dtype=np.complex128), pmap = False):
+    # Function for training and testing the performance of a reservoir trained using a particular regularization parameter
 
-    # try:
     idenmat = np.identity(
         res.rsvr_size+1+rktest_u_arr_train_nonoise.shape[0])*alpha
     if traintype not in ['sylvester', 'sylvester_wD']:
@@ -1311,14 +1311,14 @@ def optim_func(res, noise_in, noise, rktest_u_arr_train_nonoise, rktest_u_arr_te
     wass_dist = out[6]
     pmap_max = out[7]
     pmap_max_wass_dist = out[8]
-    # except:
-        # print("eigenvalue error occured.")
 
     return -1*results, mean_sum_squared, max_sum_squared, variances, valid_time, preds, wass_dist, pmap_max, pmap_max_wass_dist
 
 
 def get_res_results(itr, res_gen, rk, res_size, rho, sigma, leakage, win_type, bias_type, noisetype, noise, noise_realizations, noise_stream, traintype,
     rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests, alpha_values, rkTime_test, split_test, system, tau, params, savepred, debug_mode, train_seed,   true_pmap_max, pmap):
+    # Function for generating, training, and testing the performance of a reservoir given an input set of testing data time series,
+    # a set of regularization values, and a set of noise magnitudes
     tic = time.perf_counter()
     print('Starting res %d' % itr)
     reservoir, noise_in = generate_res(res_gen, rk, res_size, rho, sigma, leakage,
@@ -1326,10 +1326,6 @@ def get_res_results(itr, res_gen, rk, res_size, rho, sigma, leakage, win_type, b
 
     toc = time.perf_counter()
     print('Res states found for itr %d, runtime: %f sec.' % (itr, toc-tic))
-    # for r in reservoirs:
-    # r.data_trstates = 0
-    # r.states_trstates = 0
-    #    get_states(r, rk, skip = 150)
 
     final_out = []
     if not isinstance(noise, np.ndarray):
@@ -1446,6 +1442,10 @@ def get_res_results(itr, res_gen, rk, res_size, rho, sigma, leakage, win_type, b
 
 
 def find_stability(noisetype, noise, traintype, train_seed, train_gen, res_itr, res_gen, test_stream, noise_stream, rho, sigma, leakage, win_type, bias_type, train_time, res_size, res_per_test, noise_realizations, num_tests, alpha_values, system, tau, savepred, debug_mode, foldername, pmap):
+
+    # Main function for training and testing reservoir performance. This function first generates the training and testing data,
+    # the passes to get_res_results to obtain th reservoir performance.
+
     import warnings
     warnings.filterwarnings("ignore")
     if isinstance(noise, np.ndarray):
@@ -1483,10 +1483,10 @@ def find_stability(noisetype, noise, traintype, train_seed, train_gen, res_itr, 
     #print(rk.u_arr_train[-3:,-3:])
     #true_filename = foldername + \
     #    '%s_tau%0.2f_true_trajectory.csv' % (system, tau)
-    true_pmap_max_filename = foldername + \
-        '%s_tau%0.2f_true_pmap_max.csv' % (system, tau)
     #true_trajectory = np.loadtxt(true_filename, delimiter=',')
     if pmap:
+        true_pmap_max_filename = foldername + \
+            '%s_tau%0.2f_true_pmap_max.csv' % (system, tau)
         true_pmap_max = np.loadtxt(true_pmap_max_filename, delimiter=',')
         print('Snippet of true poincare map:')
         print(true_pmap_max[:5])
@@ -1500,6 +1500,9 @@ def find_stability(noisetype, noise, traintype, train_seed, train_gen, res_itr, 
 
     return out
 
+# If we are running reservoir tests in parallel, compile the find_stability as a remote function.
+# Otherwise, wrap it.
+
 @ray.remote
 def find_stability_remote(*args):
     return find_stability(*args)
@@ -1509,6 +1512,9 @@ def find_stability_serial(*args):
 
 
 def get_stability_output(out_full, noise_indices, train_indices, res_per_test, num_tests, alpha_values, savepred, metric = 'mss_var', return_all = False):#metric='pmap_max_wass_dist'):
+    # Function to process the output from all of the different reservoirs, trainning data sets, and noise values tested by find_stability.
+    # If return_all is True, this simply unpacks the linear output from the find_stability loop.
+    # If not, then this function returns only the results using the most optimal regularization (as defined by the metric) and using no regulariation.
     noise_vals = np.unique(noise_indices)
     train_vals = np.unique(train_indices)
     """
@@ -1697,6 +1703,11 @@ def get_stability_output(out_full, noise_indices, train_indices, res_per_test, n
 
 
 def main(argv):
+
+    # Main driver function for obtaining reservoir performance. This function processes input arguments and
+    # creates random number generators for the different reservoirs, trainings, noise arrays, and tests.
+    # It then calls find_stability in a loop, processes the output from find_stability, and saves the output to a folder.
+
     print('Function Started')
     train_time = 3000
     res_size = 1000
@@ -1976,9 +1987,6 @@ def main(argv):
         #    print('Noise val: %e' % ntr[k])
         #    print('Res idx: %d' % rtn[k])
         #    print(out[k][8][0, -1, -1])
-
-        # out = [find_stability(noisetype, ntr[i], traintype, tnr[i], rtn[i], rho, sigma, leakage, win_type, bias_type, train_time, \
-        #         res_size, res_per_test, noise_realizations, num_tests, alpha_values, system, tau, savepred, debug_mode) for i in range(tnr.size)]
     results = get_stability_output(out, ntr, tnr, res_per_test, num_tests, alpha_values, savepred, metric, return_all)
 
     # print(len(results[0]))
@@ -1998,7 +2006,6 @@ def main(argv):
     if not os.path.isdir(os.path.join(os.path.join(foldername, top_folder), folder)):
         os.mkdir(os.path.join(os.path.join(foldername, top_folder), folder))
 
-    # foldername = ''
     print('Ray finished')
 
     if not return_all:
