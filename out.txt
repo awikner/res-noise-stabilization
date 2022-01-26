@@ -1,2 +1,0 @@
-Ray installed
-Starting Ray Computation
