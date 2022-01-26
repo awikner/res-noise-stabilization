@@ -375,19 +375,19 @@ def getXwrapped(u_training, res_X, Win, W_data, W_indices, W_indptr, W_shape, le
 
     # loops through every timestep
     if noisetype in ['gaussian', 'perturbation']:
-        if traintype in ['normal', 'rmean', 'rplusq'] or 'confined' in traintype:
+        if traintype in ['normal', 'rmean', 'rplusq','rmeanq','rqmean','rq'] or 'confined' in traintype:
             # noise = gen_noise(u_training.shape[0], u_training.shape[1], noisetype, noise_scaling, noise_gen, noise_realization)
             for i in range(0, u_training[0].size):
                 res_X[:, i+1] = (1.0-leakage)*res_X[:, i] + leakage*np.tanh(Win @ np.append(
                     1., u_training[:, i]+noise[:, i])+mult_vec(W_data, W_indices, W_indptr, W_shape, res_X[:, i]))
             u_training_wnoise = u_training+noise
-        elif traintype in ['normalres1', 'rmeanres1', 'rplusqres1']:
+        elif traintype in ['normalres1', 'rmeanres1', 'rplusqres1','rmeanqres1','rqmeanres1','rqres1']:
             # noise = gen_noise(res_X.shape[0], u_training.shape[1], noisetype, noise_scaling, noise_gen, noise_realization)
             for i in range(0, u_training[0].size):
                 res_X[:, i+1] = (1.0-leakage)*res_X[:, i] + leakage*np.tanh(Win @ np.append(
                     1., u_training[:, i])+mult_vec(W_data, W_indices, W_indptr, W_shape, res_X[:, i]+noise[:, i]))
             u_training_wnoise = u_training
-        elif traintype in ['normalres2', 'rmeanres2', 'rplusqres2']:
+        elif traintype in ['normalres2', 'rmeanres2', 'rplusqres2','rmeanqres2','rqmeanres2','rqres2']:
             # noise = gen_noise(res_X.shape[0], u_training.shape[1], noisetype, noise_scaling, noise_gen, noise_realization)
             for i in range(0, u_training[0].size):
                 res_X[:, i+1] = (1.0-leakage)*res_X[:, i] + leakage*np.tanh(Win @ np.append(
@@ -404,7 +404,7 @@ def getXwrapped(u_training, res_X, Win, W_data, W_indices, W_indptr, W_shape, le
         for i in range(0, u_training[0].size):
             res_X_nonoise[:, i+1] = (1.0-leakage)*res_X_nonoise[:, i] + leakage*np.tanh(Win @ np.append(
                 1., u_training[:, i])+mult_vec(W_data, W_indices, W_indptr, W_shape, res_X_nonoise[:, i]))
-        if traintype in ['normal', 'rmean', 'rplusq']:
+        if traintype in ['normal', 'rmean', 'rplusq','rmeanq','rqmean','rq']:
             # noise = gen_noise(u_training.shape[0], u_training.shape[1], str(noisetype), noise_scaling, noise_gen, noise_realization)
             for i in range(0, u_training[0].size-noise_steps):
                 temp_x = res_X_nonoise[:, i]
@@ -415,7 +415,7 @@ def getXwrapped(u_training, res_X, Win, W_data, W_indices, W_indptr, W_shape, le
                         1., u_training[:, i+k]+noise[:, i+k])+mult_vec(W_data, W_indices, W_indptr, W_shape, temp_x))
                 res_X[:, i+noise_steps] = temp_x
             u_training_wnoise = u_training+noise
-        elif traintype in ['normalres1', 'rmeanres1', 'rplusqres1']:
+        elif traintype in ['normalres1', 'rmeanres1', 'rplusqres1','rmeanqres1','rqmeanres1','rqres1']:
             # noise = gen_noise(res_X.shape[0], u_training.shape[1], noisetype, noise_scaling, noise_gen, noise_realization)
             for i in range(0, u_training[0].size-noise_steps):
                 temp_x = res_X_nonoise[:, i]
@@ -426,7 +426,7 @@ def getXwrapped(u_training, res_X, Win, W_data, W_indices, W_indptr, W_shape, le
                         1., u_training[:, i+k])+mult_vec(W_data, W_indices, W_indptr, W_shape, temp_x+noise[:, i+k]))
                 res_X[:, i+noise_steps] = temp_x
             u_training_wnoise = u_training
-        elif traintype in ['normalres2', 'rmeanres2', 'rplusqres2']:
+        elif traintype in ['normalres2', 'rmeanres2', 'rplusqres2','rmeanqres2','rqmeanres2','rqres2']:
             # noise = gen_noise(res_X.shape[0], u_training.shape[1], noisetype, noise_scaling, noise_gen, noise_realization)
             for i in range(0, u_training[0].size-noise_steps):
                 temp_x = res_X_nonoise[:, i]
@@ -441,7 +441,7 @@ def getXwrapped(u_training, res_X, Win, W_data, W_indices, W_indptr, W_shape, le
             raise ValueError
         return res_X, u_training_wnoise
     elif noisetype in ['gaussian_onestep', 'perturbation_onestep']:
-        if traintype in ['normal', 'rmean', 'rplusq']:
+        if traintype in ['normal', 'rmean', 'rplusq','rmeanq','rqmean','rq']:
             # noise = gen_noise(u_training.shape[0], u_training.shape[1], noisetype, noise_scaling, noise_gen, noise_realization)
             temp_x = res_X[:, 0]
             for i in range(0, u_training[0].size):
@@ -450,7 +450,7 @@ def getXwrapped(u_training, res_X, Win, W_data, W_indices, W_indptr, W_shape, le
                 temp_x = np.tanh(Win @ np.append(1., u_training[:, i])+mult_vec(
                     W_data, W_indices, W_indptr, W_shape, temp_x))
             u_training_wnoise = u_training+noise
-        elif traintype in ['normalres1', 'rmeanres1', 'rplusqres1']:
+        elif traintype in ['normalres1', 'rmeanres1', 'rplusqres1','rmeanqres1','rqmeanres1','rqres1']:
             # noise = gen_noise(res_X.shape[0], u_training.shape[1], noisetype, noise_scaling, noise_gen, noise_realization)
             temp_x = res_X[:, 0]
             for i in range(0, u_training[0].size):
@@ -459,7 +459,7 @@ def getXwrapped(u_training, res_X, Win, W_data, W_indices, W_indptr, W_shape, le
                 temp_x = np.tanh(Win @ np.append(1., u_training[:, i])+mult_vec(
                     W_data, W_indices, W_indptr, W_shape, temp_x))
             u_training_wnoise = u_training
-        elif traintype in ['normalres2', 'rmeanres2', 'rplusqres2']:
+        elif traintype in ['normalres2', 'rmeanres2', 'rplusqres2','rmeanqres2','rqmeanres2','rqres2']:
             # noise = gen_noise(res_X.shape[0], u_training.shape[1], noisetype, noise_scaling, noise_gen, noise_realization)
             temp_x = res_X[:, 0]
             for i in range(0, u_training[0].size):
@@ -532,38 +532,38 @@ def getjacobian(Win, W, Wout, Dn):
 
 def gen_noise_driver(data_shape, res_shape, traintype, noisetype, noise_scaling, noise_stream, noise_realizations):
     if noisetype in ['gaussian', 'perturbation']:
-        if traintype in ['normal', 'rmean', 'rplusq'] or 'confined' in traintype:
+        if traintype in ['normal', 'rmean', 'rplusq','rmeanq','rqmean','rq'] or 'confined' in traintype:
             noise = gen_noise(data_shape[0], data_shape[1], noisetype,
                               noise_scaling, noise_stream, noise_realizations)
-        elif traintype in ['normalres1', 'rmeanres1', 'rplusqres1']:
+        elif traintype in ['normalres1', 'rmeanres1', 'rplusqres1','rmeanqres1','rqmeanres1','rqres1']:
             noise = gen_noise(res_shape[0], data_shape[1], noisetype,
                               noise_scaling, noise_stream, noise_realizations)
-        elif traintype in ['normalres2', 'rmeanres2', 'rplusqres2']:
+        elif traintype in ['normalres2', 'rmeanres2', 'rplusqres2','rmeanqres2','rqmeanres2','rqres2']:
             noise = gen_noise(res_shape[0], data_shape[1], noisetype,
                               noise_scaling, noise_stream, noise_realizations)
         else:
             raise ValueError
     elif noisetype not in ['gaussian_onestep', 'perturbation_onestep'] and \
             ('gaussian' in noisetype and 'step' in noisetype):
-        if traintype in ['normal', 'rmean', 'rplusq']:
+        if traintype in ['normal', 'rmean', 'rplusq','rmeanq','rqmean','rq']:
             noise = gen_noise(data_shape[0], data_shape[1], str(
                 noisetype), noise_scaling, noise_stream, noise_realizations)
-        elif traintype in ['normalres1', 'rmeanres1', 'rplusqres1']:
+        elif traintype in ['normalres1', 'rmeanres1', 'rplusqres1','rmeanqres1','rqmeanres1','rqres1']:
             noise = gen_noise(res_shape[0], data_shape[1], noisetype,
                               noise_scaling, noise_stream, noise_realizations)
-        elif traintype in ['normalres2', 'rmeanres2', 'rplusqres2']:
+        elif traintype in ['normalres2', 'rmeanres2', 'rplusqres2','rmeanqres2','rqmeanres2','rqres2']:
             noise = gen_noise(res_shape[0], data_shape[1], noisetype,
                               noise_scaling, noise_stream, noise_realizations)
         else:
             raise ValueError
     elif noisetype in ['gaussian_onestep', 'perturbation_onestep']:
-        if traintype in ['normal', 'rmean', 'rplusq']:
+        if traintype in ['normal', 'rmean', 'rplusq','rmeanq','rqmean','rq']:
             noise = gen_noise(data_shape[0], data_shape[1], noisetype,
                               noise_scaling, noise_stream, noise_realizations)
-        elif traintype in ['normalres1', 'rmeanres1', 'rplusqres1']:
+        elif traintype in ['normalres1', 'rmeanres1', 'rplusqres1','rmeanqres1','rqmeanres1','rqres1']:
             noise = gen_noise(res_shape[0], data_shape[1], noisetype,
                               noise_scaling, noise_stream, noise_realizations)
-        elif traintype in ['normalres2', 'rmeanres2', 'rplusqres2']:
+        elif traintype in ['normalres2', 'rmeanres2', 'rplusqres2','rmeanqres2','rqmeanres2','rqres2']:
             noise = gen_noise(res_shape[0], data_shape[1], noisetype,
                               noise_scaling, noise_stream, noise_realizations)
         else:
@@ -627,6 +627,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
     gradient_reg = np.zeros((rsvr_size+n+1, rsvr_size+n+1))
     Y_train = np.ascontiguousarray(u_arr_train[:, skip+1:])
     if traintype in ['normal', 'normalres1', 'normalres2']:
+        # Normal multi-noise training that sums all reservoir state outer products
         data_trstates = np.zeros((n, rsvr_size+1+n), dtype=np.float64)
         states_trstates = np.zeros(
             (n+rsvr_size+1, n+rsvr_size+1), dtype=np.float64)
@@ -640,18 +641,25 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
             states_trstates += X_train @ X_train.T
         return [data_trstates, states_trstates, gradient_reg]
     elif traintype in ['rmeanq','rmeanqres1','rmeanqres2']:
-        data_trstates = np.zeros((n, rsvr_size+1+n), dtype=np.float64)
-        states_trstates = np.zeros(
-            (n+rsvr_size+1, n+rsvr_size+1), dtype=np.float64)
+        # Training using the mean and the rescaled sum of the perturbations from the mean
         for i in range(noise_realizations):
-            X, u_arr_train_noise = getXwrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_shape, leakage, noise[i], noisetype,noise_scaling, i, traintype)
-            X = X[:, skip+1:(res_d - 1)]
+            X, u_arr_train_noise = getXwrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_shape,leakage, noise[i], noisetype,noise_scaling, i, traintype)
+            X = np.ascontiguousarray(X[:, skip+1:(res_d - 1)])
             X_train = np.ascontiguousarray(np.concatenate(
                 (np.ones((1, d-(skip+1))), X, u_arr_train_noise[:, skip:-1]), axis=0))
-            data_trstates += Y_train @ X_train.T
-            states_trstates += X_train @ X_train.T
+            if i == 0:
+                X_train_mean = np.zeros(X_train.shape)
+                X_all = np.zeros((X_train.shape[0], X_train.shape[1], noise_realizations))
+            X_train_mean += X_train/noise_realizations
+            X_all[:, :, i] = X_train
+        data_trstates = Y_train @ X_train_mean.T
+        states_trstates = X_train_mean @ X_train_mean.T
+        for i in range(noise_realizations):
+            Q_fit = X_all[:, :, i] - X_train_mean
+            states_trstates += (Q_fit @ Q_fit.T)/noise_realizations
         return [data_trstates, states_trstates, gradient_reg]
     elif traintype in ['rmean', 'rmeanres1', 'rmeanres2']:
+        # Training using the mean only
         for i in range(noise_realizations):
             X, u_arr_train_noise = getXwrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_shape, leakage, noise[i], noisetype,
                 noise_scaling, i, traintype)
@@ -664,7 +672,54 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
         data_trstates = Y_train @ X_train_mean.T
         states_trstates = X_train_mean @ X_train_mean.T
         return [data_trstates, states_trstates, gradient_reg]
+    elif traintype in ['rqmean','rqmeanres1','rqmeanres2']:
+        # Training using the noiseless reservoir and the rescaled perturbations from the mean
+        X_0, u_arr_train_noise = getXwrapped(
+            u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_shape, leakage, noise[i])
+        X_0 = np.ascontiguousarray(X_0[:, skip+1:(res_X[0].size - 1)])
+        X_train_0 = np.ascontiguousarray(np.concatenate(
+            (np.ones((1, d-(skip+1))), X_0, u_arr_train[:, skip:-1]), axis=0))
+        X_all = np.zeros(
+            (X_train_0.shape[0], X_train_0.shape[1], noise_realizations))
+        for i in range(noise_realizations):
+            X, u_arr_train_noise = getXwrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_shape,leakage, noise[i], noisetype,noise_scaling, i, traintype)
+            X = np.ascontiguousarray(X[:, skip+1:(res_d - 1)])
+            X_train = np.ascontiguousarray(np.concatenate(
+                (np.ones((1, d-(skip+1))), X, u_arr_train_noise[:, skip:-1]), axis=0))
+            if i == 0:
+                X_train_mean = np.zeros(X_train.shape)
+            X_train_mean += X_train/noise_realizations
+            X_all[:, :, i] = X_train
+        data_trstates = Y_train @ X_train_0.T
+        states_trstates = X_train_0 @ X_train_0.T
+        for i in range(noise_realizations):
+            Q_fit = X_all[:,:,i] - X_train_mean
+            states_trstates += (Q_fit @ Q_fit.T)/noise_realizations
+        return [data_trstates, states_trstates, gradient_reg]
+    elif traintype in ['rq','rqres1','rqres2']:
+        # Training using the noiseless reservoir and the rescaled perturbations from the noiseless reservoir
+        X_0, u_arr_train_noise = getXwrapped(
+            u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_shape, leakage, noise[i])
+        X_0 = np.ascontiguousarray(X_0[:, skip+1:(res_X[0].size - 1)])
+        X_train_0 = np.ascontiguousarray(np.concatenate(
+            (np.ones((1, d-(skip+1))), X_0, u_arr_train[:, skip:-1]), axis=0))
+        X_all = np.zeros(
+            (X_train_0.shape[0], X_train_0.shape[1], noise_realizations))
+        for i in range(noise_realizations):
+            X, u_arr_train_noise = getXwrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_shape,     leakage, noise[i], noisetype,noise_scaling, i, traintype)
+            X = np.ascontiguousarray(X[:, skip+1:(res_d - 1)])
+            X_train = np.ascontiguousarray(np.concatenate(
+                (np.ones((1, d-(skip+1))), X, u_arr_train_noise[:, skip:-1]), axis=0))
+            X_all[:, :, i] = X_train
+        data_trstates = Y_train @ X_train_0.T
+        states_trstates = X_train_0 @ X_train_0.T
+        for i in range(noise_realizations):
+            Q_fit = X_all[:,:,i] - X_train_0
+            states_trstates += (Q_fit @ Q_fit.T)/noise_realizations
+        return [data_trstates, states_trstates, gradient_reg]
     elif traintype in ['rplusq', 'rplusqres1', 'rplusqres2']:
+        # Training using the sum of the outer products of the sum of the noiseless reservoir and
+        # the perturbation from the mean
         X_0, u_arr_train_noise = getXwrapped(
             u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_shape, leakage, noise[i])
         X_0 = np.ascontiguousarray(X_0[:, skip+1:(res_X[0].size - 1)])
@@ -745,80 +800,124 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
         return [data_trstates, states_trstates, gradient_reg]
     elif traintype == 'gradient':
         X, D = getXwrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr,
-                           W_shape, leakage, noise[i], noisetype, noise_scaling, 1, traintype)
+                           W_shape, leakage, noise[0], noisetype, noise_scaling, 1, traintype)
         X = X[:, skip+1:(res_d - 1)]
         D = D[:, skip+1:(res_d - 1)]
         X_train = np.concatenate(
             (np.ones((1, d-(skip+1))), X, u_arr_train[:, skip:-1]), axis=0)
-        gradient_reg = np.zeros((rsvr_size+n, rsvr_size+n))
+        gradient_reg = np.zeros((rsvr_size+n+1, rsvr_size+n+1))
         for i in range(X.shape[1]):
             D_n = np.concatenate(
                 (matrix_diag_mult(D[:, i], Win[:, 1:]), np.identity(n)), axis=0)
-            gradient_reg += D_n @ D_n.T
+            gradient_reg[1:,1:] += D_n @ D_n.T
+        print('Gradient reg:')
+        print(gradient_reg[:5,:5])
         data_trstates = Y_train @ X_train.T
         states_trstates = X_train @ X_train.T
-        states_trstates[1:, 1:] = states_trstates[1:, 1:] + \
-            noise_scaling**2/noise_realizations*gradient_reg
         return [data_trstates, states_trstates, gradient_reg]
     elif traintype == 'gradient12':
-        X, D = getXwrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr,
-                           W_shape, leakage, noise[i], noisetype, noise_scaling, 1, traintype)
-        X = X[:, skip+1:(res_d - 1)]
-        D = D[:, skip+1:(res_d - 1)]
-        X_train = np.concatenate(
-            (np.ones((1, d-(skip+1))), X, u_arr_train[:, skip:-1]), axis=0)
-        gradient_reg = np.zeros((rsvr_size+n+1, rsvr_size+n+1))
-        W_mat_data, W_mat_indices, W_mat_indptr, W_mat_shape = construct_jac_mat_csc(
-            Win, W_data, W_indices, W_indptr, W_shape, rsvr_size, n)
-        for i in range(X.shape[1]):
-            D_n = np.concatenate(
-                (matrix_diag_mult(D[:, i], Win[:, 1:]), np.identity(n)), axis=0)
-            gradient_reg[1:, 1:] += D_n @ D_n.T
-        for i in range(1, X.shape[1]):
-            D_n2 = np.concatenate((np.zeros((1, n)), matrix_diag_mult(
-                D[:, i-1], Win[:, 1:]), np.identity(n)), axis=0)
-            E_n = np.concatenate((np.zeros((1, rsvr_size+n+1)), matrix_dot_left_T(W_mat_data, W_mat_indices, W_mat_indptr, W_mat_shape, np.diag(D[:, i])) +
-                np.concatenate((np.zeros((1, rsvr_size)), (1-leakage) *
-                               np.identity(rsvr_size), np.zeros((rsvr_size, n))), axis=1),
-                np.zeros((n, rsvr_size+n+1))), axis=0)
-            E_nD_n2 = E_n @ D_n2
-            gradient_reg += E_nD_n2 @ E_nD_n2.T
-        data_trstates = Y_train @ X_train.T
-        states_trstates = X_train @ X_train.T
-        states_trstates = states_trstates + \
-            noise_scaling**2/noise_realizations*gradient_reg
-        return [data_trstates, states_trstates, gradient_reg]
-    elif traintype == 'gradient2':
-        X, D = getXwrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr,
-                           W_shape, leakage, noise[i], noisetype, noise_scaling, 1, traintype)
-        X = X[:, skip+1:(res_d - 1)]
-        D = D[:, skip+1:(res_d - 1)]
-        X_train = np.concatenate(
-            (np.ones((1, d-(skip+1))), X, u_arr_train[:, skip:-1]), axis=0)
-        gradient_reg = np.zeros((rsvr_size+n+1, rsvr_size+n+1))
-        W_mat_data, W_mat_indices, W_mat_indptr, W_mat_shape = construct_jac_mat_csc(
-            Win, W_data, W_indices, W_indptr, W_shape, rsvr_size, n)
-        for i in range(1, X.shape[1]):
-            D_n2 = np.concatenate((np.zeros((1, n)), matrix_diag_mult(
-                D[:, i-1], Win[:, 1:]), np.identity(n)), axis=0)
-            E_n = np.concatenate((np.zeros((1, rsvr_size+n+1)), matrix_dot_left_T(W_mat_data, W_mat_indices, W_mat_indptr, W_mat_shape, np.diag(D[:, i])) +
-                np.concatenate((np.zeros((1, rsvr_size)), (1-leakage) *
-                               np.identity(rsvr_size), np.zeros((rsvr_size, n))), axis=1),
-                np.zeros((n, rsvr_size+n+1))), axis=0)
-            E_nD_n2 = E_n @ D_n2
-            gradient_reg += E_nD_n2 @ E_nD_n2.T
-        data_trstates = Y_train @ X_train.T
-        states_trstates = X_train @ X_train.T
-        states_trstates = states_trstates + \
-            noise_scaling**2/noise_realizations*gradient_reg
-        return [data_trstates, states_trstates, gradient_reg]
-    elif 'gradientk' in traintype:
-        k = str_to_int(traintype.replace('gradientk', ''))
-        print(k)
         X, D = getXwrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr,
                            W_shape, leakage, noise[0], noisetype, noise_scaling, 1, traintype)
         X = X[:, skip+1:(res_d - 1)]
         D = D[:, skip+1:(res_d - 1)]
+        """
+        print('X')
+        print(X[:3,:3])
+        print('D')
+        print(D[:3,:3])
+        print('Train:')
+        print(u_arr_train[:3,skip:skip+3])
+        print('Win')
+        print(Win[:5,:5])
+        """
+        X_train = np.concatenate(
+            (np.ones((1, d-(skip+1))), X, u_arr_train[:, skip:-1]), axis=0)
+        gradient_reg = np.zeros((rsvr_size+n+1, rsvr_size+n+1))
+        W_mat_data, W_mat_indices, W_mat_indptr, W_mat_shape = construct_jac_mat_csc(
+            Win, W_data, W_indices, W_indptr, W_shape, rsvr_size, n)
+        leakage_mat = np.concatenate((np.zeros((rsvr_size,1)), (1-leakage) *
+                                np.identity(rsvr_size), np.zeros((rsvr_size, n))), axis=1)
+        for i in range(1, X.shape[1]):
+            if i > 0:
+                D_n2 = np.concatenate((np.zeros((1, n)), matrix_diag_mult(
+                    D[:, i-1], Win[:, 1:]), np.identity(n)), axis=0)
+                E_n = np.concatenate((np.zeros((1, rsvr_size+n+1)), matrix_dot_left_T(W_mat_data, W_mat_indices, W_mat_indptr, W_mat_shape, np.diag(D[:, i])) + leakage_mat,
+                    np.zeros((n, rsvr_size+n+1))), axis=0)
+                E_nD_n2 = E_n @ D_n2
+                """
+                if i == 1:
+                    print('E_n * D_n')
+                    print(E_nD_n2[:5,:5])
+                if i == 2:
+                    print('Reg components @ 2,0')
+                    print(E_nD_n2[:5,:5])
+                """
+                gradient_reg += E_nD_n2 @ E_nD_n2.T
+            D_n = np.concatenate(
+                (matrix_diag_mult(D[:, i], Win[:, 1:]), np.identity(n)), axis=0)
+            """
+            if i == 1:
+                print('D_n:')
+                print(D_n[:5,:5])
+            if i == 2:
+                print('Reg components @ 2,1')
+                print(D_n[:5,:5])
+            """
+            gradient_reg[1:, 1:] += D_n @ D_n.T
+            """
+            if i == 1:
+                print('Init Gradient reg:')
+                print(gradient_reg[:5,:5])
+            if i == 2:
+                print('Second Gradient reg:')
+                print(gradient_reg[:5,:5])
+            """
+        """
+        print('Gradient reg:')
+        print(gradient_reg[:5,:5])
+        """
+        data_trstates = Y_train @ X_train.T
+        states_trstates = X_train @ X_train.T
+        return [data_trstates, states_trstates, gradient_reg]
+    elif traintype == 'gradient2':
+        X, D = getXwrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr,
+                           W_shape, leakage, noise[0], noisetype, noise_scaling, 1, traintype)
+        X = X[:, skip+1:(res_d - 1)]
+        D = D[:, skip+1:(res_d - 1)]
+        X_train = np.concatenate(
+            (np.ones((1, d-(skip+1))), X, u_arr_train[:, skip:-1]), axis=0)
+        gradient_reg = np.zeros((rsvr_size+n+1, rsvr_size+n+1))
+        W_mat_data, W_mat_indices, W_mat_indptr, W_mat_shape = construct_jac_mat_csc(
+            Win, W_data, W_indices, W_indptr, W_shape, rsvr_size, n)
+        for i in range(1, X.shape[1]):
+            D_n2 = np.concatenate((np.zeros((1, n)), matrix_diag_mult(
+                D[:, i-1], Win[:, 1:]), np.identity(n)), axis=0)
+            E_n = np.concatenate((np.zeros((1, rsvr_size+n+1)), matrix_dot_left_T(W_mat_data, W_mat_indices, W_mat_indptr, W_mat_shape, np.diag(D[:, i])) +
+                np.concatenate((np.zeros((rsvr_size,1)), (1-leakage) *
+                               np.identity(rsvr_size), np.zeros((rsvr_size, n))), axis=1),
+                np.zeros((n, rsvr_size+n+1))), axis=0)
+            E_nD_n2 = E_n @ D_n2
+            gradient_reg += E_nD_n2 @ E_nD_n2.T
+        data_trstates = Y_train @ X_train.T
+        states_trstates = X_train @ X_train.T
+        return [data_trstates, states_trstates, gradient_reg]
+    elif 'gradientk' in traintype:
+        k = str_to_int(traintype.replace('gradientk', ''))
+        #print(k)
+        X, D = getXwrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr,
+                           W_shape, leakage, noise[0], noisetype, noise_scaling, 1, traintype)
+        X = X[:, skip+1:(res_d - 1)]
+        D = D[:, skip+1:(res_d - 1)]
+        """
+        print('X')
+        print(X[:3,:3])
+        print('D')
+        print(D[:3,:3])
+        print('Train:')
+        print(u_arr_train[:3,skip:skip+3])
+        print('Win')
+        print(Win[:5,:5])
+        """
         X_train = np.concatenate(
             (np.ones((1, d-(skip+1))), X, u_arr_train[:, skip:-1]), axis=0)
         gradient_reg = np.zeros((rsvr_size+n+1, rsvr_size+n+1))
@@ -840,24 +939,48 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
             E_n[1:rsvr_size+1, :, i-1] = matrix_diag_sparse_mult_add(
                 D[:, i], W_mat_data, W_mat_indices, W_mat_indptr, W_mat_shape, leakage_mat)
         reg_components[:, :, k-1] = D_n[:, :, -1]
+        """
+        print('D_n:')
+        print(reg_components[:5,:5,k-1])
+        """
+
         for i in range(k-1):
             reg_components[:, :, i] = D_n[:, :, i]
             for j in range(i, k-1):
                 reg_components[:, :, i] = matrix_sparse_mult(
                     E_n[:, :, j], reg_components[:, :, i])
+        """
+        print('E_n * D_n')
+        print(reg_components[:5,:5,0])
+        """
 
         for i in range(k, X.shape[1]):
             for j in range(k):
                 gradient_reg += reg_components[:,
                     :, j] @ reg_components[:, :, j].T
-            reg_components[1:rsvr_size+1, :, k -
-                1] = matrix_diag_mult(D[:, i], Win[:, 1:])
-            reg_components[1+rsvr_size:, :, k-1] = np.identity(n)
+            """
+            if i == k:
+                print('Init Gradient reg:')
+                print(gradient_reg[:5,:5])
+            if i == k+1:
+                print('Second Gradient reg:')
+                print(gradient_reg[:5,:5])
+            """
             E_n[1:rsvr_size+1, :, k-2] = matrix_diag_sparse_mult_add(
                 D[:, i], W_mat_data, W_mat_indices, W_mat_indptr, W_mat_shape, leakage_mat)
             for j in range(k-1):
                 reg_components[:, :, j] = matrix_sparse_mult(
-                    E_n[:, :, k-2], reg_components[:, :, j])
+                    E_n[:, :, k-2], reg_components[:, :, j+1])
+            reg_components[1:rsvr_size+1, :, k - 1] = matrix_diag_mult(D[:, i], Win[:, 1:])
+            reg_components[1+rsvr_size:, :, k-1] = np.identity(n)
+            """
+            if i == k:
+                print('Reg components @ 2,1')
+                print(reg_components[:5,:5, k -1])
+            if i == k:
+                print('Reg components @ 2,0')
+                print(reg_components[:5,:5, 0])
+            """
             """
             if i % 50 == 0:
                 with objmode(toc = 'double'):
@@ -869,7 +992,10 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
             """
         for j in range(k):
             gradient_reg += reg_components[:, :, j] @ reg_components[:, :, j].T
-
+        """
+        print('Gradient reg:')
+        print(gradient_reg[:5,:5])
+        """
         data_trstates = Y_train @ X_train.T
         states_trstates = X_train @ X_train.T
         return [data_trstates, states_trstates, gradient_reg]
@@ -1405,8 +1531,8 @@ def find_stability(noisetype, noise, traintype, train_seed, train_gen, res_itr, 
         u0 = 0.6*(train_gen.random(64)*2-1)
         rk = RungeKutta(0, 0, 0, tau=tau, T=train_time,
                         ttsplit=train_time, u0=u0, system=system, params=params)
-    print('Training data %d:' % train_seed)
-    print(rk.u_arr_train[-3:,-3:])
+    #print('Training data %d:' % train_seed)
+    #print(rk.u_arr_train[-3:,-3:])
     #true_filename = foldername + \
     #    '%s_tau%0.2f_true_trajectory.csv' % (system, tau)
     true_pmap_max_filename = foldername + \
@@ -1790,7 +1916,10 @@ def main(argv):
     noise_values_array = np.logspace(-4, 0, num = 13, base = 10)[5:10]
     # noise_values_array = np.array([np.logspace(-4, 0, num = 13, base = 10)[6]])
     # noise_values_array = np.array([0,1e-3,1e-2])
-    alpha_values = np.append(0., np.logspace(-7, -2, 11)*noise_realizations)
+    alpha_values = np.append(0., np.logspace(-7, -2, 11))
+    if traintype in ['normal','normalres1','normalres2','rmean','rmeanres1','rmeanres2',
+            'rplusq','rplusqres1','rplusqres2']:
+        alpha_values = alpha_values*noise_realizations
     # alpha_values = np.array([0,1e-6,1e-4])
     ss_res   = np.random.SeedSequence(12)
     ss_train = np.random.SeedSequence(34)
