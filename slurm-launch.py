@@ -19,6 +19,7 @@ COMMAND_PLACEHOLDER = "${COMMAND_PLACEHOLDER}"
 GIVEN_NODE = "${GIVEN_NODE}"
 LOAD_ENV = "${LOAD_ENV}"
 RUNTIME = "${RUNTIME}"
+ACCOUNT = "${ACCOUNT}"
 MEMORY  = "${MEMORY}"
 CPUS    = "${CPUS}"
 PARTITION = "${PARTITION}"
@@ -32,6 +33,12 @@ if __name__ == "__main__":
         type=str,
         default="15:00",
         help="Total runtime for the function.")
+    parser.add_argument(
+        "--account",
+        "-A",
+        type=str,
+        default="physics-hi",
+        help="Account to charge cluster time to.")
     parser.add_argument(
         "--exp-name",
         type=str,
@@ -106,6 +113,7 @@ if __name__ == "__main__":
     text = text.replace(LOAD_ENV, str(args.load_env))
     text = text.replace(GIVEN_NODE, node_info)
     text = text.replace(RUNTIME, args.runtime)
+    text = text.replace(ACCOUNT, args.account)
     text = text.replace(MEMORY, memory)
     text = text.replace(CPUS, str(args.cpus_per_node))
     text = text.replace(SCRATCH, str(args.tmp))
@@ -116,7 +124,7 @@ if __name__ == "__main__":
         "RUNNABLE!")
 
     # ===== Save the script =====
-    script_file = "{}.sh".format(job_name)
+    script_file = "bash_scripts/{}.sh".format(job_name)
     with open(script_file, "w") as f:
         f.write(text)
 
@@ -125,5 +133,5 @@ if __name__ == "__main__":
     subprocess.Popen(["sbatch", script_file])
     print(
         "Job submitted! Script file is at: <{}>. Log file is at: <{}>".format(
-            script_file, "{}.log".format(job_name)))
+            script_file, "log_files/{}.log".format(job_name)))
     sys.exit(0)

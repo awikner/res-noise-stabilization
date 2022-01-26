@@ -71,21 +71,49 @@ def kursiv_forecast(u, params):
         Nb = params[6]*fft(np.real(ifft(b))**2.0)
         c  = params[1]*a + params[2]*(2*Nb - Nv)
         Nc = params[6]*fft(np.real(ifft(c))**2.0)
-        v  = params[0]*v + Nv*params[3] + 2*(Na+Nb)*params[4] + Nc*params[5]
-        unext = np.real(ifft(v))
+        vnext  = params[0]*v + Nv*params[3] + 2*(Na+Nb)*params[4] + Nc*params[5]
+        unext = np.real(ifft(vnext))
     return unext
+
+@jit(nopython = True, fastmath = True)
+def kursiv_forecast_pred(u, params):
+    u = np.ascontiguousarray(u.T)
+    with objmode(unext = 'double[:,:]'):
+        v  = fft(u,axis = 1)
+        Nv = params[6]*fft(np.real(ifft(v, axis = 1))**2.0, axis = 1)
+        a  = params[1]*v + params[2]*Nv
+        Na = params[6]*fft(np.real(ifft(a, axis = 1))**2.0, axis = 1)
+        b  = params[1]*v + params[2]*Na
+        Nb = params[6]*fft(np.real(ifft(b, axis = 1))**2.0, axis = 1)
+        c  = params[1]*a + params[2]*(2*Nb - Nv)
+        Nc = params[6]*fft(np.real(ifft(c, axis = 1))**2.0, axis = 1)
+        v  = params[0]*v + Nv*params[3] + 2*(Na+Nb)*params[4] + Nc*params[5]
+        unext = np.real(ifft(v, axis = 1))
+    return unext.T
 
 
 @jit(nopython = True, fastmath = True)
-def kursiv_predict(u0, tau = 0.25, N = 64, d = 22, T = 100, params = np.array([[],[]], dtype = np.complex128)):
+def kursiv_predict(u0, tau = 0.25, N = 64, d = 22, T = 100, params = np.array([[],[]], dtype = np.complex128), int_steps = 1):
     if params.size == 0:
         new_params = precompute_KS_params(N, d, tau)
     else:
         new_params = params
-    steps = int(T/tau)
+    steps = T*int_steps
 
-    u_arr = np.zeros((N, steps+1))
+
+    u_arr = np.zeros((N, steps+int_steps))
     u_arr[:,0] = u0
-    for i in range(steps):
+    for i in range(steps+int_steps-1):
         u_arr[:,i+1] = kursiv_forecast(u_arr[:,i], new_params)
+    return np.ascontiguousarray(u_arr[:,::int_steps]), new_params
+
+@jit(nopython = True, fastmath = True)
+def kursiv_predict_pred(u0_array, tau = 0.25, N = 64, d = 22, T = 100, params = np.array([[],[]], dtype = np.complex128)):
+    if params.size == 0:
+        new_params = precompute_KS_params(N, d, tau)
+    else:
+        new_params = params
+    steps = T
+
+    u_arr = kursiv_forecast_pred(u0_array, new_params)
     return u_arr, new_params
