@@ -1992,16 +1992,17 @@ def main(argv):
     tn = tn.flatten()
     nt = nt.flatten()
 
-    top_folder = 'Data/%s_noisetest_noisetype_%s_traintype_%s/' % (system, noisetype, traintype)
-    folder = '%s_more_noisetest_%srho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s/' % (system,          predflag, rho, sigma, leakage, win_type, bias_type, tau, res_size, train_time, noise_realizations, noisetype, traintype)
-    if not os.path.isdir(os.path.join(foldername, top_folder)):
-        os.mkdir(os.path.join(foldername, top_folder))
-    if not os.path.isdir(os.path.join(os.path.join(foldername, top_folder), folder)):
-        os.mkdir(os.path.join(os.path.join(foldername, top_folder), folder))
-
     print('Ray finished')
 
     if not return_all:
+        top_folder = 'Data/%s_noisetest_noisetype_%s_traintype_%s/' % (system, noisetype, traintype)
+        folder = '%s_more_noisetest_%srho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s_metric_%s/' \
+            % (system,predflag, rho, sigma, leakage, win_type, bias_type, tau, res_size, \
+            train_time, noise_realizations, noisetype, traintype, metric)
+        if not os.path.isdir(os.path.join(foldername, top_folder)):
+            os.mkdir(os.path.join(foldername, top_folder))
+        if not os.path.isdir(os.path.join(os.path.join(foldername, top_folder), folder)):
+            os.mkdir(os.path.join(os.path.join(foldername, top_folder), folder))
         stable_frac        = []
         stable_frac_0      = []
         stable_frac_alpha  = []
@@ -2086,6 +2087,12 @@ def main(argv):
                         preds[i][r_test[j], test_r[j]], delimiter = ',')
         print('Results Saved')
     elif return_all:
+        top_folder = 'Data/%s_noisetest_noisetype_%s_traintype_%s/' % (system, noisetype, traintype)
+        folder = '%s_more_noisetest_%srho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s/' % (system,predflag, rho, sigma, leakage, win_type, bias_type, tau, res_size, train_time, noise_realizations, noisetype, traintype)
+        if not os.path.isdir(os.path.join(foldername, top_folder)):
+            os.mkdir(os.path.join(foldername, top_folder))
+        if not os.path.isdir(os.path.join(os.path.join(foldername, top_folder), folder)):
+            os.mkdir(os.path.join(os.path.join(foldername, top_folder), folder))
         stable_frac        = []
         stable_frac_0      = []
         mean_sum_squared   = []
