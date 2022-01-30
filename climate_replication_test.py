@@ -299,7 +299,7 @@ def RungeKuttawrapped_pred(h=0.01, tau=0.1, T=300, ttsplit=5000, u0_array=np.arr
         u_arr, new_params = kursiv_predict_pred(
             u0_array, tau=tau, T=T, params=params)
         u_arr = np.ascontiguousarray(u_arr)/(1.1876770355823614)
-    elif system = 'KS_d2175':
+    elif system == 'KS_d2175':
         u_arr, new_params = kursiv_predict_pred(u0_array, tau=tau, T=T, params=params, d=21.75)
         u_arr = np.ascontiguousarray(u_arr)/(1.2146066380280796)
     else:
