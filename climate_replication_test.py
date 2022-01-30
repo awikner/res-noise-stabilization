@@ -241,6 +241,10 @@ class RungeKutta:
             u_arr, self.params = kursiv_predict(u0, tau=tau, T=T, params=params)
             self.input_size = u_arr.shape[0]
             u_arr = np.ascontiguousarray(u_arr)/(1.1876770355823614)
+        elif system == 'KS_d2175':
+            u_arr, self.params = kursiv_predict(u0, tau=tau, T=T, d=21.75, params=params)
+            self.input_size = u_arr.shape[0]
+            u_arr = np.ascontiguousarray(u_arr)/(1.2146066380280796)
         else:
             raise ValueError
 
@@ -266,6 +270,9 @@ def RungeKuttawrapped(x0=2, y0=2, z0=23, h=0.01, tau=0.1, T=300, ttsplit=5000, u
     elif system == 'KS':
         u_arr, new_params = kursiv_predict(u0, tau=tau, T=T, params=params)
         u_arr = np.ascontiguousarray(u_arr)/(1.1876770355823614)
+    elif system == 'KS_d2175':
+        u_arr, new_params = kursiv_predict(u0, tau=tau, T=T, d=21.75, params=params)
+        u_arr = np.ascontiguousarray(u_arr)/(1.2146066380280796)
     else:
         raise ValueError
 
@@ -292,6 +299,9 @@ def RungeKuttawrapped_pred(h=0.01, tau=0.1, T=300, ttsplit=5000, u0_array=np.arr
         u_arr, new_params = kursiv_predict_pred(
             u0_array, tau=tau, T=T, params=params)
         u_arr = np.ascontiguousarray(u_arr)/(1.1876770355823614)
+    elif system = 'KS_d2175':
+        u_arr, new_params = kursiv_predict_pred(u0_array, tau=tau, T=T, params=params, d=21.75)
+        u_arr = np.ascontiguousarray(u_arr)/(1.2146066380280796)
     else:
         raise ValueError
 
@@ -1030,7 +1040,7 @@ def get_test_data(test_stream, tau, num_tests, rkTime, split, system='lorenz'):
     if system == 'lorenz':
         ic = test_stream[0].random(3)*2-1
         u0 = np.zeros(64)
-    elif system == 'KS':
+    elif system in ['KS', 'KS_d2175']:
         ic = np.zeros(3)
         u0 = (test_stream[0].random(64)*2-1)*0.6
     u_arr_train_nonoise, u_arr_test, p, params = RungeKuttawrapped(x0=ic[0],
@@ -1050,7 +1060,7 @@ def get_test_data(test_stream, tau, num_tests, rkTime, split, system='lorenz'):
         if system == 'lorenz':
             ic = test_stream[i].random(3)*2-1
             u0 = np.zeros(64)
-        elif system == 'KS':
+        elif system in ['KS', 'KS_d2175']:
             ic = np.zeros(3)
             u0 = (test_stream[i].random(64)*2-1)*0.6
         rktest_u_arr_train_nonoise[:, :, i], rktest_u_arr_test[:, :, i], p, params = RungeKuttawrapped(x0=ic[0],
@@ -1122,8 +1132,9 @@ def testwrapped(res_X, Win, W_data, W_indices, W_indptr, W_shape, Wout, leakage,
                 pred_pmap_max = poincare_max(calc_pred, np.arange(pred.shape[0]))
             elif system == 'KS':
                 # wass_dist[i] = wasserstein_distance_empirical(pred.flatten()*1.1876770355823614, true_trajectory.flatten())
-                 pred_pmap_max = poincare_max(
-                    pred*1.1876770355823614, np.arange(pred.shape[0]))
+                pred_pmap_max = poincare_max(pred*1.1876770355823614, np.arange(pred.shape[0]))
+            elif system == 'KS_d2175':
+                pred_pmap_max = poincare_max(pred*1.2146066380280796, np.arange(pred.shape[0]))
 
             pmap_max.append(pred_pmap_max)
             for j in range(rktest_u_arr_test.shape[0]):
@@ -1168,6 +1179,10 @@ def testwrapped(res_X, Win, W_data, W_indices, W_indptr, W_shape, Wout, leakage,
                 u0 = pred*1.1876770355823614
                 rkmap_u_arr_train = RungeKuttawrapped_pred(
                     u0_array=u0, h=tau, T=1, system=system, params=params, ttsplit=pred.shape[1])[0]
+            elif system == 'KS_d2175':
+                u0 = pred*1.2146066380280796
+                rkmap_u_arr_train = RungeKuttawrapped_pred(
+                    u0_array=u0, h=tau, T=1, system=system, params=params, ttsplit=pred.shape[1])[0]
             # print(rkmap_u_arr_train[0,:10])
             x2y2z2 = sum_numba_axis0(
                 (pred[:, 1:]-rkmap_u_arr_train[:, :-1])**2.0)
@@ -1180,6 +1195,10 @@ def testwrapped(res_X, Win, W_data, W_indices, W_indptr, W_shape, Wout, leakage,
                                                           [j-1]*8.575917849311919+23.596294463016896, h=0.01, T=1, tau=tau, system=system, params=params)[0]
                 elif system == 'KS':
                     u0 = pred[:, j-1]*(1.1876770355823614)
+                    rkmap_u_arr_train = RungeKuttawrapped(
+                        0, 0, 0, h=tau, T=1, u0=u0, system=system, params=params)[0]
+                elif system == 'KS_d2175':
+                    u0 = pred[:, j-1]*(1.2146066380280796)
                     rkmap_u_arr_train = RungeKuttawrapped(
                         0, 0, 0, h=tau, T=1, u0=u0, system=system, params=params)[0]
                 # if j <= 10:
@@ -1228,7 +1247,7 @@ def testwrapped(res_X, Win, W_data, W_indices, W_indptr, W_shape, Wout, leakage,
         if system == 'lorenz':
             means[i] = np.mean(pred[0])
             variances[i] = np.var(pred[0])
-        elif system == 'KS':
+        elif system in ['KS', 'KS_d2175']:
             means[i] = np.mean(pred.flatten())
             variances[i] = np.var(pred.flatten())
 
@@ -1454,7 +1473,7 @@ def find_stability(noisetype, noise, traintype, train_seed, train_gen, res_itr, 
     if system == 'lorenz':
         rkTime_test = 4000
         split_test = 2000
-    elif system == 'KS':
+    elif system in ['KS', 'KS_d2175']:
         time_mult = 0.25/tau
         rkTime_test = int(18000*time_mult)
         split_test = int(2000*time_mult)
@@ -1468,7 +1487,7 @@ def find_stability(noisetype, noise, traintype, train_seed, train_gen, res_itr, 
         ic = train_gen.random(3)*2-1
         rk = RungeKutta(x0=ic[0], y0=ic[1], z0=30*ic[2], tau=tau,
                         T=train_time, ttsplit=train_time, system=system, params=params)
-    elif system == 'KS':
+    elif system in ['KS', 'KS_d2175']:
         u0 = 0.6*(train_gen.random(64)*2-1)
         rk = RungeKutta(0, 0, 0, tau=tau, T=train_time,
                         ttsplit=train_time, u0=u0, system=system, params=params)
@@ -1836,7 +1855,7 @@ def main(argv):
     if tau_flag:
         if system == 'lorenz':
             tau = 0.1
-        elif system == 'KS':
+        elif system in ['KS', 'KS_d2175']:
             tau = 0.25
     if savepred:
         predflag = 'wpred_'
