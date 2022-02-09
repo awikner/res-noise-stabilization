@@ -132,6 +132,10 @@ dmypy.json
 *.out
 *.png
 *.txt
+*.bz2
+
+# Non-template data processing files
+data_scripts/process_test_data_*.py
 
 # Jupyter Notebooks
 *.ipynb
