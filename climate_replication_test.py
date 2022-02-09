@@ -45,6 +45,7 @@ from helpers.lorenzrungekutta_numba import *
 from helpers.ks_etdrk4 import *
 from helpers.csc_mult import *
 from helpers.poincare_max import *
+from helpers.get_run_opts import *
 
 warnings.filterwarnings("ignore", category=NumbaPerformanceWarning)
 
@@ -171,54 +172,58 @@ class Reservoir:
         print('Adjacency matrix section:')
         print(self.W_data[:4])
         """
-
-        if win_type == 'full':
-            input_vars = np.arange(input_size)
-        elif win_type == 'x':
-            input_vars = np.array([0])
-        if bias_type == 'old':
-            const_frac = 0.15
-            const_conn = int(rsvr_size*const_frac)
-            Win = np.zeros((rsvr_size, input_size+1))
-            Win[:const_conn, 0] = (res_gen.random(
-                Win[:const_conn, 0].size)*2 - 1)*input_weight
-            q = int((rsvr_size-const_conn)//input_vars.size)
-            for i, var in enumerate(input_vars):
-                Win[const_conn+q*i:const_conn+q *
-                    (i+1), var+1] = (res_gen.random(q)*2-1)*input_weight
-        elif bias_type == 'new_random':
-            Win = np.zeros((rsvr_size, input_size+1))
-            Win[:, 0] = (res_gen.random(rsvr_size)*2-1)*input_weight
-            q = int(rsvr_size//input_vars.size)
-            for i, var in enumerate(input_vars):
-                Win[q*i:q*(i+1), var+1] = (res_gen.random(q)*2-1)*input_weight
-            leftover_nodes = rsvr_size - q*input_vars.size
-            var = input_vars[res_gen.integers(
-                input_vars.size, size=leftover_nodes)]
-            Win[rsvr_size-leftover_nodes:, var +
-                1] = (res_gen.random(leftover_nodes)*2-1)*input_weight
-        elif bias_type == 'new_new_random':
-            Win = np.zeros((rsvr_size, input_size+1))
-            Win[:, 0] = (res_gen.random(rsvr_size)*2-1)*input_weight
-            q = int(rsvr_size//input_vars.size)
-            for i, var in enumerate(input_vars):
-                Win[q*i:q*(i+1), var+1] = (res_gen.random(q)*2-1)*input_weight
-            leftover_nodes = rsvr_size - q*input_vars.size
-            var = input_vars[res_gen.choice(
-                input_vars.size, size=leftover_nodes, replace=False)]
-            Win[rsvr_size-leftover_nodes:, var +
-                1] = (res_gen.random(leftover_nodes)*2-1)*input_weight
-        elif bias_type == 'new_const':
-            Win = np.zeros((rsvr_size, input_size+1))
-            Win[:, 0] = input_weight
-            q = int(rsvr_size//input_vars.size)
-            for i, var in enumerate(input_vars):
-                Win[q*i:q*(i+1), var+1] = (res_gen.random(q)*2-1)*input_weight
-            leftover_nodes = rsvr_size - q*input_vars.size
-            var = input_vars[res_gen.integers(
-                input_vars.size, size=leftover_nodes)]
-            Win[rsvr_size-leftover_nodes:, var +
-                1] = (res_gen.random(leftover_nodes)*2-1)*input_weight
+        if win_type == 'dense':
+            if bias_type != 'new_random':
+                raise ValueError
+            Win = (res_gen.random(rsvr_size*(input_size+1)).reshape(rsvr_size, input_size+1)*2-1)*input_weight
+        else:
+            if win_type == 'full':
+                input_vars = np.arange(input_size)
+            elif win_type == 'x':
+                input_vars = np.array([0])
+            if bias_type == 'old':
+                const_frac = 0.15
+                const_conn = int(rsvr_size*const_frac)
+                Win = np.zeros((rsvr_size, input_size+1))
+                Win[:const_conn, 0] = (res_gen.random(
+                    Win[:const_conn, 0].size)*2 - 1)*input_weight
+                q = int((rsvr_size-const_conn)//input_vars.size)
+                for i, var in enumerate(input_vars):
+                    Win[const_conn+q*i:const_conn+q *
+                        (i+1), var+1] = (res_gen.random(q)*2-1)*input_weight
+            elif bias_type == 'new_random':
+                Win = np.zeros((rsvr_size, input_size+1))
+                Win[:, 0] = (res_gen.random(rsvr_size)*2-1)*input_weight
+                q = int(rsvr_size//input_vars.size)
+                for i, var in enumerate(input_vars):
+                    Win[q*i:q*(i+1), var+1] = (res_gen.random(q)*2-1)*input_weight
+                leftover_nodes = rsvr_size - q*input_vars.size
+                var = input_vars[res_gen.integers(
+                    input_vars.size, size=leftover_nodes)]
+                Win[rsvr_size-leftover_nodes:, var +
+                    1] = (res_gen.random(leftover_nodes)*2-1)*input_weight
+            elif bias_type == 'new_new_random':
+                Win = np.zeros((rsvr_size, input_size+1))
+                Win[:, 0] = (res_gen.random(rsvr_size)*2-1)*input_weight
+                q = int(rsvr_size//input_vars.size)
+                for i, var in enumerate(input_vars):
+                    Win[q*i:q*(i+1), var+1] = (res_gen.random(q)*2-1)*input_weight
+                leftover_nodes = rsvr_size - q*input_vars.size
+                var = input_vars[res_gen.choice(
+                    input_vars.size, size=leftover_nodes, replace=False)]
+                Win[rsvr_size-leftover_nodes:, var +
+                    1] = (res_gen.random(leftover_nodes)*2-1)*input_weight
+            elif bias_type == 'new_const':
+                Win = np.zeros((rsvr_size, input_size+1))
+                Win[:, 0] = input_weight
+                q = int(rsvr_size//input_vars.size)
+                for i, var in enumerate(input_vars):
+                    Win[q*i:q*(i+1), var+1] = (res_gen.random(q)*2-1)*input_weight
+                leftover_nodes = rsvr_size - q*input_vars.size
+                var = input_vars[res_gen.integers(
+                    input_vars.size, size=leftover_nodes)]
+                Win[rsvr_size-leftover_nodes:, var +
+                    1] = (res_gen.random(leftover_nodes)*2-1)*input_weight
 
         self.Win = np.ascontiguousarray(Win)
 
@@ -566,11 +571,11 @@ def get_states(res, rk, noise, noisetype='none', noise_scaling=0, noise_realizat
             skip, noise, noisetype, noise_scaling, noise_realizations, traintype)
         return Dn
     elif traintype in ['sylvester', 'sylvester_wD']:
-        res.data_trstates, res.states_trstates, res.left_mat = get_states_wrapped(
+        res.data_trstates, res.states_trstates, res.Y_train, res.X_train, res.left_mat= get_states_wrapped(
             np.ascontiguousarray(rk.u_arr_train), res.X, res.Win, res.W_data, res.W_indices, res.W_indptr, res.W_shape, res.leakage,
             skip, noise, noisetype, noise_scaling, noise_realizations, traintype)
     else:
-        res.data_trstates, res.states_trstates, res.gradient_reg = get_states_wrapped(
+        res.data_trstates, res.states_trstates, res.Y_train, res.X_train, res.gradient_reg= get_states_wrapped(
             np.ascontiguousarray(rk.u_arr_train), res.X, res.Win, res.W_data, res.W_indices, res.W_indptr, res.W_shape, res.leakage,
             skip, noise, noisetype, noise_scaling, noise_realizations, traintype)
 
@@ -599,7 +604,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
                 (np.ones((1, d-(skip+1))), X, u_arr_train_noise[:, skip:-1]), axis=0))
             data_trstates += Y_train @ X_train.T
             states_trstates += X_train @ X_train.T
-        return [data_trstates, states_trstates, gradient_reg]
+        return [data_trstates, states_trstates, Y_train, X_train, gradient_reg]
     elif traintype in ['rmeanq','rmeanqres1','rmeanqres2']:
         # Training using the mean and the rescaled sum of the perturbations from the mean
         for i in range(noise_realizations):
@@ -617,7 +622,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
         for i in range(noise_realizations):
             Q_fit = X_all[:, :, i] - X_train_mean
             states_trstates += (Q_fit @ Q_fit.T)/noise_realizations
-        return [data_trstates, states_trstates, gradient_reg]
+        return [data_trstates, states_trstates, Y_train, X_train, gradient_reg]
     elif traintype in ['rmean', 'rmeanres1', 'rmeanres2']:
         # Training using the mean only
         for i in range(noise_realizations):
@@ -631,11 +636,11 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
             X_train_mean += X_train/noise_realizations
         data_trstates = Y_train @ X_train_mean.T
         states_trstates = X_train_mean @ X_train_mean.T
-        return [data_trstates, states_trstates, gradient_reg]
+        return [data_trstates, states_trstates, Y_train, X_train, gradient_reg]
     elif traintype in ['rqmean','rqmeanres1','rqmeanres2']:
         # Training using the noiseless reservoir and the rescaled perturbations from the mean
         X_0, u_arr_train_noise = getXwrapped(
-            u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_shape, leakage, noise[i])
+            u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_shape, leakage, noise[0])
         X_0 = np.ascontiguousarray(X_0[:, skip+1:(res_X[0].size - 1)])
         X_train_0 = np.ascontiguousarray(np.concatenate(
             (np.ones((1, d-(skip+1))), X_0, u_arr_train[:, skip:-1]), axis=0))
@@ -655,11 +660,11 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
         for i in range(noise_realizations):
             Q_fit = X_all[:,:,i] - X_train_mean
             states_trstates += (Q_fit @ Q_fit.T)/noise_realizations
-        return [data_trstates, states_trstates, gradient_reg]
+        return [data_trstates, states_trstates, Y_train, X_train, gradient_reg]
     elif traintype in ['rq','rqres1','rqres2']:
         # Training using the noiseless reservoir and the rescaled perturbations from the noiseless reservoir
         X_0, u_arr_train_noise = getXwrapped(
-            u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_shape, leakage, noise[i])
+            u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_shape, leakage, noise[0])
         X_0 = np.ascontiguousarray(X_0[:, skip+1:(res_X[0].size - 1)])
         X_train_0 = np.ascontiguousarray(np.concatenate(
             (np.ones((1, d-(skip+1))), X_0, u_arr_train[:, skip:-1]), axis=0))
@@ -676,12 +681,12 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
         for i in range(noise_realizations):
             Q_fit = X_all[:,:,i] - X_train_0
             states_trstates += (Q_fit @ Q_fit.T)/noise_realizations
-        return [data_trstates, states_trstates, gradient_reg]
+        return [data_trstates, states_trstates, Y_train, X_train, gradient_reg]
     elif traintype in ['rplusq', 'rplusqres1', 'rplusqres2']:
         # Training using the sum of the outer products of the sum of the noiseless reservoir and
         # the perturbation from the mean
         X_0, u_arr_train_noise = getXwrapped(
-            u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_shape, leakage, noise[i])
+            u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_shape, leakage, noise[0])
         X_0 = np.ascontiguousarray(X_0[:, skip+1:(res_X[0].size - 1)])
         X_train_0 = np.ascontiguousarray(np.concatenate(
             (np.ones((1, d-(skip+1))), X_0, u_arr_train[:, skip:-1]), axis=0))
@@ -705,7 +710,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
                 X_fit, X_all[:, :, i] - X_train_mean + X_train_0, axis=1)
         data_trstates = Y_fit @ X_fit.T
         states_trstates = X_fit @ X_fit.T
-        return [data_trstates, states_trstates, gradient_reg]
+        return [data_trstates, states_trstates, Y_train, X_train, gradient_reg]
     elif 'confined' in traintype:
         if 'upper' in traintype:
             with objmode(ub='double'):
@@ -757,7 +762,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
             """
         data_trstates += Y_train @ X_train.T
         states_trstates += X_train @ X_train.T
-        return [data_trstates, states_trstates, gradient_reg]
+        return [data_trstates, states_trstates, Y_train, X_train, gradient_reg]
     elif traintype == 'gradient':
         # Training using only the input jacobian (linearized 1-step noise)
         X, D = getXwrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr,
@@ -775,7 +780,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
         print(gradient_reg[:5,:5])
         data_trstates = Y_train @ X_train.T
         states_trstates = X_train @ X_train.T
-        return [data_trstates, states_trstates, gradient_reg]
+        return [data_trstates, states_trstates, Y_train, X_train, gradient_reg]
     elif traintype == 'gradient12':
         # Training using the input and reservoir jacobian (linearized 2-step noise)
         X, D = getXwrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr,
@@ -840,7 +845,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
         """
         data_trstates = Y_train @ X_train.T
         states_trstates = X_train @ X_train.T
-        return [data_trstates, states_trstates, gradient_reg]
+        return [data_trstates, states_trstates, Y_train, X_train, gradient_reg]
     elif traintype == 'gradient2':
         # Linearized 2-step noise with no 1-step noise
         X, D = getXwrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr,
@@ -863,7 +868,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
             gradient_reg += E_nD_n2 @ E_nD_n2.T
         data_trstates = Y_train @ X_train.T
         states_trstates = X_train @ X_train.T
-        return [data_trstates, states_trstates, gradient_reg]
+        return [data_trstates, states_trstates, Y_train, X_train, gradient_reg]
     elif 'gradientk' in traintype:
         # Linearized k-step noise
         k = str_to_int(traintype.replace('gradientk', ''))
@@ -962,11 +967,11 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
         """
         data_trstates = Y_train @ X_train.T
         states_trstates = X_train @ X_train.T
-        return [data_trstates, states_trstates, gradient_reg]
+        return [data_trstates, states_trstates, Y_train, X_train, gradient_reg]
     elif traintype == 'sylvester':
         # Sylvester regularization w/o derivative
         X, p = getXwrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr,
-                           W_shape, leakage, noise[i], noisetype, noise_scaling, 1, traintype)
+                           W_shape, leakage, noise[0], noisetype, noise_scaling, 1, traintype)
         X = np.ascontiguousarray(X[:, skip+1:(res_d - 1)])
         X_train = np.ascontiguousarray(np.concatenate(
             (np.ones((1, d-(skip+1))), X, u_arr_train[:, skip:-1]), axis=0))
@@ -977,11 +982,11 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
         states_trstates = X_train @ X_train.T
         left_mat = -noise_scaling**2/noise_realizations * \
             (Win[:, 1:].T @ Win[:, 1:])
-        return [data_trstates, states_trstates, left_mat]
+        return [data_trstates, states_trstates, Y_train, X_train, left_mat]
     elif traintype == 'sylvester_wD':
         # Sylvester regularization with derivative
         X, D = getXwrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr,
-                           W_shape, leakage, noise[i], noisetype, noise_scaling, 1, traintype)
+                           W_shape, leakage, noise[0], noisetype, noise_scaling, 1, traintype)
         X = X[:, skip+1:(res_d - 1)]
         D = D[:, skip+1:(res_d - 1)]
         X_train = np.concatenate(
@@ -996,13 +1001,13 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
         data_trstates = Y_train @ X_train.T
         data_trstates[:, 1:rsvr_size+1] += target_correction
         states_trstates = X_train @ X_train.T
-        return [data_trstates, states_trstates, left_mat]
+        return [data_trstates, states_trstates, Y_train, X_train, left_mat]
     else:
         # Noiseless training
         data_trstates = np.zeros((n, rsvr_size+1+n), dtype=np.float64)
         states_trstates = np.zeros(
             (n+rsvr_size+1, n+rsvr_size+1), dtype=np.float64)
-        return [data_trstates, states_trstates, gradient_reg]
+        return [data_trstates, states_trstates, Y_train, X_train, gradient_reg]
 
 
 @jit(nopython=True, fastmath=True)
@@ -1084,13 +1089,13 @@ def test(res, noise_in, rktest_u_arr_train_nonoise, rktest_u_arr_test, true_pmap
     # Wrapper function for the numba compatible test function.
 
     # tic = time.perf_counter()
-    stable_count, mean_rms, max_rms, variances, valid_time, mean_all, variances_all, preds, wass_dist, pmap_max, pmap_max_wass_dist = testwrapped(
-        res.X, res.Win, res.W_data, res.W_indices, res.W_indptr, res.W_shape, res.Wout, res.leakage, rktest_u_arr_train_nonoise, rktest_u_arr_test,   true_pmap_max, num_tests, rkTime, split, noise_in,  showMapError, showTrajectories, showHist, system, params=params, pmap=pmap)
+    stable_count, mean_rms, max_rms, variances, valid_time, rms, preds, wass_dist,           pmap_max, pmap_max_wass_dist = testwrapped(
+        res.X, res.Win, res.W_data, res.W_indices, res.W_indptr, res.W_shape, res.Wout, res.leakage,             rktest_u_arr_train_nonoise, rktest_u_arr_test, true_pmap_max, num_tests, rkTime, split, noise_in,showMapError, showTrajectories, showHist, system, params=params, pmap=pmap)
     # toc = time.perf_counter()
     # runtime = toc - tic
     # print("Test " + str(i) + " valid time: " + str(j))
 
-    return stable_count/num_tests, mean_rms, max_rms, variances, valid_time, mean_all, variances_all, preds, wass_dist, pmap_max, pmap_max_wass_dist
+    return stable_count/num_tests, mean_rms, max_rms, variances, valid_time, rms, preds, wass_dist, pmap_max, pmap_max_wass_dist
 
 
 @jit(nopython=True, fastmath=True)
@@ -1106,8 +1111,9 @@ def testwrapped(res_X, Win, W_data, W_indices, W_indptr, W_shape, Wout, leakage,
     pmap_max = []
     pmap_max_wass_dist = np.zeros(num_tests)
     preds = np.zeros((num_tests, rktest_u_arr_test.shape[0], (rkTime-split)+1))
-    mean_all = np.zeros((num_tests, (rkTime-split)+1))
-    variances_all = np.zeros((num_tests, (rkTime-split)+1))
+    #mean_all = np.zeros((num_tests, (rkTime-split)+1))
+    #variances_all = np.zeros((num_tests, (rkTime-split)+1))
+    rms = np.zeros((num_tests, (rkTime-split)))
 
     # print(num_tests)
     for i in range(num_tests):
@@ -1249,19 +1255,19 @@ def testwrapped(res_X, Win, W_data, W_indices, W_indptr, W_shape, Wout, leakage,
               str(wasserstein_distance(pred[0], rktest_u_arr_test[0,:,i])))
         print()
         """
-        rms = np.sqrt(x2y2z2/pred.shape[0])
-        max_rms[i] = np.max(rms)
-        mean_rms[i] = np.mean(rms)
+        rms[i] = np.sqrt(x2y2z2/pred.shape[0])
+        max_rms[i] = np.max(rms[i])
+        mean_rms[i] = np.mean(rms[i])
         if system == 'lorenz':
             means[i] = np.mean(pred[0])
             variances[i]     = np.var(pred[0])
-            mean_all[i]      = sum_numba_axis0(pred)/pred.shape[0]
-            variances_all[i] = numba_var_axis0(pred)
+            #mean_all[i]      = sum_numba_axis0(pred)/pred.shape[0]
+            #variances_all[i] = numba_var_axis0(pred)
         elif system in ['KS', 'KS_d2175']:
             means[i] = np.mean(pred.flatten())
             variances[i] = np.var(pred.flatten())
-            mean_all[i] = sum_numba_axis0(pred)/pred.shape[0]
-            variances_all[i] = numba_var_axis0(pred)
+            #mean_all[i] = sum_numba_axis0(pred)/pred.shape[0]
+            #variances_all[i] = numba_var_axis0(pred)
 
         # print('Map error: ', mean_rms[i])
         # print('Variance: ', variances[i])
@@ -1291,8 +1297,8 @@ def testwrapped(res_X, Win, W_data, W_indices, W_indptr, W_shape, Wout, leakage,
     print()
     """
 
-    return stable_count, mean_rms, max_rms, variances, valid_time, mean_all, variances_all, preds, wass_dist, pmap_max, pmap_max_wass_dist
-
+    #return stable_count, mean_rms, max_rms, variances, valid_time, mean_all, variances_all, preds, wass_dist, pmap_max, pmap_max_wass_dist
+    return stable_count, mean_rms, max_rms, variances, valid_time, rms, preds, wass_dist,    pmap_max, pmap_max_wass_dist
 
 def generate_res(res_gen, rk, res_size, rho, sigma, leakage, win_type, bias_type, noise_stream, noisetype='none', noise_scaling=0, noise_realizations=1, traintype='normal', skip=150):
     # Function for generating a reservoir and obtaining matrices used for training the reservoir
@@ -1324,15 +1330,18 @@ def optim_func(res, noise_in, noise, rktest_u_arr_train_nonoise, rktest_u_arr_te
     else:
         res.Wout = solve_sylvester(
             res.left_mat, res.states_trstates+idenmat, res.data_trstates)
-    results, mean_rms, max_rms, variances, valid_time,  mean_all, variances_all, preds, wass_dist, pmap_max, pmap_max_wass_dist= \
+    train_rms = np.sqrt(np.mean((res.Wout @ res.X_train - res.Y_train)**2.0, axis = 0))
+    train_mean_rms = np.mean(train_rms)
+    train_max_rms  = np.max(train_rms)
+    results, mean_rms, max_rms, variances, valid_time,  rms, preds, wass_dist, pmap_max,     pmap_max_wass_dist= \
         test(res, noise_in, rktest_u_arr_train_nonoise, rktest_u_arr_test,   true_pmap_max, num_tests=num_tests, rkTime=rkTime, split=split,
         showMapError=True, showTrajectories=True, showHist=True, system=system, params=params, pmap = pmap)
 
-    return -1*results, mean_rms, max_rms, variances, valid_time, mean_all, variances_all, preds, wass_dist, pmap_max, pmap_max_wass_dist
+    return -1*results, mean_rms, max_rms, variances, valid_time, rms, preds, wass_dist, pmap_max, pmap_max_wass_dist, train_mean_rms, train_max_rms
 
 
 def get_res_results(itr, res_gen, rk, res_size, rho, sigma, leakage, win_type, bias_type, noisetype, noise, noise_realizations, noise_stream, traintype,
-    rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests, alpha_values, rkTime_test, split_test, system, tau, params, savepred, save_time_mean_var, debug_mode, train_seed,   true_pmap_max, pmap):
+    rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests, alpha_values, rkTime_test, split_test, system, tau, params, savepred, save_time_rms, debug_mode, train_seed,   true_pmap_max, pmap):
     # Function for generating, training, and testing the performance of a reservoir given an input set of testing data time series,
     # a set of regularization values, and a set of noise magnitudes
     tic = time.perf_counter()
@@ -1355,9 +1364,12 @@ def get_res_results(itr, res_gen, rk, res_size, rho, sigma, leakage, win_type, b
         variances = np.zeros((num_tests, alpha_values.size-1))
         valid_time = np.zeros((num_tests, alpha_values.size-1))
         wass_dist = np.zeros((num_tests, alpha_values.size-1))
-        if save_time_mean_var:
-            mean_all = np.zeros((num_tests, (rkTime_test-split_test)+1, alpha_values.size-1))
-            variances_all = np.zeros((num_tests, (rkTime_test-split_test)+1, alpha_values.size-1))
+        train_mean_rms = np.zeros((alpha_values.size))
+        train_max_rms  = np.zeros((alpha_values.size))
+        if save_time_rms:
+            #mean_all = np.zeros((num_tests, (rkTime_test-split_test)+1, alpha_values.size-1))
+            #variances_all = np.zeros((num_tests, (rkTime_test-split_test)+1, alpha_values.size-1))
+            rms = np.zeros((num_tests, (rkTime_test-split_test), alpha_values.size-1))
         # pmap_max           = []
         pmap_max_wass_dist = np.zeros((num_tests, alpha_values.size-1))
         noise_tic = time.perf_counter()
@@ -1368,16 +1380,19 @@ def get_res_results(itr, res_gen, rk, res_size, rho, sigma, leakage, win_type, b
             print('Regularization: ', alpha_values[j])
             if debug_mode:
                 out = min_optim_func(alpha_values[j])
+                train_mean_rms[j] = out[-2]
+                train_max_rms[j]  = out[-1]
                 if j == 0:
                     stable_frac_0 = out[0]
                     variances_0 = out[3]
                     mean_rms_0 = out[1]
                     max_rms_0 = out[2]
                     valid_time_0 = out[4]
-                    if save_time_mean_var:
-                        mean_all_0 = out[5]
-                        variances_all_0 = out[6]
-                    wass_dist_0 = out[8]
+                    if save_time_rms:
+                        #mean_all_0 = out[5]
+                        #variances_all_0 = out[6]
+                        rms_0 = out[5]
+                    wass_dist_0 = out[7]
                     # restart editing here
                 else:
                     stable_frac[j-1] = out[0]
@@ -1385,65 +1400,73 @@ def get_res_results(itr, res_gen, rk, res_size, rho, sigma, leakage, win_type, b
                     mean_rms[:, j-1] = out[1]
                     max_rms[:,j-1] = out[2]
                     valid_time[:, j-1] = out[4]
-                    if save_time_mean_var:
-                        mean_all[:,:,j-1] = out[5]
-                        variances_all[:,:,j-1] = out[6]
-                    wass_dist[:, j-1] = out[8]
+                    if save_time_rms:
+                        #mean_all[:,:,j-1] = out[5]
+                        #variances_all[:,:,j-1] = out[6]
+                        rms[:,:,j-1] = out[5]
+                    wass_dist[:, j-1] = out[7]
                     # pmap_max.append(out[7])
-                    pmap_max_wass_dist[:, j-1] = out[10]
+                    pmap_max_wass_dist[:, j-1] = out[9]
                 if savepred:
-                    if j == 1:
+                    if j == 0:
                         preds = out[7]
-                    elif j == 2:
-                        preds = np.stack((preds, out[7]), axis=3)
-                    elif j > 2:
-                        preds = np.concatenate((preds, out[7].reshape(
-                            out[7].shape[0], out[7].shape[1], out[7].shape[2], 1)), axis=3)
+                    elif j == 1:
+                        preds = np.stack((preds, out[6]), axis=3)
+                    elif j > 1:
+                        preds = np.concatenate((preds, out[6].reshape(
+                            out[6].shape[0], out[6].shape[1], out[6].shape[2], 1)), axis=3)
             else:
                 try:
                     out = min_optim_func(alpha_values[j])
+                    train_mean_rms[j] = out[-2]
+                    train_max_rms[j]  = out[-1]
                     if j == 0:
                         stable_frac_0 = out[0]
                         variances_0 = out[3]
                         mean_rms_0 = out[1]
                         max_rms_0 = out[2]
                         valid_time_0 = out[4]
-                        if save_time_mean_var:
-                            mean_all_0 = out[5]
-                            variances_all_0 = out[6]
-                        wass_dist_0 = out[8]
+                        if save_time_rms:
+                            #mean_all_0 = out[5]
+                            #variances_all_0 = out[6]
+                            rms_0 = out[5]
+                        wass_dist_0 = out[7]
                     else:
                         stable_frac[j-1] = out[0]
                         variances[:, j-1] = out[3]
                         mean_rms[:, j-1] = out[1]
                         max_rms[:, j-1] = out[2]
                         valid_time[:, j-1] = out[4]
-                        if save_time_mean_var:
-                            mean_all[:,:,j-1] = out[5]
-                            variances_all[:,:,j-1] = out[6]
-                        wass_dist[:, j-1] = out[8]
+                        if save_time_rms:
+                            #mean_all[:,:,j-1] = out[5]
+                            #variances_all[:,:,j-1] = out[6]
+                            rms[:,:,j-1] = out[5]
+                        wass_dist[:, j-1] = out[7]
                         # pmap_max.append(out[7])
-                        pmap_max_wass_dist[:, j-1] = out[10]
+                        pmap_max_wass_dist[:, j-1] = out[9]
                     if savepred:
-                        if j == 1:
+                        if j == 0:
                             preds = out[7]
-                        elif j == 2:
-                            preds = np.stack((preds, out[7]), axis=3)
-                        elif j > 2:
-                            preds = np.concatenate((preds, out[7].reshape(
-                                out[7].shape[0], out[7].shape[1], out[7].shape[2], 1)), axis=3)
+                        elif j == 1:
+                            preds = np.stack((preds, out[6]), axis=3)
+                        elif j > 1:
+                            preds = np.concatenate((preds, out[6].reshape(
+                                out[6].shape[0], out[6].shape[1], out[6].shape[2], 1)), axis=3)
                 except:
                     print('Training unsucessful for alpha:')
                     print(alpha_values[j])
+                    train_mean_rms[j] = 0.
+                    train_max_rms[j]  = 0.
                     if j == 0:
                         stable_frac_0 = 0.0
                         variances_0 = np.zeros(num_tests)
                         mean_rms_0 = np.zeros(num_tests)
                         max_rms_0 = np.zeros(num_tests)
                         valid_time_0 = np.zeros(num_tests)
-                        if save_time_mean_var:
-                            mean_all_0  = np.zeros((num_tests, (rkTime-split)+1))
-                            variances_all_0  = np.zeros((num_tests, (rkTime-split)+1))
+                        if save_time_rms:
+                            #mean_all_0  = np.zeros((num_tests, (rkTime-split)+1))
+                            #variances_all_0  = np.zeros((num_tests, (rkTime-split)+1))
+                            rms_0 = np.zeros((num_tests, (rkTime-split)))
                         wass_dist_0 = np.zeros(num_tests)
                     else:
                         stable_frac[j-1] = 0.0
@@ -1452,34 +1475,39 @@ def get_res_results(itr, res_gen, rk, res_size, rho, sigma, leakage, win_type, b
                         max_rms[:, j-1] = np.zeros(num_tests)
                         valid_time[:, j-1] = np.zeros(num_tests)
                         wass_dist[:, j-1] = np.zeros(num_tests)
-                        if save_time_mean_var:
-                            mean_all[:,:,j-1]= np.zeros((num_tests, (rkTime-split)+1))
-                            variances_all[:,:,j-1]= np.zeros((num_tests, (rkTime-split)+1))
+                        if save_time_rms:
+                            #mean_all[:,:,j-1]= np.zeros((num_tests, (rkTime-split)+1))
+                            #variances_all[:,:,j-1]= np.zeros((num_tests, (rkTime-split)+1))
+                            rms[:,:,j-1] = np.zeros((num_tests, (rkTime-split)))
                         # pmap_max.append(np.empty((2,2), dtype = np.float64))
                         pmap_max_wass_dist[:, j-1] = np.zeros(num_tests)
                     if savepred:
                         pred_out = np.zeros(
                             (num_tests, rktest_u_arr_test.shape[0], (rkTime_test-split_test)+1))
-                        if j == 1:
+                        if j == 0:
                             preds = preds_out
-                        elif j == 2:
+                        elif j == 1:
                             preds = np.stack((preds, preds_out), axis=3)
-                        elif j > 2:
+                        elif j > 1:
                             preds = np.concatenate((preds, preds_out.reshape(
                                 preds_out.shape[0], preds_out.shape[1], preds_out.shape[2], 1)), axis=3)
         if not savepred:
             preds = np.empty((1, 1, 1, 1), dtype=np.complex128)
-        if not save_time_mean_var:
-            mean_all_0 = np.empty((1,1), dtype=np.float64)
-            mean_all   = np.empty((1,1,1), dtype=np.float64)
-            variances_all_0 = np.empty((1,1), dtype=np.float64)
-            variances_all   = np.empty((1,1,1), dtype=np.float64)
+        if not save_time_rms:
+            #mean_all_0 = np.empty((1,1), dtype=np.float64)
+            #mean_all   = np.empty((1,1,1), dtype=np.float64)
+            #variances_all_0 = np.empty((1,1), dtype=np.float64)
+            #variances_all   = np.empty((1,1,1), dtype=np.float64)
+            rms_0 = np.empty((1,1), dtype=np.float64)
+            rms   = np.empty((1,1,1), dtype=np.float64)
+
 
         final_out.append((np.copy(stable_frac_0), np.copy(stable_frac), np.copy(mean_rms_0), np.copy(mean_rms),\
                 np.copy(max_rms_0), np.copy(max_rms), np.copy(variances_0), np.copy(variances),  \
-                np.copy(valid_time_0), np.copy(valid_time), np.copy(mean_all_0), np.copy(mean_all), \
-                np.copy(variances_all_0), np.copy(variances_all), np.copy(preds), train_seed, noise, \
-                itr, np.copy(wass_dist_0), np.copy(wass_dist), np.copy(pmap_max_wass_dist), rkTime_test, split_test))  # pmap_max, np.copy(pmap_max_wass_dist)))
+                np.copy(valid_time_0), np.copy(valid_time), \
+                np.copy(rms_0), np.copy(rms), np.copy(preds), train_seed, noise, \
+                itr, np.copy(wass_dist_0), np.copy(wass_dist), np.copy(pmap_max_wass_dist), np.copy(train_mean_rms),\
+                np.copy(train_max_rms)))  # pmap_max, np.copy(pmap_max_wass_dist)))
         noise_toc = time.perf_counter()
         print('Noise test time: %f sec.' % (noise_toc - noise_tic))
     toc = time.perf_counter()
@@ -1488,7 +1516,7 @@ def get_res_results(itr, res_gen, rk, res_size, rho, sigma, leakage, win_type, b
     return final_out
 
 
-def find_stability(noisetype, noise, traintype, train_seed, train_gen, res_itr, res_gen, test_stream, noise_stream, rho, sigma, leakage, win_type, bias_type, train_time, res_size, res_per_test, noise_realizations, num_tests, alpha_values, system, tau, savepred, save_time_mean_var, debug_mode, foldername, pmap):
+def find_stability(noisetype, noise, traintype, train_seed, train_gen, res_itr, res_gen, test_stream, noise_stream, rho, sigma, leakage, win_type, bias_type, train_time, res_size, res_per_test, noise_realizations, num_tests, alpha_values, system, tau, savepred, save_time_rms, debug_mode, root_folder, pmap, raw_data_folder):
 
     # Main function for training and testing reservoir performance. This function first generates the training and testing data,
     # the passes to get_res_results to obtain th reservoir performance.
@@ -1528,11 +1556,11 @@ def find_stability(noisetype, noise, traintype, train_seed, train_gen, res_itr, 
                         ttsplit=train_time, u0=u0, system=system, params=params)
     #print('Training data %d:' % train_seed)
     #print(rk.u_arr_train[-3:,-3:])
-    #true_filename = foldername + \
+    #true_filename = root_folder + \
     #    '%s_tau%0.2f_true_trajectory.csv' % (system, tau)
     #true_trajectory = np.loadtxt(true_filename, delimiter=',')
     if pmap:
-        true_pmap_max_filename = foldername + \
+        true_pmap_max_filename = root_folder + \
             '%s_tau%0.2f_true_pmap_max.csv' % (system, tau)
         true_pmap_max = np.loadtxt(true_pmap_max_filename, delimiter=',')
         print('Snippet of true poincare map:')
@@ -1540,12 +1568,51 @@ def find_stability(noisetype, noise, traintype, train_seed, train_gen, res_itr, 
     else:
         true_pmap_max = np.zeros(100)
 
-    out = get_res_results(res_itr, res_gen, rk, res_size, rho, sigma, leakage, win_type, bias_type, noisetype, noise, noise_realizations, noise_stream, traintype, rktest_u_arr_train_nonoise,
-                          rktest_u_arr_test, num_tests, alpha_values, rkTime_test, split_test, system, tau, params, savepred, save_time_mean_var, debug_mode, train_seed,   true_pmap_max, pmap)
+    out = get_res_results(res_itr, res_gen, rk, res_size, rho, sigma, leakage, win_type, bias_type,\
+            noisetype, noise, noise_realizations, noise_stream, traintype, rktest_u_arr_train_nonoise,\
+            rktest_u_arr_test, num_tests, alpha_values, rkTime_test, split_test, system, tau, params, \
+            savepred, save_time_rms, debug_mode, train_seed,   true_pmap_max, pmap)
+
+    if not isinstance(noise, np.ndarray):
+        noise_array = np.array([noise])
+    else:
+        noise_array = noise
+
+    for i, noise_val in enumerate(noise_array):
+        np.savetxt(os.path.join(raw_data_folder, 'stable_frac_res%d_train%d_noise%e.csv' % (res_itr, train_seed, noise_val)),\
+            np.concatenate((np.array([out[i][0]]), out[i][1]), axis = 0), delimiter = ',')
+        np.savetxt(os.path.join(raw_data_folder, 'mean_rms_res%d_train%d_noise%e.csv' % (res_itr, train_seed, noise_val)),\
+            np.hstack((out[i][2].reshape(-1,1), out[i][3])), delimiter = ',')
+        np.savetxt(os.path.join(raw_data_folder, 'max_rms_res%d_train%d_noise%e.csv' % (res_itr, train_seed, noise_val)),\
+            np.hstack((out[i][4].reshape(-1,1), out[i][5])), delimiter = ',')
+        np.savetxt(os.path.join(raw_data_folder, 'variance_res%d_train%d_noise%e.csv' % (res_itr, train_seed, noise_val)),\
+            np.hstack((out[i][6].reshape(-1,1), out[i][7])), delimiter = ',')
+        np.savetxt(os.path.join(raw_data_folder, 'valid_time_res%d_train%d_noise%e.csv' % (res_itr, train_seed, noise_val)),\
+            np.hstack((out[i][8].reshape(-1,1), out[i][9])), delimiter = ',')
+        np.savetxt(os.path.join(raw_data_folder, 'train_mean_rms_res%d_train%d_noise%e.csv' % (res_itr, train_seed, noise_val)),\
+            out[i][-2], delimiter = ',')
+        np.savetxt(os.path.join(raw_data_folder, 'train_max_rms_res%d_train%d_noise%e.csv' % (res_itr, train_seed, noise_val)),\
+            out[i][-1], delimiter = ',')
+        if pmap:
+            np.savetxt(os.path.join(raw_data_folder, 'pmap_max_wass_dist_res%d_train%d_noise%e.csv' % (res_itr, train_seed, noise_val)),\
+                out[i][20], delimiter = ',')
+        if save_time_rms:
+            for j in range(num_tests):
+                #np.savetxt(os.path.join(raw_data_folder, 'mean_all_res%d_train%d_test%d_noise%e.csv' % (res_itr, train_seed, j, noise_val)),\
+                #    np.hstack((out[i][10][j].reshape(-1,1), out[i][11][j])), delimiter = ',')
+                #np.savetxt(os.path.join(raw_data_folder, 'variances_all_res%d_train%d_test%d_noise%e.csv' % (res_itr, train_seed, j, noise_val)),\
+                #    np.hstack((out[i][12][j].reshape(-1,1), out[i][13][j])), delimiter = ',')
+                np.savetxt(os.path.join(raw_data_folder, 'rms_res%d_train%d_test%d_noise%e.csv' % (res_itr, train_seed, j, noise_val)),\
+                    np.hstack((out[i][10][j].reshape(-1,1), out[i][11][j])), delimiter = ',')
+        if savepred:
+            for j, (k, reg) in product(range(num_tests), enumerate(alpha_values)):
+                np.savetxt(os.path.join(raw_data_folder, 'pred_res%d_train%d_test%d_noise%e_reg%e.csv' % (res_itr, train_seed, j, noise_val, reg)),\
+                        out[i][12][j,:,:,k], delimiter = ',')
+
     # toc_global = time.perf_counter()
     # print('Total Runtime: %s sec.' % (toc_global - tic_global))
 
-    return out
+    return rkTime_test, split_test
 
 # If we are running reservoir tests in parallel, compile the find_stability as a remote function.
 # Otherwise, wrap it.
@@ -1557,448 +1624,40 @@ def find_stability_remote(*args):
 def find_stability_serial(*args):
     return find_stability(*args)
 
-
-def get_stability_output(out_full, data_path, filename, noise_indices, train_indices, res_per_test, num_tests, alpha_values, savepred, save_time_mean_var, pmap, rkTime, split, metric = 'mss_var', return_all = False):#metric='pmap_max_wass_dist'):
-    # Function to process the output from all of the different reservoirs, trainning data sets, and noise values tested by find_stability.
-    # If return_all is True, this simply unpacks the linear output from the find_stability loop.
-    # If not, then this function returns only the results using the most optimal regularization (as defined by the metric) and using no regulariation.
-    noise_vals = np.unique(noise_indices)
-    train_vals = np.unique(train_indices)
-    """
-    print(train_vals)
-    print(noise_vals)
-    """
-    tn, nt = np.meshgrid(train_vals, noise_vals)
-    tn = tn.flatten()
-    nt = nt.flatten()
-    results = []
-    print('Trains:')
-    print(train_vals)
-    print('Noise:')
-    print(noise_vals)
-    print('Res')
-    print(res_per_test)
-    print('Regs:')
-    print(alpha_values)
-
-    stable_frac = np.zeros((res_per_test, train_vals.size, noise_vals.size, alpha_values.size))
-    mean_rms = np.zeros((res_per_test, train_vals.size, num_tests, noise_vals.size, alpha_values.size))
-    max_rms = np.zeros((res_per_test, train_vals.size, num_tests, noise_vals.size, alpha_values.size))
-    variances = np.zeros((res_per_test, train_vals.size, num_tests, noise_vals.size, alpha_values.size))
-    valid_time = np.zeros((res_per_test, train_vals.size, num_tests, noise_vals.size, alpha_values.size))
-    if save_time_mean_var:
-        mean_all = np.zeros((res_per_test, train_vals.size, num_tests, noise_vals.size, (rkTime-split)+1, alpha_values.size))
-        variances_all = np.zeros((res_per_test, train_vals.size, num_tests, noise_vals.size, (rkTime-split)+1, alpha_values.size))
-    wass_dist = np.zeros((res_per_test, train_vals.size, num_tests, noise_vals.size, alpha_values.size))
-    # pmap_max          = np.zeros((res_per_test, train_vals.size, noise_vals.size), dtype=object)
-    pmap_max_wass_dist = np.zeros((res_per_test, train_vals.size, num_tests, noise_vals.size, alpha_values.size-1))
-
-    for k, train in enumerate(train_vals):
-        for j, noise in enumerate(noise_vals):
-            out = out_full[(train == train_indices) & (noise == noise_indices)]
-            for i in range(res_per_test):
-                stable_frac[i,k,j,0] = out[i][0]
-                stable_frac[i,k,j,1:] = out[i][1]
-                mean_rms[i,k,:,j,0] = out[i][2]
-                mean_rms[i,k,:,j,1:] = out[i][3]
-                max_rms[i,k,:,j,0] = out[i][4]
-                max_rms[i,k,:,j,1:] = out[i][5]
-                variances[i,k,:,j,0] = out[i][6]
-                variances[i,k,:,j,1:] = out[i][7]
-                valid_time[i,k,:,j,0] = out[i][8]
-                valid_time[i,k,:,j,1:] = out[i][9]
-                mean_all[i,k,:,j,:,0] = out[i][10]
-                mean_all[i,k,:,j,:,1:] = out[i][11]
-                variances_all[i,k,:,j,:,0] = out[i][12]
-                variances_all[i,k,:,j,:,1:] = out[i][13]
-                wass_dist[i,k,:,j,0] = out[i][18]
-                wass_dist[i,k,:,j,1:] = out[i][19]
-                pmap_max_wass_dist[i,k,:,j,:] = out[i][20]
-                # pmap_max[k,j,i] = out[i][14]
-    if return_all and not savepred:
-        all_res, all_train_idx, all_test, all_noise_idx, all_reg_idx = np.meshgrid(np.arange(res_per_test, dtype = int),\
-                np.arange(train_vals.size, dtype = int), np.arange(num_tests, dtype = int),\
-                np.arange(noise_vals.size, dtype = int), np.arange(alpha_values.size, dtype = int))
-
-        all_res       = all_res.flatten()
-        all_train_idx = all_train_idx.flatten()
-        all_test      = all_test.flatten()
-        all_noise_idx = all_noise_idx.flatten()
-        all_reg_idx   = all_reg_idx.flatten()
-        all_train     = train_vals[all_train_idx]
-        all_noise     = noise_vals[all_noise_idx]
-        all_reg       = alpha_values[all_reg_idx]
-
-        data_dict = {'res': all_res,
-                    'train': all_train,
-                    'test': all_test,
-                    'noise': all_noise,
-                    'reg': all_reg}
-
-        print(data_dict)
-
-        data_out         = pd.DataFrame(data_dict)
-        data_out['stable_frac'] = -stable_frac[all_res, all_train_idx, all_noise_idx, all_reg_idx]
-        data_out['mean_rms'] = mean_rms[all_res, all_train_idx, all_test, all_noise_idx, all_reg_idx]
-        data_out['max_rms'] = max_rms[all_res, all_train_idx, all_test, all_noise_idx, all_reg_idx]
-        data_out['variance'] = variances[all_res, all_train_idx, all_test, all_noise_idx, all_reg_idx]
-        data_out['valid_time'] = valid_time[all_res, all_train_idx, all_test, all_noise_idx, all_reg_idx]
-
-        if pmap:
-            data_out['pmap_max_wass_dist'] = [pmap_max_wass_dist[i,j,k,l,m-1] if m != 0 else np.nan\
-                                    for i,j,k,l,m in zip(all_res, all_train_idx, all_test, all_noise_idx, all_reg_idx)]
-        if save_time_mean_var:
-            data_out = pd.concat([data_out, pd.DataFrame(mean_all[all_res, all_train_idx, all_test, all_noise_idx, :, all_reg_idx],\
-                    columns = ['mean_all%d' % i for i in range((rkTime-split)+1)])], axis = 1)
-            print('Concatenated mean_all')
-            data_out = pd.concat([data_out, pd.DataFrame(variances_all[all_res, all_train_idx, all_test, all_noise_idx, :, all_reg_idx],\
-                    columns = ['variances_all%d' % i for i in range((rkTime-split)+1)])], axis = 1)
-            print('Concatendated variances_all')
-
-        print('Compressing and saving data...')
-        save_tic = time.perf_counter()
-        data_out.to_csv(data_path + filename + '.bz2')
-        save_toc = time.perf_counter()
-        print('Time to compress and save data: %0.2f sec.' % ((save_toc-save_tic)))
-
-    elif return_all and savepred:
-        raise ValueError
-    else:
-        best_stable_frac = np.zeros((res_per_test, train_vals.size, noise_vals.size))
-        best_mean_rms = np.zeros((res_per_test, train_vals.size, num_test, noise_vals.size))
-        best_max_rms = np.zeros((res_per_test, train_vals.size, num_test, noise_vals.size))
-        best_variances = np.zeros((res_per_test, train_vals.size, num_test, noise_vals.size))
-        best_valid_time = np.zeros((res_per_test, train_vals.size, num_test, noise_vals.size))
-        if save_time_mean_var:
-            best_mean_all = np.zeros((res_per_test, train_vals.size, num_tests, noise_vals.size, (rkTime-split)+1))
-            best_variances_all = np.zeros((res_per_test, train_vals.size, num_tests, noise_vals.size, (rkTime-split)+1))
-        best_wass_dist = np.zeros((res_per_test, train_vals.size, num_test, noise_vals.size))
-        # best_pmap_max   = np.zeros((res_per_test, train_vals.size, num_test, noise_vals.size), dtype = object)
-        best_pmap_max_wass_dist = np.zeros((res_per_test, train_vals.size, num_test, noise_vals.size))
-        stable_frac_alpha = np.zeros(noise_vals.size)
-        best_j = np.zeros(noise_vals.size)
-        for i, noise in enumerate(noise_vals):
-            if metric == 'mss_var':
-                best_alpha_val = 0
-            elif metric in ['wass_dist', 'pmap_max_wass_dist', 'mean_rms', 'max_rms']:
-                best_alpha_val = np.inf
-            for j in range(1, alpha_values.size):
-                if metric == 'mss_var':
-                    metric_flag = np.mean(
-                            stable_frac[:, :, i,  j]) <= best_alpha_val
-                elif metric == 'wass_dist':
-                    metric_flag = np.mean(
-                            wass_dist[:, :, :, i, j]) <= best_alpha_val
-                elif metric == 'pmap_max_wass_dist':
-                    #print(j)
-                    #print(np.mean(pmap_max_wass_dist[:, i, :, :, j-1]))
-                    metric_flag = np.mean(
-                            pmap_max_wass_dist[:, :, :, i, j-1]) <= best_alpha_val
-                elif metric == 'mean_rms':
-                    metric_flag = np.mean(mean_rms[:,:,:,i,j]) <= best_alpha_val
-                elif metric == 'max_rms':
-                    metric_flag = np.median(max_rms[:,:,:,i,j]) <= best_alpha_val
-                if metric_flag or (metric == 'mss_var' and best_alpha_val == 0 and j == alpha_values.size-1) or \
-                        (metric in ['wass_dist', 'pmap_max_wass_dist', 'mean_rms', 'max_rms'] \
-                        and np.isinf(best_alpha_val) and j == alpha_values.size-1):
-                    if metric == 'mss_var':
-                        best_alpha_val = np.mean(stable_frac[:, :, i, j])
-                    elif metric == 'wass_dist':
-                        best_alpha_val = np.mean(wass_dist[:, :, :, i, j])
-                    elif metric == 'pmap_max_wass_dist':
-                        best_alpha_val = np.mean(
-                                pmap_max_wass_dist[:,:,:,i,j-1])
-                    elif metric == 'mean_rms':
-                        best_alpha_val = np.mean(mean_rms[:,:,:,i,j])
-                    elif metric == 'max_rms':
-                        best_alpha_val = np.median(max_rms[:,:,:,i,j])
-                    best_stable_frac[:,:,:,i] = -stable_frac[:, :, i, j]
-                    best_variances[:,:,:,i] = variances[:, :, :, i, j]
-                    best_mean_rms[:,:,:,i] = mean_rms[:, :, :, i, j]
-                    best_max_rms[:,:,:,i] = max_rms[:, :, :, i, j]
-                    best_valid_time[:,:,:,i] = valid_time[:, :, :, i, j]
-                    best_wass_dist[:,:,:,i] = wass_dist[:, :, :, i, j]
-                    best_pmap_max_wass_dist[:,i] = pmap_max_wass_dist[:, :, :, i, j-1]
-                    stable_frac_alpha[i] = alpha_values[j]
-                    best_j[i] = int(j)
-                    if save_time_mean_var:
-                        best_mean_all[:,:,:,i] = mean_all[:,:,:,i,:,j]
-                        best_variances_all[:,:,:,i] = variances_all[:,:,:,i,:,j]
-        all_res, all_train_idx, all_test, all_noise_idx = np.meshgrid(np.arange(res_per_test, dtype = int),\
-                np.arange(train_vals.size, dtype = int), np.arange(noise_vals.size, dtype = int), \
-                np.arange(num_tests, dtype = int))
-
-        all_res       = all_res.flatten()
-        all_train_idx = all_train_idx.flatten()
-        all_test      = all_test.flatten()
-        all_noise_idx = all_noise_idx.flatten()
-        all_train     = train_vals[all_train_idx]
-        all_noise     = noise_vals[all_noise_idx]
-        all_reg       = alpha_values[best_j[all_noise_idx]]
-
-        data_dict = {'res': all_res,
-                     'train': all_train,
-                     'test': all_test,
-                     'noise': all_noise,
-                     'reg': all_reg}
-
-        data_out         = pd.DataFrame(data_dict)
-        data_out['stable_frac'] = best_stable_frac[all_res, all_train_idx, all_noise_idx]
-        data_out['mean_rms'] = best_mean_rms[all_res, all_train_idx, all_test, all_noise_idx]
-        data_out['max_rms'] = best_max_rms[all_res, all_train_idx, all_test, all_noise_idx]
-        data_out['variance'] = best_variances[all_res, all_train_idx, all_test, all_noise_idx]
-        data_out['valid_time'] = best_valid_time[all_res, all_train_idx, all_test, all_noise_idx]
-
-        if pmap:
-            data_out['pmap_max_wass_dist'] = best_pmap_max_wass_dist[all_res, all_train_idx, all_test, all_noise_idx]
-        if save_time_mean_var:
-            data_out = pd.concat([data_out, pd.DataFrame(mean_all[all_res, all_train_idx, all_test, all_noise_idx],\
-                columns = ['mean_all%d' % i for i in range((rkTime-split)+1)])], axis = 1)
-            print('Concatenated mean_all')
-            data_out = pd.concat([data_out, pd.DataFrame(variances_all[all_res, all_train_idx, all_test, all_noise_idx],\
-                     columns = ['variances_all%d' % i for i in range((rkTime-split)+1)])], axis = 1)
-            print('Concatenated variances_all')
-
-        print('Compressing and saving data...')
-        save_tic = time.perf_counter()
-        data_out.to_csv(data_path + filename + '.bz2')
-        save_toc = time.perf_counter()
-        print('Time to compress and save data: %0.2f sec.' % ((save_toc-save_tic)))
-
-                    # for k,l,m in product(np.arange(train_vals.size), np.arange(res_per_test), np.arange(num_tests)):
-                    #    best_pmap_max[k,i,l,m] = pmap_max[k,i,l][j-1][m]
-        print(best_j)
-        for k in range(tn.size):
-            if savepred:
-                pred_folder = os.path.join(data_path, filename+'_folder')
-                out = out_full[(tn[k] == train_indices) & (nt[k] == noise_indices)]
-                for i in range(res_per_test):
-                    if i == 0:
-                        preds = out[i][14]
-                    elif i == 1:
-                        preds = np.stack((preds, out[i][10]), axis=0)
-                    elif i > 1:
-                        preds = np.concatenate((preds, out[i][14].reshape(
-                            1, out[i][14].shape[0], out[i][14].shape[1], out[i][14].shape[2], out[i][14].shape[3])), axis=0)
-                if res_per_test == 1:
-                    preds = preds.reshape(
-                        1, preds.shape[0], preds.shape[1], preds.shape[2], preds.shape[3])
-                # print(nt[k])
-                # print(noise_vals)
-                # print(nt[k] == noise_vals)
-                noise_idx = np.where(nt[k] == noise_vals)[0][0]
-
-                # print(preds.shape)
-                # print(noise_idx)
-                best_preds = preds[:, :, :, :, int(best_j[noise_idx])-1]
-                for i in range(res_per_test):
-                    for j in range(num_tests):
-                        np.savetxt(pred_folder + 'pred_res%d_train%d_test%d_noise%e_reg%e.csv' % \
-                                (i, tn[k], j, nt[k], alpha_values[best_j[noise_idx]]), preds[i,j],\
-                                delimiter = ',')
-                """
-                print('Training index: %d' % tn[k])
-                print('Noise index: %e' % nt[k])
-                print('End of best pred:')
-                print(best_preds[:,:,-1,-1])
-                """
-
-        return
-
-
 def main(argv):
 
     # Main driver function for obtaining reservoir performance. This function processes input arguments and
     # creates random number generators for the different reservoirs, trainings, noise arrays, and tests.
     # It then calls find_stability in a loop, processes the output from find_stability, and saves the output to a folder.
 
-    print('Function Started')
-    train_time = 3000
-    res_size = 1000
-    res_per_test = 20
-    noise_realizations = 1
-    num_tests = 10
-    num_trains = 25
-    traintype = 'normal'
-    noisetype = 'gaussian'
-    system = 'KS'
-    savepred = False
-    save_time_mean_var = False
-    rho = 0.5
-    sigma = 1.0
-    leakage = 1.0
-    bias_type = 'old'
-    win_type = 'full'
-    debug_mode = False
-    pmap = False
-    machine = 'deepthought2'
-    ifray = True
-    tau_flag = True
-    num_cpus = 20
-    metric = 'mss_var'
-    return_all = False
+    root_folder, top_folder, run_name, system, noisetype, traintype, savepred, save_time_rms, rho,\
+        sigma, leakage, win_type, bias_type, tau, res_size, train_time, noise_realizations,\
+        res_per_test, num_trains, num_tests, debug_mode, pmap, metric, return_all, ifray, machine = \
+        get_run_opts(argv)
 
-    try:
-        opts, args = getopt.getopt(argv, "T:N:r:",
-                ['noisetype=', 'traintype=', 'system=', 'res=',
-                'tests=', 'trains=', 'savepred=', 'tau=', 'rho=',
-                'sigma=', 'leakage=', 'bias_type=', 'debug=', 'win_type=',
-                'machine=', 'num_cpus=', 'pmap=', 'parallel=', 'metric=','returnall=',
-                'savetime='])
-    except getopt.GetoptError:
-        print('Error: Some options not recognized')
-        sys.exit(2)
-    for opt, arg in opts:
-        if opt == '-T':
-            train_time = int(arg)
-            print('Training iterations: %d' % train_time)
-        elif opt == '-N':
-            res_size = int(arg)
-            print('Reservoir nodes: %d' % res_size)
-        elif opt == '-r':
-            noise_realizations = int(arg)
-            print('Noise Realizations: %d' % noise_realizations)
-        elif opt == '--savetime':
-            if str(arg) == 'True':
-                save_time_mean_var = True
-            elif str(arg) == 'False':
-                save_time_mean_var = False
-            else:
-                raise ValueError
-        elif opt == '--metric':
-            metric = str(arg)
-            if metric not in ['wass_dist', 'pmap_max_wass_dist', 'mean_rms', 'max_rms', 'mss_var']:
-                raise ValueError
-            print('Stability metric: %s' % metric)
-        elif opt == '--returnall':
-            if arg == 'True':
-                return_all = True
-            elif arg == 'False':
-                return_all = False
-            else:
-                raise ValueError
-        elif opt == '--parallel':
-            parallel_in = str(arg)
-            if parallel_in == 'True':
-                ifray = True
-            elif parallel_in == 'False':
-                ifray = False
-            else:
-                raise ValueError
-        elif opt == '--pmap':
-            pmap_in = str(arg)
-            if pmap_in == 'True':
-                pmap = True
-            elif pmap_in == 'False':
-                pmap = False
-            else:
-                raise ValueError
-        elif opt == '--machine':
-            machine = str(arg)
-            if not machine == 'skynet' and not machine == 'deepthought2':
-                raise ValueError
-            print('Machine: %s' % machine)
-        elif opt == '--num_cpus':
-            num_cpus = int(arg)
-            print('Number of CPUS: %d' % num_cpus)
-        elif opt == '--rho':
-            rho = float(arg)
-            print('Rho: %f' % rho)
-        elif opt == '--sigma':
-            sigma = float(arg)
-            print('Sigma: %f' % sigma)
-        elif opt == '--leakage':
-            leakage = float(arg)
-            print('Leakage: %f' % leakage)
-        elif opt == '--tau':
-            tau  = float(arg)
-            tau_flag = False
-            print('Reservoir timestep: %f' % tau)
-        elif opt == '--win_type':
-            win_type = str(arg)
-            print('Win Type: %s' % win_type)
-        elif opt == '--bias_type':
-            bias_type = str(arg)
-            print('Bias Type: %s' % bias_type)
-        elif opt == '--res':
-            res_per_test = int(arg)
-            print('Number of reservoirs: %d' % res_per_test)
-        elif opt == '--tests':
-            num_tests = int(arg)
-            print('Number of tests: %d' % num_tests)
-        elif opt == '--trains':
-            num_trains = int(arg)
-            print('Number of training data sequences: %d' % num_trains)
-        elif opt == '--savepred':
-            if arg == 'True':
-                savepred = True
-            elif arg == 'False':
-                savepred = False
-            print('Saving predictions: %s' % arg)
-        elif opt == '--noisetype':
-            noisetype = str(arg)
-            print('Noise type: %s' % noisetype)
-        elif opt == '--traintype':
-            traintype = str(arg)
-            print('Training type: %s' % traintype)
-        elif opt == '--system':
-            system = str(arg)
-            print('System: %s' % system)
-        elif opt == '--debug':
-            if arg == 'True':
-                debug_mode = True
-            elif arg == 'False':
-                debug_mode = False
-            print('Debug Mode: %s' % arg)
-    if return_all and savepred:
-        print('Cannot return results for all parameters and full predictions due to memory constraints.')
-        raise ValueError
-    if tau_flag:
-        if system == 'lorenz':
-            tau = 0.1
-        elif system in ['KS', 'KS_d2175']:
-            tau = 0.25
-    if savepred:
-        predflag = 'wpred_'
-    else:
-        predflag = ''
-    if save_time_mean_var:
-        timeflag = 'savetime_'
-    else:
-        timeflag = ''
+    raw_data_folder = os.path.join(os.path.join(root_folder, top_folder), run_name + '_folder')
     if machine == 'skynet':
         if ifray:
             ray.init(num_cpus = num_cpus)
-        foldername = '/h/awikner/res-noise-stabilization/'
     elif machine == 'deepthought2':
         if ifray:
             ray.init(address=os.environ["ip_head"])
-        foldername = '/lustre/awikner1/res-noise-stabilization/'
-    print(foldername)
-
-    ########################################
-    # train_time = 500
-    # res_size = 100
-    # res_per_test = 100
-    # noise_realizations = 1
-    #sys.path.append(foldername)
-    #from lorenzrungekutta_numba import rungekutta, rungekutta_pred
-    #from ks_etdrk4 import kursiv_predict, kursiv_predict_pred
-    #from csc_mult import mult_vec, construct_jac_mat_csc, matrix_diag_mult,\
-    #        matrix_dot_left_T, matrix_diag_sparse_mult_add, matrix_dot_left_T
-    #from poincare_max import poincare_max
 
 
-    noise_values_array = np.logspace(-4, 0, num = 13, base = 10)[5:10]
+    noise_values_array = np.logspace(-3, 0, num = 19, base = 10)[5:11]
     #noise_values_array = np.logspace(-4, 0, num = 13, base = 10)[6:8]
     # noise_values_array = np.array([np.logspace(-4, 0, num = 13, base = 10)[6]])
     # noise_values_array = np.array([0,1e-3,1e-2])
-    alpha_values = np.append(0., np.logspace(-7, -2, 11))
+    alpha_values = np.append(0., np.logspace(-7, -3, 9))
     #alpha_values = np.array([0., 1e-6, 1e-4])
     if traintype in ['normal','normalres1','normalres2','rmean','rmeanres1','rmeanres2',
             'rplusq','rplusqres1','rplusqres2']:
         alpha_values = alpha_values*noise_realizations
     # alpha_values = np.array([0,1e-6,1e-4])
+
+    np.savetxt(os.path.join(raw_data_folder, 'test_noise_values.csv'), noise_values_array, delimiter = ',')
+    np.savetxt(os.path.join(raw_data_folder, 'test_alpha_values.csv'), alpha_values      , delimiter = ',')
+
     ss_res   = np.random.SeedSequence(12)
     ss_train = np.random.SeedSequence(34)
     ss_test  = np.random.SeedSequence(56)
@@ -2026,18 +1685,20 @@ def main(argv):
                 tr[i], train_streams[i], rt[i], res_streams[i], test_streams[i], noise_streams, rho, sigma, \
                 leakage, win_type, bias_type, train_time, \
                 res_size, res_per_test, noise_realizations, num_tests, alpha_values,\
-                system, tau, savepred, save_time_mean_var, debug_mode, \
-                foldername, pmap) for i in range(tr.size)])
+                system, tau, savepred, save_time_rms, debug_mode, \
+                root_folder, pmap, raw_data_folder) for i in range(tr.size)])
         else:
             out_base  = [find_stability_serial(noisetype, noise_values_array, traintype, \
                 tr[i], train_streams[i], rt[i], res_streams[i], test_streams[i], noise_streams, rho, sigma, \
                 leakage, win_type, bias_type, train_time, \
                 res_size, res_per_test, noise_realizations, num_tests, alpha_values,\
-                system, tau, savepred, save_time_mean_var, debug_mode,\
-                foldername, pmap) for i in range(tr.size)]
+                system, tau, savepred, save_time_rms, debug_mode,\
+                root_folder, pmap, raw_data_folder) for i in range(tr.size)]
 
         # print('Ray out len: %d' % len(out_base))
         # print('Out elem len: %d' % len(out_base[0]))
+
+        """
 
         tnr, ntr, rtn = np.meshgrid(np.arange(num_trains), noise_values_array, np.arange(res_per_test))
         tnr = tnr.flatten()
@@ -2061,6 +1722,7 @@ def main(argv):
             final_out.append(out[idx])
 
         out = np.array(final_out, dtype = object)
+        """
     else:
         res_seeds       = ss_res.spawn(res_per_test)
         train_seeds     = ss_train.spawn(num_trains)
@@ -2090,13 +1752,14 @@ def main(argv):
                 tnr[i], train_streams[i], rtn[i], res_streams[i], test_streams[i], noise_streams[i], \
                 rho, sigma, leakage, win_type, bias_type, train_time, \
                 res_size, res_per_test, noise_realizations, num_tests, alpha_values,\
-                system, tau, savepred, save_time_mean_var, debug_mode, foldername, pmap) for i in range(tnr.size)])
+                system, tau, savepred, save_time_rms, debug_mode, root_folder, pmap, raw_data_folder) for i in range(tnr.size)])
         else:
             out_base  = [find_stability_serial(noisetype, ntr[i], traintype,\
                 tnr[i], train_streams[i], rtn[i], res_streams[i], test_streams[i], noise_streams[i], \
                 rho, sigma, leakage, win_type, bias_type, train_time, \
                 res_size, res_per_test, noise_realizations, num_tests, alpha_values,\
-                system, tau, savepred, save_time_mean_var, debug_mode, foldername, pmap) for i in range(tnr.size)]
+                system, tau, savepred, save_time_rms, debug_mode, root_folder, pmap, raw_data_folder) for i in range(tnr.size)]
+        """
         out = []
         for i in range(len(out_base)):
             for j in range(len(out_base[i])):
@@ -2108,6 +1771,9 @@ def main(argv):
         #    print('Noise val: %e' % ntr[k])
         #    print('Res idx: %d' % rtn[k])
         #    print(out[k][8][0, -1, -1])
+        """
+    rkTime, split = out_base[0]
+    np.savetxt(os.path.join(raw_data_folder, 'test_time_split.csv'), np.array([rkTime, split]), delimiter = ',')
 
     # print(len(results[0]))
     ray.shutdown()
@@ -2115,24 +1781,6 @@ def main(argv):
     runtime = toc - tic
     print('Runtime over all cores: %f sec.' %(runtime))
     print('Ray finished.')
-
-    if not return_all:
-        top_folder = 'Data/%s_noisetest_noisetype_%s_traintype_%s/' % (system, noisetype, traintype)
-        folder = '%s_more_noisetest_%s%srho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s_metric_%s/' \
-             % (system,predflag, timeflag, rho, sigma, leakage, win_type, bias_type, tau, res_size, \
-             train_time, noise_realizations, noisetype, traintype, metric)
-    elif return_all:
-        top_folder = 'Data/%s_noisetest_noisetype_%s_traintype_%s/' % (system, noisetype, traintype)
-        folder = '%s_%s_%srho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s' % (system,predflag, timeflag, rho, sigma, leakage, win_type, bias_type, tau,res_size, train_time, noise_realizations, noisetype, traintype)
-    if not os.path.isdir(os.path.join(foldername, top_folder)):
-        os.mkdir(os.path.join(foldername, top_folder))
-    if savepred and not os.path.isdir(os.path.join(os.path.join(foldername, top_folder), folder)):
-        os.mkdir(os.path.join(os.path.join(foldername, top_folder), folder))
-
-    data_folder = os.path.join(foldername, top_folder)
-
-    get_stability_output(out, data_folder, folder, ntr, tnr, res_per_test, num_tests, alpha_values, savepred,save_time_mean_var, pmap, out[0][-2], out[0][-1], metric, return_all)
-
     print('Results Saved')
 
 
