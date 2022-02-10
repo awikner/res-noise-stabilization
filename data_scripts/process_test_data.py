@@ -32,6 +32,8 @@ sys.path.append('/h/awikner/res-noise-stabilization/')
 
 def main(argv):
 
+    saved_flag = False
+
     tic = time.perf_counter()
 
     root_folder, top_folder, run_name, system, noisetype, traintype, savepred, save_time_rms, rho,\
@@ -106,9 +108,19 @@ def main(argv):
                 #variances_all[i,j,l,k] = np.loadtxt(os.path.join(raw_data_folder, 'variances_all_res%d_train%d_test%d_noise%e.csv' % (i,j,l,noise)), delimiter = ',')
                 rms[i,j,l,k] = np.loadtxt(os.path.join(raw_data_folder, 'rms_res%d_train%d_test%d_noise%e.csv' % (i,j,l,noise)), delimiter = ',')
     load_toc = time.perf_counter()
-    print('All data loaded in %s sec.' % (load_toc - load_tic))
+    print('All data loaded in %0.2f sec.' % (load_toc - load_tic))
 
     if return_all and not savepred:
+
+        save_filename = os.path.join(os.path.join(root_folder, top_folder), run_name + '.bz2')
+        if os.path.exists(save_filename):
+            saved_flag = True
+            print('Found data file with the same name. Loading...')
+            save_tic = time.perf_counter()
+            saved_data = pd.read_csv(save_filename, index_col = 0)
+            save_toc = time.perf_counter()
+            print('Saved data loaded in %0.2f sec.' % (save_toc - save_tic))
+
         all_res, all_train_idx, all_test, all_noise_idx, all_reg_idx = np.meshgrid(np.arange(res_per_test, dtype = int),\
                 np.arange(train_vals.size, dtype = int), np.arange(num_tests, dtype = int),\
                 np.arange(noise_vals.size, dtype = int), np.arange(alpha_values.size, dtype = int))
@@ -127,8 +139,6 @@ def main(argv):
                     'test': all_test,
                     'noise': all_noise,
                     'reg': all_reg}
-
-        print(data_dict)
 
         data_out         = pd.DataFrame(data_dict)
         data_out['stable_frac'] = stable_frac[all_res, all_train_idx, all_noise_idx, all_reg_idx]
@@ -153,9 +163,23 @@ def main(argv):
                     columns = ['rms%d' % (i+1) for i in range((rkTime-split))])], axis = 1)
             print('Concatenated rms')
 
+        if saved_flag:
+            saved_cols = saved_data.columns.to_list()
+            if set(saved_cols) != set(data_out.columns.to_list()):
+                print('Saved Data set of the same name does not contain the same type of data.')
+                print('Delete this file before running this code again.')
+                raise ValueError
+            data_out = pd.concat([data_out, saved_data], copy = False)
+            data_out.drop_duplicates(['res','train','test','noise','reg'], inplace = True)
+            sort_tic = time.perf_counter()
+            data_out.sort_values(['res','train','test','noise','reg'], inplace=True, ignore_index=True)
+            sort_toc = time.perf_counter()
+            print('Data sorted in %0.2f sec.' % (sort_toc - sort_tic))
+
+
         print('Compressing and saving data...')
         save_tic = time.perf_counter()
-        data_out.to_csv(os.path.join(os.path.join(root_folder, top_folder), run_name + '.bz2'))
+        data_out.to_csv(save_filename)
         save_toc = time.perf_counter()
         print('Time to compress and save data: %0.2f sec.' % ((save_toc-save_tic)))
 
