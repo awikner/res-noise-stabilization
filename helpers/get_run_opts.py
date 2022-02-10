@@ -35,6 +35,8 @@ def get_run_opts(argv, runflag = True):
         num_cpus = 20
         metric = 'mss_var'
         return_all = False
+        noise_values_array = np.logspace(-3, 0, num = 19, base = 10)[5:11]
+        alpha_values = np.append(0., np.logspace(-7, -3, 9))
 
         try:
             opts, args = getopt.getopt(argv, "T:N:r:",
@@ -42,7 +44,7 @@ def get_run_opts(argv, runflag = True):
                     'tests=', 'trains=', 'savepred=', 'tau=', 'rho=',
                     'sigma=', 'leakage=', 'bias_type=', 'debug=', 'win_type=',
                     'machine=', 'num_cpus=', 'pmap=', 'parallel=', 'metric=','returnall=',
-                    'savetime='])
+                    'savetime=', 'noisevals=', 'regvals='])
         except getopt.GetoptError:
             print('Error: Some options not recognized')
             sys.exit(2)
@@ -56,6 +58,20 @@ def get_run_opts(argv, runflag = True):
             elif opt == '-r':
                 noise_realizations = int(arg)
                 print('Noise Realizations: %d' % noise_realizations)
+            elif opt == '--noisevals':
+                noise_values_array = np.array([float(noise) for noise in arg.split(',')])
+                noise_str = '[ '
+                for noise in noise_values_array:
+                    noise_str += '%0.3e, ' % noise
+                noise_str = noise_str[:-2] + ' ]'
+                print('Noise values: %s' % noise_str)
+            elif opt == '--noisevals':
+                alpha_values = np.array([float(reg) for reg in arg.split(',')])
+                reg_str = '[ '
+                for reg in alpha_values:
+                    reg_str += '%0.3e, ' % reg
+                reg_str = reg_str[:-2] + ' ]'
+                print('Regularization values: %s' % reg_str)
             elif opt == '--savetime':
                 if str(arg) == 'True':
                     save_time_rms = True
@@ -192,8 +208,8 @@ def get_run_opts(argv, runflag = True):
             os.mkdir(os.path.join(os.path.join(root_folder, data_folder), run_name + '_folder'))
 
         return root_folder, data_folder, run_name, system, noisetype, traintype, savepred, save_time_rms, rho,\
-            sigma, leakage, win_type, bias_type, tau, res_size, train_time, noise_realizations,\
-            res_per_test, num_trains, num_tests, debug_mode, pmap, metric, return_all, ifray, machine
+            sigma, leakage, win_type, bias_type, tau, res_size, train_time, noise_realizations, noise_values_array,\
+            alpha_values, res_per_test, num_trains, num_tests, debug_mode, pmap, metric, return_all, ifray, machine
     else:
         if not savepred:
             return os.path.join(os.path.join(root_folder, data_folder), run_name + '.bz2'), ''
