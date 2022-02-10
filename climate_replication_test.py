@@ -1631,8 +1631,8 @@ def main(argv):
     # It then calls find_stability in a loop, processes the output from find_stability, and saves the output to a folder.
 
     root_folder, top_folder, run_name, system, noisetype, traintype, savepred, save_time_rms, rho,\
-        sigma, leakage, win_type, bias_type, tau, res_size, train_time, noise_realizations,\
-        res_per_test, num_trains, num_tests, debug_mode, pmap, metric, return_all, ifray, machine = \
+        sigma, leakage, win_type, bias_type, tau, res_size, train_time, noise_realizations, noise_values_array,\
+        alpha_values, res_per_test, num_trains, num_tests, debug_mode, pmap, metric, return_all, ifray, machine = \
         get_run_opts(argv)
 
     raw_data_folder = os.path.join(os.path.join(root_folder, top_folder), run_name + '_folder')
@@ -1644,11 +1644,11 @@ def main(argv):
             ray.init(address=os.environ["ip_head"])
 
 
-    noise_values_array = np.logspace(-3, 0, num = 19, base = 10)[5:11]
+    #noise_values_array = np.logspace(-3, 0, num = 19, base = 10)[5:11]
     #noise_values_array = np.logspace(-4, 0, num = 13, base = 10)[6:8]
     # noise_values_array = np.array([np.logspace(-4, 0, num = 13, base = 10)[6]])
     # noise_values_array = np.array([0,1e-3,1e-2])
-    alpha_values = np.append(0., np.logspace(-7, -3, 9))
+    #alpha_values = np.append(0., np.logspace(-7, -3, 9))
     #alpha_values = np.array([0., 1e-6, 1e-4])
     if traintype in ['normal','normalres1','normalres2','rmean','rmeanres1','rmeanres2',
             'rplusq','rplusqres1','rplusqres2']:
