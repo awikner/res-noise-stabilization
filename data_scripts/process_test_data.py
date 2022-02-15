@@ -37,8 +37,8 @@ def main(argv):
     tic = time.perf_counter()
 
     root_folder, top_folder, run_name, system, noisetype, traintype, savepred, save_time_rms, rho,\
-        sigma, leakage, win_type, bias_type, tau, res_size, train_time, noise_realizations,\
-        res_per_test, num_trains, num_tests, debug_mode, pmap, metric, return_all, ifray, machine = \
+        sigma, leakage, win_type, bias_type, tau, res_size, train_time, noise_realizations, noise_values_array,\
+        alpha_values, res_per_test, num_trains, num_tests, debug_mode, pmap, metric, return_all, ifray, machine = \
         get_run_opts(argv)
 
     raw_data_folder = os.path.join(os.path.join(root_folder, top_folder), run_name + '_folder')
