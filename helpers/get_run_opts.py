@@ -35,6 +35,7 @@ def get_run_opts(argv, runflag = True):
         num_cpus = 20
         metric = 'mss_var'
         return_all = False
+        max_valid_time = 500
         noise_values_array = np.logspace(-3, 0, num = 19, base = 10)[5:11]
         alpha_values = np.append(0., np.logspace(-7, -3, 9))
 
@@ -44,7 +45,7 @@ def get_run_opts(argv, runflag = True):
                     'tests=', 'trains=', 'savepred=', 'tau=', 'rho=',
                     'sigma=', 'leakage=', 'bias_type=', 'debug=', 'win_type=',
                     'machine=', 'num_cpus=', 'pmap=', 'parallel=', 'metric=','returnall=',
-                    'savetime=', 'noisevals=', 'regvals='])
+                    'savetime=', 'noisevals=', 'regvals=', 'maxvt='])
         except getopt.GetoptError:
             print('Error: Some options not recognized')
             sys.exit(2)
@@ -58,6 +59,9 @@ def get_run_opts(argv, runflag = True):
             elif opt == '-r':
                 noise_realizations = int(arg)
                 print('Noise Realizations: %d' % noise_realizations)
+            elif opt == '--maxvt':
+                max_valid_time = int(arg)
+                print('Maximum valid time: %d' % max_valid_time)
             elif opt == '--noisevals':
                 noise_values_array = np.array([float(noise) for noise in arg.split(',')])
                 noise_str = '[ '
@@ -65,7 +69,7 @@ def get_run_opts(argv, runflag = True):
                     noise_str += '%0.3e, ' % noise
                 noise_str = noise_str[:-2] + ' ]'
                 print('Noise values: %s' % noise_str)
-            elif opt == '--noisevals':
+            elif opt == '--regvals':
                 alpha_values = np.array([float(reg) for reg in arg.split(',')])
                 reg_str = '[ '
                 for reg in alpha_values:
@@ -209,7 +213,8 @@ def get_run_opts(argv, runflag = True):
 
         return root_folder, data_folder, run_name, system, noisetype, traintype, savepred, save_time_rms, rho,\
             sigma, leakage, win_type, bias_type, tau, res_size, train_time, noise_realizations, noise_values_array,\
-            alpha_values, res_per_test, num_trains, num_tests, debug_mode, pmap, metric, return_all, ifray, machine
+            alpha_values, res_per_test, num_trains, num_tests, debug_mode, pmap, metric, return_all, ifray, machine,\
+            max_valid_time
     else:
         if not savepred:
             return os.path.join(os.path.join(root_folder, data_folder), run_name + '.bz2'), ''
