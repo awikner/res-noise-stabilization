@@ -38,8 +38,8 @@ def main(argv):
 
     root_folder, top_folder, run_name, system, noisetype, traintype, savepred, save_time_rms, rho,\
         sigma, leakage, win_type, bias_type, tau, res_size, train_time, noise_realizations, noise_values_array,\
-        alpha_values, res_per_test, num_trains, num_tests, debug_mode, pmap, metric, return_all, ifray, machine = \
-        get_run_opts(argv)
+        alpha_values, res_per_test, num_trains, num_tests, debug_mode, pmap, metric, return_all, ifray, machine,\
+        max_valid_time = get_run_opts(argv)
 
     raw_data_folder = os.path.join(os.path.join(root_folder, top_folder), run_name + '_folder')
     raw_data_size_str = str(subprocess.check_output('du -s %s' % raw_data_folder, shell = True))
@@ -53,6 +53,7 @@ def main(argv):
     time_test    = np.loadtxt(os.path.join(raw_data_folder, 'test_time_split.csv'), delimiter = ',')
     rkTime       = int(time_test[0])
     split        = int(time_test[1])
+    num_vt_tests = (rkTime-split) // max_valid_time
 
     #def get_stability_output(out_full, data_path, filename, noise_indices, train_indices, res_per_test, num_tests, alpha_values, savepred, save_time_rms, pmap, rkTime, split, metric = 'mss_var', return_all = False):#metric='pmap_max_wass_dist'):
     # Function to process the output from all of the different reservoirs, trainning data sets, and noise values tested by find_stability.
@@ -82,7 +83,7 @@ def main(argv):
     mean_rms = np.zeros((res_per_test, train_vals.size, num_tests, noise_vals.size, alpha_values.size))
     max_rms = np.zeros((res_per_test, train_vals.size, num_tests, noise_vals.size, alpha_values.size))
     variances = np.zeros((res_per_test, train_vals.size, num_tests, noise_vals.size, alpha_values.size))
-    valid_time = np.zeros((res_per_test, train_vals.size, num_tests, noise_vals.size, alpha_values.size))
+    valid_time = np.zeros((res_per_test, train_vals.size, num_tests, noise_vals.size, num_vt_tests, alpha_values.size))
     if save_time_rms:
         #mean_all = np.zeros((res_per_test, train_vals.size, num_tests, noise_vals.size, (rkTime-split)+1, alpha_values.size))
         #variances_all = np.zeros((res_per_test, train_vals.size, num_tests, noise_vals.size, (rkTime-split)+1, alpha_values.size))
@@ -99,7 +100,8 @@ def main(argv):
         mean_rms[i,j,:,k]      = np.loadtxt(os.path.join(raw_data_folder, 'mean_rms_res%d_train%d_noise%e.csv'% (i,j,noise)), delimiter = ',')
         max_rms[i,j,:,k]       = np.loadtxt(os.path.join(raw_data_folder, 'max_rms_res%d_train%d_noise%e.csv' % (i,j,noise)), delimiter = ',')
         variances[i,j,:,k]     = np.loadtxt(os.path.join(raw_data_folder, 'variance_res%d_train%d_noise%e.csv'% (i,j,noise)), delimiter = ',')
-        valid_time[i,j,:,k]    = np.loadtxt(os.path.join(raw_data_folder, 'valid_time_res%d_train%d_noise%e.csv' % (i,j,noise)), delimiter = ',')
+        for l in range(num_tests):
+            valid_time[i,j,l,k]    = np.loadtxt(os.path.join(raw_data_folder, 'valid_time_res%d_train%d_test%d_noise%e.csv' % (i,j,l,noise)), delimiter = ',')
         if pmap:
             pmap_max_wass_dist[i,j,:,k] = np.loadtxt(os.path.join(raw_data_folder, 'pmap_max_wass_dist_res%d_train%d_noise%e.csv' % (i,j,noise)), delimiter = ',')
         if save_time_rms:
@@ -147,7 +149,8 @@ def main(argv):
         data_out['mean_rms'] = mean_rms[all_res, all_train_idx, all_test, all_noise_idx, all_reg_idx]
         data_out['max_rms'] = max_rms[all_res, all_train_idx, all_test, all_noise_idx, all_reg_idx]
         data_out['variance'] = variances[all_res, all_train_idx, all_test, all_noise_idx, all_reg_idx]
-        data_out['valid_time'] = valid_time[all_res, all_train_idx, all_test, all_noise_idx, all_reg_idx]
+        data_out = pd.concat([data_out, pd.DataFrame(valid_time[all_res, all_train_idx, all_test, all_noise_idx, :, all_reg_idx],\
+                columns = ['valid_time%d' % i for i in range(num_vt_tests)])], axis = 1)
 
         if pmap:
             data_out['pmap_max_wass_dist'] = [pmap_max_wass_dist[i,j,k,l,m-1] if m != 0 else np.nan\
@@ -175,6 +178,8 @@ def main(argv):
             data_out.sort_values(['res','train','test','noise','reg'], inplace=True, ignore_index=True)
             sort_toc = time.perf_counter()
             print('Data sorted in %0.2f sec.' % (sort_toc - sort_tic))
+            raw_data_size = float(data_out.memory_usage().sum())/1000.
+
 
 
         print('Compressing and saving data...')
@@ -192,7 +197,7 @@ def main(argv):
         best_mean_rms = np.zeros((res_per_test, train_vals.size, num_test, noise_vals.size))
         best_max_rms = np.zeros((res_per_test, train_vals.size, num_test, noise_vals.size))
         best_variances = np.zeros((res_per_test, train_vals.size, num_test, noise_vals.size))
-        best_valid_time = np.zeros((res_per_test, train_vals.size, num_test, noise_vals.size))
+        best_valid_time = np.zeros((res_per_test, train_vals.size, num_test, noise_vals.size, num_vt_tests))
         if save_time_rms:
             #best_mean_all = np.zeros((res_per_test, train_vals.size, num_tests, noise_vals.size, (rkTime-split)+1))
             #best_variances_all = np.zeros((res_per_test, train_vals.size, num_tests, noise_vals.size, (rkTime-split)+1))
@@ -201,14 +206,16 @@ def main(argv):
         stable_frac_alpha = np.zeros(noise_vals.size)
         best_j = np.zeros(noise_vals.size)
         for i, noise in enumerate(noise_vals):
-            if metric == 'mss_var':
+            if metric in ['mss_var', 'valid_time']:
                 best_alpha_val = 0
             elif metric in ['pmap_max_wass_dist', 'mean_rms', 'max_rms']:
                 best_alpha_val = np.inf
             for j in range(1, alpha_values.size):
                 if metric == 'mss_var':
                     metric_flag = np.mean(
-                            stable_frac[:, :, i,  j]) <= best_alpha_val
+                        stable_frac[:, :, i,  j]) > best_alpha_val
+                elif metric == 'valid_time':
+                    metric_flag = np.median(valid_time[:,:,:,i,:,j]) > best_alpha_val
                 elif metric == 'pmap_max_wass_dist':
                     #print(j)
                     #print(np.mean(pmap_max_wass_dist[:, i, :, :, j-1]))
@@ -218,11 +225,13 @@ def main(argv):
                     metric_flag = np.mean(mean_rms[:,:,:,i,j]) <= best_alpha_val
                 elif metric == 'max_rms':
                     metric_flag = np.median(max_rms[:,:,:,i,j]) <= best_alpha_val
-                if metric_flag or (metric == 'mss_var' and best_alpha_val == 0 and j == alpha_values.size-1) or \
+                if metric_flag or (metric in ['mss_var', 'valid_time'] and best_alpha_val == 0 and j == alpha_values.size-1) or \
                         (metric in ['pmap_max_wass_dist', 'mean_rms', 'max_rms'] \
                         and np.isinf(best_alpha_val) and j == alpha_values.size-1):
                     if metric == 'mss_var':
                         best_alpha_val = np.mean(stable_frac[:, :, i, j])
+                    elif metric == 'valid_time':
+                        best_alpha_val = np.median(valid_time[:,:,:,i,:,j])
                     elif metric == 'pmap_max_wass_dist':
                         best_alpha_val = np.mean(
                                 pmap_max_wass_dist[:,:,:,i,j-1])
@@ -236,7 +245,7 @@ def main(argv):
                     best_variances[:,:,:,i] = variances[:, :, :, i, j]
                     best_mean_rms[:,:,:,i] = mean_rms[:, :, :, i, j]
                     best_max_rms[:,:,:,i] = max_rms[:, :, :, i, j]
-                    best_valid_time[:,:,:,i] = valid_time[:, :, :, i, j]
+                    best_valid_time[:,:,:,i] = valid_time[:, :, :, i, :,j]
                     best_pmap_max_wass_dist[:,i] = pmap_max_wass_dist[:, :, :, i, j-1]
                     stable_frac_alpha[i] = alpha_values[j]
                     best_j[i] = int(j)
@@ -269,7 +278,8 @@ def main(argv):
         data_out['mean_rms'] = best_mean_rms[all_res, all_train_idx, all_test, all_noise_idx]
         data_out['max_rms'] = best_max_rms[all_res, all_train_idx, all_test, all_noise_idx]
         data_out['variance'] = best_variances[all_res, all_train_idx, all_test, all_noise_idx]
-        data_out['valid_time'] = best_valid_time[all_res, all_train_idx, all_test, all_noise_idx]
+        data_out = pd.concat([data_out, pd.DataFrame(best_valid_time[all_res, all_train_idx, all_test, all_noise_idx,:],\
+                columns = ['valid_time%d' % i for i in range(num_vt_tests)])], axis = 1)
 
         if pmap:
             data_out['pmap_max_wass_dist'] = best_pmap_max_wass_dist[all_res, all_train_idx, all_test, all_noise_idx]
