@@ -1,5 +1,6 @@
+import numpy as np
 import os
-import subproccess
+import subprocess
 import re
 import time
 import sys
@@ -9,10 +10,10 @@ def start_deepthought2_run(system = 'KS', traintype = 'normal', noisetype = 'gau
         leakage = 1.0, tau = 0.25, win_type = 'full', bias_type = 'old',\
         noise_values_array = np.logspace(-3, 0, num = 19, base = 10)[5:11], \
         alpha_values = np.append(0., np.logspace(-7, -3, 9)), num_res = 3,\
-        num_trains = 4, num_tests = 4, metric = 'mss_var', returnall = False, \
-        savepred = False, savetime = False, max_valid_time = 500, debug = False, \
-        num_nodes = 4, cpus_per_node = 20, runtime = '2:00:00', account = 'physics-hi',\
-        debug_part = False, just_process = False):
+        num_trains = 4, num_tests = 4, metric = 'mss_var', machine = 'deepthought2', \
+        returnall = False, savepred = False, savetime = False, max_valid_time = 500, \
+        debug = False, num_nodes = 4, cpus_per_node = 20, runtime = '2:00:00', \
+        account = 'physics-hi',debug_part = False, just_process = False, parallel = True):
 
     noise_values_str = '%e' % noise_values_array[0]
     for noise in noise_values_array[1:]:
@@ -47,13 +48,18 @@ def start_deepthought2_run(system = 'KS', traintype = 'normal', noisetype = 'gau
     else:
         savetime_str = 'False'
 
+    if parallel:
+        parallel_str = 'True'
+    else:
+        parallel_str = 'False'
+
 
 
 
     testname = '%s_%s_%s_%d_%dnodes_%dtrain_rho%0.1f_sigma%0.1e_leakage%0.1f_tau%0.3f' % \
-            (system, traintype, noisetype, no, res_size, trainlen, rho, sigma, leakage,  tau)
-    options_str = '--savepred=%s --system=%s --noisetype=%s --traintype=%s -r %d --rho=%f --sigma=%f --leakage=%f --win_type=%s --bias_type=%s --tau=%f -N %d -T %d --res=%d --tests=%d --trains=%d --debug=%s --metric=%s --returnall=%s --savetime=%s --noisevals=%s --regvals=%s --maxvt=%d' % (savepred_str, system, noisetype, traintype, no,  rho,sigma, leakage, win_type, bias_type, tau, res_size, trainlen, num_res, num_tests, num_trains, debug_str, metric, returnall_str, savetime_str,
-            noise_values_str, reg_values_str, max_valid_time)
+            (system, traintype, noisetype, noise_realizations, res_size, trainlen, rho, sigma, leakage,  tau)
+    options_str = '--savepred=%s --system=%s --noisetype=%s --traintype=%s -r %d --rho=%f --sigma=%f --leakage=%f --win_type=%s --bias_type=%s --tau=%f -N %d -T %d --res=%d --tests=%d --trains=%d --debug=%s --metric=%s --returnall=%s --savetime=%s --noisevals=%s --regvals=%s --maxvt=%d --machine=%s --parallel=%s' % (savepred_str, system, noisetype, traintype, noise_realizations,  rho,sigma, leakage, win_type, bias_type, tau, res_size, trainlen, num_res, num_tests, num_trains, debug_str, metric, returnall_str,
+            savetime_str, noise_values_str, reg_values_str, max_valid_time, machine, parallel_str)
     input_str = 'python slurm-launch.py --exp-name %s --command "python -u climate_replication_test.py %s" --num-nodes %d --cpus-per-node=%d --load-env "conda activate reservoir-rls" -t %s -A %s %s' % (testname, options_str, num_nodes, cpus_per_node, runtime, account, debug_part_str)
     print(input_str)
     run_out = subprocess.check_output(input_str, shell=True)
