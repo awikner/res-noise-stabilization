@@ -11,9 +11,10 @@ def start_deepthought2_run(system = 'KS', traintype = 'normal', noisetype = 'gau
         noise_values_array = np.logspace(-3, 0, num = 19, base = 10)[5:11], \
         alpha_values = np.append(0., np.logspace(-7, -3, 9)), num_res = 3,\
         num_trains = 4, num_tests = 4, metric = 'mss_var', machine = 'deepthought2', \
-        returnall = False, savepred = False, savetime = False, max_valid_time = 500, \
-        debug = False, num_nodes = 4, cpus_per_node = 20, runtime = '2:00:00', \
-        account = 'physics-hi',debug_part = False, just_process = False, parallel = True):
+        returnall = False, savepred = False, squarenodes = False, savetime = False, max_valid_time = 500, \
+        debug = False, num_nodes = 4, cpus_per_node = None, runtime = '2:00:00', \
+        account = 'physics-hi',debug_part = False, just_process = False, parallel = True,\
+        old_flag = False):
 
     noise_values_str = '%e' % noise_values_array[0]
     for noise in noise_values_array[1:]:
@@ -22,6 +23,11 @@ def start_deepthought2_run(system = 'KS', traintype = 'normal', noisetype = 'gau
     reg_values_str = '%e' % alpha_values[0]
     for reg in alpha_values[1:]:
         reg_values_str += ',%e' % reg
+
+    if isinstance(cpus_per_node, int):
+        cpus_str = '--cpus-per-node=%d' % cpus_per_node
+    else:
+        cpus_str = ''
 
     if debug_part:
         debug_part_str = '-p debug'
@@ -53,14 +59,25 @@ def start_deepthought2_run(system = 'KS', traintype = 'normal', noisetype = 'gau
     else:
         parallel_str = 'False'
 
+    if squarenodes:
+        squarenodes_str = 'True'
+    else:
+        squarenodes_str = 'False'
+
+    if old_flag:
+        program_str = 'climate_replication_test_old.py'
+    else:
+        program_str = 'climate_replication_test.py'
+
 
 
 
     testname = '%s_%s_%s_%d_%dnodes_%dtrain_rho%0.1f_sigma%0.1e_leakage%0.1f_tau%0.3f' % \
             (system, traintype, noisetype, noise_realizations, res_size, trainlen, rho, sigma, leakage,  tau)
-    options_str = '--savepred=%s --system=%s --noisetype=%s --traintype=%s -r %d --rho=%f --sigma=%f --leakage=%f --win_type=%s --bias_type=%s --tau=%f -N %d -T %d --res=%d --tests=%d --trains=%d --debug=%s --metric=%s --returnall=%s --savetime=%s --noisevals=%s --regvals=%s --maxvt=%d --machine=%s --parallel=%s' % (savepred_str, system, noisetype, traintype, noise_realizations,  rho,sigma, leakage, win_type, bias_type, tau, res_size, trainlen, num_res, num_tests, num_trains, debug_str, metric, returnall_str,
+    options_str = '--savepred=%s --system=%s --noisetype=%s --traintype=%s -r %d --rho=%f --sigma=%f --leakage=%f --win_type=%s --bias_type=%s --tau=%f -N %d -T %d --res=%d --tests=%d --trains=%d --debug=%s --squarenodes=%s --metric=%s --returnall=%s --savetime=%s --noisevals=%s --regvals=%s --maxvt=%d --machine=%s --parallel=%s' % (savepred_str, system, noisetype, traintype, noise_realizations,  rho,sigma, leakage, win_type, bias_type, tau, res_size, trainlen, num_res, num_tests, num_trains,
+            debug_str, squarenodes_str, metric, returnall_str,
             savetime_str, noise_values_str, reg_values_str, max_valid_time, machine, parallel_str)
-    input_str = 'python slurm-launch.py --exp-name %s --command "python -u climate_replication_test.py %s" --num-nodes %d --cpus-per-node=%d --load-env "conda activate reservoir-rls" -t %s -A %s %s' % (testname, options_str, num_nodes, cpus_per_node, runtime, account, debug_part_str)
+    input_str = 'python slurm-launch.py --exp-name %s --command "python -u %s %s" --num-nodes %d %s --load-env "conda activate reservoir-rls" -t %s -A %s %s' % (testname, program_str, options_str, num_nodes, cpus_str, runtime, account, debug_part_str)
     print(input_str)
     run_out = subprocess.check_output(input_str, shell=True)
     time.sleep(1)
