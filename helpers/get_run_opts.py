@@ -22,6 +22,7 @@ def get_run_opts(argv, runflag = True):
         system = 'KS'
         savepred = False
         save_time_rms = False
+        squarenodes = False
         rho = 0.5
         sigma = 1.0
         leakage = 1.0
@@ -46,7 +47,8 @@ def get_run_opts(argv, runflag = True):
                     'tests=', 'trains=', 'savepred=', 'tau=', 'rho=',
                     'sigma=', 'leakage=', 'bias_type=', 'debug=', 'win_type=',
                     'machine=', 'num_cpus=', 'pmap=', 'parallel=', 'metric=','returnall=',
-                    'savetime=', 'noisevals=', 'regvals=', 'maxvt=', 'noisestreams='])
+                    'savetime=', 'noisevals=', 'regvals=', 'maxvt=', 'noisestreams=',
+                    'squarenodes='])
         except getopt.GetoptError:
             print('Error: Some options not recognized')
             sys.exit(2)
@@ -60,6 +62,14 @@ def get_run_opts(argv, runflag = True):
             elif opt == '-r':
                 noise_realizations = int(arg)
                 print('Noise Realizations: %d' % noise_realizations)
+            elif opt == '--squarenodes':
+                if arg == 'True':
+                    squarenodes = True
+                elif arg == 'False':
+                    squarenodes = False
+                else:
+                    raise ValueError
+                print('Square reservoir nodes: %s' % arg)
             elif opt == '--noisestreams':
                 noise_streams_per_test = int(arg)
                 print('Noise Streams per test: %d' % noise_streams_per_test)
@@ -181,9 +191,12 @@ def get_run_opts(argv, runflag = True):
         train_time, res_size, noise_realizations, save_time_rms, metric,\
                 return_all, machine, rho, sigma, leakage, tau, win_type, \
                 bias_type, res_per_test, num_tests, num_trains, savepred, \
-                noisetype, traintype, system = argv
+                noisetype, traintype, system, squarenodes = argv
     if return_all and savepred:
         print('Cannot return results for all parameters and full predictions due to memory constraints.')
+        raise ValueError
+    if 'gradient' in traintype and squarenodes:
+        print('Node State squaring not implemented for gradient regularization.')
         raise ValueError
     if savepred:
         predflag = 'wpred_'
@@ -193,6 +206,10 @@ def get_run_opts(argv, runflag = True):
         timeflag = 'savetime_'
     else:
         timeflag = ''
+    if squarenodes:
+        squarenodes_flag = 'squarenodes_'
+    else:
+        squarenodes_flag = ''
     if machine == 'skynet':
         root_folder = '/h/awikner/res-noise-stabilization/'
     elif machine == 'deepthought2':
@@ -203,22 +220,22 @@ def get_run_opts(argv, runflag = True):
 
     if not return_all:
         data_folder = 'Data/%s_noisetest_noisetype_%s_traintype_%s/' % (system, noisetype, traintype)
-        run_name = '%s_more_noisetest_%s%srho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s_metric_%s' \
-             % (system,predflag, timeflag, rho, sigma, leakage, win_type, bias_type, tau, res_size, \
+        run_name = '%s_%s%s%srho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s_metric_%s' \
+             % (system,predflag, timeflag, squarenodes_flag, rho, sigma, leakage, win_type, bias_type, tau, res_size, \
              train_time, noise_realizations, noisetype, traintype, metric)
     elif return_all:
         data_folder = 'Data/%s_noisetest_noisetype_%s_traintype_%s/' % (system, noisetype, traintype)
-        run_name = '%s_%s_%srho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s' % (system,predflag, timeflag, rho, sigma, leakage, win_type, bias_type, tau,res_size, train_time, noise_realizations, noisetype, traintype)
+        run_name = '%s_%s%s%srho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s' % (system,predflag, timeflag, squarenodes_flag, rho, sigma, leakage, win_type, bias_type, tau,res_size, train_time, noise_realizations, noisetype, traintype)
     if runflag:
         if not os.path.isdir(os.path.join(root_folder, data_folder)):
             os.mkdir(os.path.join(root_folder, data_folder))
         if not os.path.isdir(os.path.join(os.path.join(root_folder, data_folder), run_name + '_folder')):
             os.mkdir(os.path.join(os.path.join(root_folder, data_folder), run_name + '_folder'))
 
-        return root_folder, data_folder, run_name, system, noisetype, traintype, savepred, save_time_rms, rho,\
+        return root_folder, data_folder, run_name, system, noisetype, traintype, savepred, save_time_rms, squarenodes, rho,\
             sigma, leakage, win_type, bias_type, tau, res_size, train_time, noise_realizations, noise_streams_per_test,\
             noise_values_array,alpha_values, res_per_test, num_trains, num_tests, debug_mode, pmap, metric, \
-            return_all, ifray, machine,max_valid_time
+            return_all, ifray, machine, max_valid_time
     else:
         if not savepred:
             return os.path.join(os.path.join(root_folder, data_folder), run_name + '.bz2'), ''

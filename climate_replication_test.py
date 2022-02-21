@@ -143,7 +143,7 @@ def wasserstein_distance_empirical(measured_samples, true_samples):
 
 
 class Reservoir:
-    def __init__(self, rk, res_gen, input_size, rsvr_size=300, spectral_radius=0.6, input_weight=1, leakage=1.0, win_type='full', bias_type='old', avg_degree = 10):
+    def __init__(self, rk, res_gen, input_size, rsvr_size=300, spectral_radius=0.6, input_weight=1, leakage=1.0, win_type='full', bias_type='old', avg_degree = 3):
         # Define class for storing reservoir layers generated from input parameters and an input random number generator
         self.rsvr_size = rsvr_size
         """
@@ -561,28 +561,36 @@ def gen_noise(noise_size, noise_length, noisetype, noise_scaling, noise_stream, 
     return noise
 
 
-def get_states(res, rk, noise, noisetype='none', noise_scaling=0, noise_realizations=1,
+def get_states(res, squarenodes, rk, noise, noisetype='none', noise_scaling=0, noise_realizations=1,
         traintype='normal', skip=150):
     # Obtains the matrices used to train the reservoir using either linear regression or a sylvester equation
     # (in the case of Sylvester or Sylvester_wD training types)
     # Calls the numba compatible wrapped function
     if traintype == 'getD':
         Dn = getD(np.ascontiguousarray(rk.u_arr_train), res.X, res.Win, res.W_data, res.W_indices, res.W_indptr, res.W_shape, res.leakage,
-            skip, noise, noisetype, noise_scaling, noise_realizations, traintype)
+            skip, noise, noisetype, noise_scaling, noise_realizations, traintype, squarenodes)
         return Dn
     elif traintype in ['sylvester', 'sylvester_wD']:
         res.data_trstates, res.states_trstates, res.Y_train, res.X_train, res.left_mat= get_states_wrapped(
             np.ascontiguousarray(rk.u_arr_train), res.X, res.Win, res.W_data, res.W_indices, res.W_indptr, res.W_shape, res.leakage,
-            skip, noise, noisetype, noise_scaling, noise_realizations, traintype)
+            skip, noise, noisetype, noise_scaling, noise_realizations, traintype, squarenodes)
     else:
         res.data_trstates, res.states_trstates, res.Y_train, res.X_train, res.gradient_reg= get_states_wrapped(
             np.ascontiguousarray(rk.u_arr_train), res.X, res.Win, res.W_data, res.W_indices, res.W_indptr, res.W_shape, res.leakage,
-            skip, noise, noisetype, noise_scaling, noise_realizations, traintype)
+            skip, noise, noisetype, noise_scaling, noise_realizations, traintype, squarenodes)
+
+@jit(nopython=True, fastmath = True)
+def get_squared(X, rsvr_size, squarenodes):
+    if not squarenodes:
+        return X
+    else:
+        X[1:(rsvr_size+1)//2] = X[1:(rsvr_size+1)//2]**2.0
+        return X
 
 
 @jit(nopython=True, fastmath=True)
 def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_shape, leakage, skip, noise, noisetype='none',
-        noise_scaling=0, noise_realizations=1, traintype='normal', q=0):
+        noise_scaling=0, noise_realizations=1, traintype='normal', squarenodes = False, q=0):
     # Numba compatible function to obtain the matrices used to train the reservoir using either linear regression or a sylvester equation.
     # The type of matrices depends on the traintype, number of noise realizations, and noisetype
     res_X = np.ascontiguousarray(res_X)
@@ -602,6 +610,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
             X = X[:, skip+1:(res_d - 1)]
             X_train = np.ascontiguousarray(np.concatenate(
                 (np.ones((1, d-(skip+1))), X, u_arr_train_noise[:, skip:-1]), axis=0))
+            X_train = get_squared(X_train, rsvr_size, squarenodes)
             data_trstates += Y_train @ X_train.T
             states_trstates += X_train @ X_train.T
         return [data_trstates, states_trstates, Y_train, X_train, gradient_reg]
@@ -612,6 +621,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
             X = np.ascontiguousarray(X[:, skip+1:(res_d - 1)])
             X_train = np.ascontiguousarray(np.concatenate(
                 (np.ones((1, d-(skip+1))), X, u_arr_train_noise[:, skip:-1]), axis=0))
+            X_train = get_squared(X_train, rsvr_size, squarenodes)
             if i == 0:
                 X_train_mean = np.zeros(X_train.shape)
                 X_all = np.zeros((X_train.shape[0], X_train.shape[1], noise_realizations))
@@ -631,6 +641,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
             X = X[:, skip+1:(res_d - 1)]
             X_train = np.ascontiguousarray(np.concatenate(
                 (np.ones((1, d-(skip+1))), X, u_arr_train_noise[:, skip:-1]), axis=0))
+            X_train = get_squared(X_train, rsvr_size, squarenodes)
             if i == 0:
                 X_train_mean = np.zeros(X_train.shape)
             X_train_mean += X_train/noise_realizations
@@ -644,6 +655,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
         X_0 = np.ascontiguousarray(X_0[:, skip+1:(res_X[0].size - 1)])
         X_train_0 = np.ascontiguousarray(np.concatenate(
             (np.ones((1, d-(skip+1))), X_0, u_arr_train[:, skip:-1]), axis=0))
+        X_train_0 = get_squared(X_train_0, rsvr_size, squarenodes)
         X_all = np.zeros(
             (X_train_0.shape[0], X_train_0.shape[1], noise_realizations))
         for i in range(noise_realizations):
@@ -651,6 +663,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
             X = np.ascontiguousarray(X[:, skip+1:(res_d - 1)])
             X_train = np.ascontiguousarray(np.concatenate(
                 (np.ones((1, d-(skip+1))), X, u_arr_train_noise[:, skip:-1]), axis=0))
+            X_train = get_squared(X_train, rsvr_size, squarenodes)
             if i == 0:
                 X_train_mean = np.zeros(X_train.shape)
             X_train_mean += X_train/noise_realizations
@@ -668,6 +681,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
         X_0 = np.ascontiguousarray(X_0[:, skip+1:(res_X[0].size - 1)])
         X_train_0 = np.ascontiguousarray(np.concatenate(
             (np.ones((1, d-(skip+1))), X_0, u_arr_train[:, skip:-1]), axis=0))
+        X_train_0 = get_squared(X_train_0, rsvr_size, squarenodes)
         X_all = np.zeros(
             (X_train_0.shape[0], X_train_0.shape[1], noise_realizations))
         for i in range(noise_realizations):
@@ -675,6 +689,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
             X = np.ascontiguousarray(X[:, skip+1:(res_d - 1)])
             X_train = np.ascontiguousarray(np.concatenate(
                 (np.ones((1, d-(skip+1))), X, u_arr_train_noise[:, skip:-1]), axis=0))
+            X_train = get_squared(X_train, rsvr_size, squarenodes)
             X_all[:, :, i] = X_train
         data_trstates = Y_train @ X_train_0.T
         states_trstates = X_train_0 @ X_train_0.T
@@ -690,6 +705,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
         X_0 = np.ascontiguousarray(X_0[:, skip+1:(res_X[0].size - 1)])
         X_train_0 = np.ascontiguousarray(np.concatenate(
             (np.ones((1, d-(skip+1))), X_0, u_arr_train[:, skip:-1]), axis=0))
+        X_train_0 = get_squared(X_train_0, rsvr_size, squarenodes)
         X_all = np.zeros(
             (X_train_0.shape[0], X_train_0.shape[1], noise_realizations))
         for i in range(noise_realizations):
@@ -698,6 +714,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
             X = np.ascontiguousarray(X[:, skip+1:(res_d - 1)])
             X_train = np.ascontiguousarray(np.concatenate(
                 (np.ones((1, d-(skip+1))), X, u_arr_train_noise[:, skip:-1]), axis=0))
+            X_train = get_squared(X_train, rsvr_size, squarenodes)
             if i == 0:
                 X_train_mean = np.zeros(X_train.shape)
             X_train_mean += X_train/noise_realizations
@@ -733,6 +750,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
             X = X[:, skip+1:(res_d - 1)]
             X_train = np.ascontiguousarray(np.concatenate(
                 (np.ones((1, d-(skip+1))), X, u_arr_train_noise[:, skip:-1]), axis=0))
+            X_train = get_squared(X_train, rsvr_size, squarenodes)
             sync_len = 0
             inbound_data = np.where(np.logical_and(
                 Y_train[0] < ub, Y_train[0] > lb))[0]
@@ -776,8 +794,10 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
             D_n = np.concatenate(
                 (matrix_diag_mult(D[:, i], Win[:, 1:]), np.identity(n)), axis=0)
             gradient_reg[1:,1:] += D_n @ D_n.T
+        """
         print('Gradient reg:')
         print(gradient_reg[:5,:5])
+        """
         data_trstates = Y_train @ X_train.T
         states_trstates = X_train @ X_train.T
         return [data_trstates, states_trstates, Y_train, X_train, gradient_reg]
@@ -1012,26 +1032,26 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
 
 @jit(nopython=True, fastmath=True)
 def getD(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_shape, leakage, noise, skip, noisetype='none',
-         noise_scaling=0, noise_realizations=1, traintype='normal'):
+         noise_scaling=0, noise_realizations=1, traintype='normal', squarenodes = False):
     n, d = u_arr_train.shape
     rsvr_size, res_d = res_X.shape
     Y_train = u_arr_train[:, skip+1:]
     X, D = getXwrapped(u_arr_train, res_X, Win, W_data, W_indices,
-                       W_indptr, W_shape, leakage, noise, 'none', 0, 0, 'gradient')
+                       W_indptr, W_shape, leakage, noise, 'none', 0, 0, 'gradient', squarenodes)
     return [D[:, skip+1:(res_d - 1)]]
 
 # CONCATENATE ALL THE DATA BEFORE RUNNING REGRESSION
 
 
-def predict(res, u0,  steps=1000):
+def predict(res, u0,  steps=1000, squarenodes = False):
     # Wrapper for the prediction function
     Y = predictwrapped(res.X, res.Win, res.W_data, res.W_indices,
-                       res.W_indptr, res.W_shape, res.Wout, res.leakage, u0, steps)
+                       res.W_indptr, res.W_shape, res.Wout, res.leakage, u0, steps, squarenodes)
     return Y
 
 
 @jit(nopython=True, fastmath=True)
-def predictwrapped(res_X, Win, W_data, W_indices, W_indptr, W_shape, Wout, leakage, u0, steps):
+def predictwrapped(res_X, Win, W_data, W_indices, W_indptr, W_shape, Wout, leakage, u0, steps, squarenodes = False):
     # Numba compatible prediction function
     Y = np.empty((Win.shape[1]-1, steps + 1))
     X = np.empty((res_X.shape[0], steps + 1))
@@ -1042,7 +1062,8 @@ def predictwrapped(res_X, Win, W_data, W_indices, W_indptr, W_shape, Wout, leaka
     for i in range(0, steps):
         X[:, i+1] = (1-leakage)*X[:, i] + leakage*np.tanh(Win @ np.append(1.,
                      Y[:, i]) + mult_vec(W_data, W_indices, W_indptr, W_shape, X[:, i]))
-        Y[:, i+1] = Wout @ np.concatenate((np.array([1.]), X[:, i+1], Y[:, i]))
+        Y[:, i+1] = Wout @ get_squared(np.concatenate((np.array([1.]), X[:, i+1], Y[:, i])),\
+                X.shape[0], squarenodes)
 
     return Y
 
@@ -1085,12 +1106,12 @@ def get_test_data(test_stream, tau, num_tests, rkTime, split, system='lorenz'):
     return rktest_u_arr_train_nonoise, rktest_u_arr_test, params
 
 
-def test(res, noise_in, rktest_u_arr_train_nonoise, rktest_u_arr_test, true_pmap_max, num_tests=100, rkTime=1000, split=3000, showMapError=False, showTrajectories=False, showHist=False, system='lorenz', params=np.array([[], []], dtype=np.complex128), pmap=False, max_valid_time = 500):
+def test(res, squarenodes, noise_in, rktest_u_arr_train_nonoise, rktest_u_arr_test, true_pmap_max, num_tests=100, rkTime=1000, split=3000, showMapError=False, showTrajectories=False, showHist=False, system='lorenz', params=np.array([[], []], dtype=np.complex128), pmap=False, max_valid_time = 500):
     # Wrapper function for the numba compatible test function.
 
     # tic = time.perf_counter()
     stable_count, mean_rms, max_rms, variances, valid_time, rms, preds, wass_dist,           pmap_max, pmap_max_wass_dist = testwrapped(
-        res.X, res.Win, res.W_data, res.W_indices, res.W_indptr, res.W_shape, res.Wout, res.leakage,             rktest_u_arr_train_nonoise, rktest_u_arr_test, true_pmap_max, num_tests, rkTime, split, noise_in,showMapError, showTrajectories, showHist, system, params=params, pmap=pmap, max_valid_time = max_valid_time)
+        res.X, res.Win, res.W_data, res.W_indices, res.W_indptr, res.W_shape, res.Wout, res.leakage,             rktest_u_arr_train_nonoise, rktest_u_arr_test, true_pmap_max, num_tests, rkTime, split, noise_in,showMapError, showTrajectories, showHist, system, params=params, pmap=pmap, max_valid_time = max_valid_time, squarenodes = squarenodes)
     # toc = time.perf_counter()
     # runtime = toc - tic
     # print("Test " + str(i) + " valid time: " + str(j))
@@ -1099,7 +1120,7 @@ def test(res, noise_in, rktest_u_arr_train_nonoise, rktest_u_arr_test, true_pmap
 
 
 @jit(nopython=True, fastmath=True)
-def testwrapped(res_X, Win, W_data, W_indices, W_indptr, W_shape, Wout, leakage, rktest_u_arr_train_nonoise, rktest_u_arr_test,   true_pmap_max, num_tests, rkTime, split, noise_in, showMapError=True,   showTrajectories=True, showHist=True, system='lorenz', tau=0.1, params=np.array([[], []], dtype=np.complex128), pmap=False, max_valid_time = 500):
+def testwrapped(res_X, Win, W_data, W_indices, W_indptr, W_shape, Wout, leakage, rktest_u_arr_train_nonoise, rktest_u_arr_test,   true_pmap_max, num_tests, rkTime, split, noise_in, showMapError=True,   showTrajectories=True, showHist=True, system='lorenz', tau=0.1, params=np.array([[], []], dtype=np.complex128), pmap=False, max_valid_time = 500, squarenodes = False):
     # Numba compatable function for testing trained reservoir performance against true system time series
     stable_count = 0
 #SBATCH --output=log_files/{{JOB_NAME}}.log
@@ -1133,7 +1154,7 @@ def testwrapped(res_X, Win, W_data, W_indices, W_indptr, W_shape, Wout, leakage,
         res_X, p = getXwrapped(np.ascontiguousarray(
             rktest_u_arr_train_nonoise[:, :, i]), res_X, Win, W_data, W_indices, W_indptr, W_shape, leakage, noise_in)
         pred_full = predictwrapped(res_X, Win, W_data, W_indices, W_indptr, W_shape,
-                              Wout, leakage, u0=rktest_u_arr_test[:, 0, i], steps=(rkTime-split))
+                              Wout, leakage, u0=rktest_u_arr_test[:, 0, i], steps=(rkTime-split), squarenodes = squarenodes)
         """
         with objmode():
             print('Test %d pred:' % i)
@@ -1206,7 +1227,7 @@ def testwrapped(res_X, Win, W_data, W_indices, W_indptr, W_shape, Wout, leakage,
             """
             if k < (num_vt_tests - 1):
                 pred = predictwrapped(res_X, Win, W_data, W_indices, W_indptr, W_shape,
-                    Wout, leakage, u0=rktest_u_arr_test[:, (k+1)*max_valid_time, i], steps=max_valid_time-1)
+                    Wout, leakage, u0=rktest_u_arr_test[:, (k+1)*max_valid_time, i], steps=max_valid_time-1, squarenodes = squarenodes)
                 check_vt = True
         if array_compute:
             if system == 'lorenz':
@@ -1323,7 +1344,7 @@ def testwrapped(res_X, Win, W_data, W_indices, W_indptr, W_shape, Wout, leakage,
     #return stable_count, mean_rms, max_rms, variances, valid_time, mean_all, variances_all, preds, wass_dist, pmap_max, pmap_max_wass_dist
     return stable_count, mean_rms, max_rms, variances, valid_time, rms, preds, wass_dist,    pmap_max, pmap_max_wass_dist
 
-def generate_res(res_gen, rk, res_size, rho, sigma, leakage, win_type, bias_type, noise_stream, noisetype='none', noise_scaling=0, noise_realizations=1, traintype='normal', skip=150):
+def generate_res(res_gen, squarenodes, rk, res_size, rho, sigma, leakage, win_type, bias_type, noise_stream, noisetype='none', noise_scaling=0, noise_realizations=1, traintype='normal', skip=150):
     # Function for generating a reservoir and obtaining matrices used for training the reservoir
     reservoir = Reservoir(rk, res_gen, rk.u_arr_train.shape[0], rsvr_size=res_size,
                 spectral_radius=rho, input_weight=sigma, leakage=leakage, win_type=win_type, bias_type=bias_type)
@@ -1334,12 +1355,12 @@ def generate_res(res_gen, rk, res_size, rho, sigma, leakage, win_type, bias_type
     noise_in = gen_noise_driver(data_shape, res_shape, traintype,
                                 noisetype, noise_scaling, noise_stream, noise_realizations)
     # print(noise_in.shape)
-    get_states(reservoir, rk, noise_in, noisetype, noise_scaling,
+    get_states(reservoir, squarenodes, rk, noise_in, noisetype, noise_scaling,
                noise_realizations, traintype, skip)
     return reservoir, noise_in
 
 
-def optim_func(res, noise_in, noise, rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests, alpha,   true_pmap_max, rkTime=400, split=2000, traintype='normal', system='lorenz', params=np.array([[], []], dtype=np.complex128), pmap = False, max_valid_time = 500):
+def optim_func(res, squarenodes, noise_in, noise, rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests, alpha,   true_pmap_max, rkTime=400, split=2000, traintype='normal', system='lorenz', params=np.array([[], []], dtype=np.complex128), pmap = False, max_valid_time = 500):
     # Function for training and testing the performance of a reservoir trained using a particular regularization parameter
 
     idenmat = np.identity(
@@ -1357,19 +1378,19 @@ def optim_func(res, noise_in, noise, rktest_u_arr_train_nonoise, rktest_u_arr_te
     train_mean_rms = np.mean(train_rms)
     train_max_rms  = np.max(train_rms)
     results, mean_rms, max_rms, variances, valid_time,  rms, preds, wass_dist, pmap_max,     pmap_max_wass_dist= \
-        test(res, noise_in, rktest_u_arr_train_nonoise, rktest_u_arr_test,   true_pmap_max, num_tests=num_tests, rkTime=rkTime, split=split,
+        test(res, squarenodes, noise_in, rktest_u_arr_train_nonoise, rktest_u_arr_test,   true_pmap_max, num_tests=num_tests, rkTime=rkTime, split=split,
         showMapError=True, showTrajectories=True, showHist=True, system=system, params=params, pmap = pmap, max_valid_time = max_valid_time)
 
     return -1*results, mean_rms, max_rms, variances, valid_time, rms, preds, wass_dist, pmap_max, pmap_max_wass_dist, train_mean_rms, train_max_rms
 
 
-def get_res_results(itr, res_gen, rk, res_size, rho, sigma, leakage, win_type, bias_type, noisetype, noise, noise_realizations, noise_stream, traintype,
+def get_res_results(itr, res_gen, squarenodes, rk, res_size, rho, sigma, leakage, win_type, bias_type, noisetype, noise, noise_realizations, noise_stream, traintype,
     rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests, alpha_values, rkTime_test, split_test, system, tau, params, savepred, save_time_rms, debug_mode, train_seed,   true_pmap_max, pmap, max_valid_time):
     # Function for generating, training, and testing the performance of a reservoir given an input set of testing data time series,
     # a set of regularization values, and a set of noise magnitudes
     tic = time.perf_counter()
     print('Starting res %d' % itr)
-    reservoir, noise_in = generate_res(res_gen, rk, res_size, rho, sigma, leakage,
+    reservoir, noise_in = generate_res(res_gen, squarenodes, rk, res_size, rho, sigma, leakage,
                                        win_type, bias_type, noise_stream, noisetype, noise, noise_realizations, traintype)
 
     toc = time.perf_counter()
@@ -1397,7 +1418,7 @@ def get_res_results(itr, res_gen, rk, res_size, rho, sigma, leakage, win_type, b
         # pmap_max           = []
         pmap_max_wass_dist = np.zeros((num_tests, alpha_values.size-1))
         noise_tic = time.perf_counter()
-        min_optim_func = lambda alpha: optim_func(reservoir, noise_in[0], noise, rktest_u_arr_train_nonoise, rktest_u_arr_test,
+        min_optim_func = lambda alpha: optim_func(reservoir, squarenodes, noise_in[0], noise, rktest_u_arr_train_nonoise, rktest_u_arr_test,
                                                   num_tests, alpha,   true_pmap_max, rkTime_test, split_test, traintype, system, params, pmap, max_valid_time)
         func_vals = np.zeros(alpha_values.size)
         for j in range(alpha_values.size):
@@ -1540,7 +1561,7 @@ def get_res_results(itr, res_gen, rk, res_size, rho, sigma, leakage, win_type, b
     return final_out
 
 
-def find_stability(noisetype, noise, traintype, train_seed, train_gen, res_itr, res_gen, test_stream, noise_stream, rho, sigma, leakage, win_type, bias_type, train_time, res_size, res_per_test, noise_realizations, num_tests, alpha_values, system, tau, savepred, save_time_rms, debug_mode, root_folder, pmap, max_valid_time, raw_data_folder):
+def find_stability(noisetype, noise, traintype, train_seed, train_gen, res_itr, res_gen, squarenodes, test_stream, noise_stream, rho, sigma, leakage, win_type, bias_type, train_time, res_size, res_per_test, noise_realizations, num_tests, alpha_values, system, tau, savepred, save_time_rms, debug_mode, root_folder, pmap, max_valid_time, raw_data_folder):
 
     # Main function for training and testing reservoir performance. This function first generates the training and testing data,
     # the passes to get_res_results to obtain th reservoir performance.
@@ -1592,7 +1613,7 @@ def find_stability(noisetype, noise, traintype, train_seed, train_gen, res_itr, 
     else:
         true_pmap_max = np.zeros(100)
 
-    out = get_res_results(res_itr, res_gen, rk, res_size, rho, sigma, leakage, win_type, bias_type,\
+    out = get_res_results(res_itr, res_gen, squarenodes, rk, res_size, rho, sigma, leakage, win_type, bias_type,\
             noisetype, noise, noise_realizations, noise_stream, traintype, rktest_u_arr_train_nonoise,\
             rktest_u_arr_test, num_tests, alpha_values, rkTime_test, split_test, system, tau, params, \
             savepred, save_time_rms, debug_mode, train_seed,   true_pmap_max, pmap, max_valid_time)
@@ -1655,7 +1676,7 @@ def main(argv):
     # creates random number generators for the different reservoirs, trainings, noise arrays, and tests.
     # It then calls find_stability in a loop, processes the output from find_stability, and saves the output to a folder.
 
-    root_folder, top_folder, run_name, system, noisetype, traintype, savepred, save_time_rms, rho,\
+    root_folder, top_folder, run_name, system, noisetype, traintype, savepred, save_time_rms, squarenodes, rho,\
         sigma, leakage, win_type, bias_type, tau, res_size, train_time, noise_realizations, \
         noise_streams_per_test, noise_values_array,alpha_values, res_per_test, num_trains, num_tests,\
         debug_mode, pmap, metric, return_all, ifray, machine,max_valid_time = get_run_opts(argv)
@@ -1707,14 +1728,14 @@ def main(argv):
         tic = time.perf_counter()
         if ifray:
             out_base  = ray.get([find_stability_remote.remote(noisetype, noise_values_array, traintype, \
-                tr[i], train_streams[i], rt[i], res_streams[i], test_streams[i], noise_streams, rho, sigma, \
+                tr[i], train_streams[i], rt[i], res_streams[i], squarenodes, test_streams[i], noise_streams, rho, sigma, \
                 leakage, win_type, bias_type, train_time, \
                 res_size, res_per_test, noise_realizations, num_tests, alpha_values,\
                 system, tau, savepred, save_time_rms, debug_mode, \
                 root_folder, pmap, max_valid_time, raw_data_folder) for i in range(tr.size)])
         else:
             out_base  = [find_stability_serial(noisetype, noise_values_array, traintype, \
-                tr[i], train_streams[i], rt[i], res_streams[i], test_streams[i], noise_streams, rho, sigma, \
+                tr[i], train_streams[i], rt[i], res_streams[i], squarenodes, test_streams[i], noise_streams, rho, sigma, \
                 leakage, win_type, bias_type, train_time, \
                 res_size, res_per_test, noise_realizations, num_tests, alpha_values,\
                 system, tau, savepred, save_time_rms, debug_mode,\
@@ -1774,13 +1795,13 @@ def main(argv):
         tic = time.perf_counter()
         if ifray:
             out_base  = ray.get([find_stability_remote.remote(noisetype, ntr[i], traintype,\
-                tnr[i], train_streams[i], rtn[i], res_streams[i], test_streams[i], noise_streams[i], \
+                tnr[i], train_streams[i], rtn[i], res_streams[i], squarenodes, test_streams[i], noise_streams[i], \
                 rho, sigma, leakage, win_type, bias_type, train_time, \
                 res_size, res_per_test, noise_realizations, num_tests, alpha_values,\
                 system, tau, savepred, save_time_rms, debug_mode, root_folder, pmap, max_valid_time, raw_data_folder) for i in range(tnr.size)])
         else:
             out_base  = [find_stability_serial(noisetype, ntr[i], traintype,\
-                tnr[i], train_streams[i], rtn[i], res_streams[i], test_streams[i], noise_streams[i], \
+                tnr[i], train_streams[i], rtn[i], res_streams[i], squarenodes, test_streams[i], noise_streams[i], \
                 rho, sigma, leakage, win_type, bias_type, train_time, \
                 res_size, res_per_test, noise_realizations, num_tests, alpha_values,\
                 system, tau, savepred, save_time_rms, debug_mode, root_folder, pmap, max_valid_time, raw_data_folder) for i in range(tnr.size)]
