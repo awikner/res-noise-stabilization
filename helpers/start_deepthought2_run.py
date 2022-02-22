@@ -103,7 +103,7 @@ def start_deepthought2_run(system = 'KS', traintype = 'normal', noisetype = 'gau
         elif just_process and '{{JOB_ID}}' in line:
             pass
         else:
-            script.write(line.replace('{{JOB_ID}}',job_id).replace('{{JOB_NAME}}', log_name))
+            script.write(line.replace('{{JOB_ID}}',job_id).replace('{{JOB_NAME}}', log_name).replace('{{ACCOUNT}}', account))
     script.close()
 
     os.system('sbatch %s %s' % (script_name, options_str))
