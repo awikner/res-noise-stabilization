@@ -48,7 +48,7 @@ def get_run_opts(argv, runflag = True):
                     'sigma=', 'leakage=', 'bias_type=', 'debug=', 'win_type=',
                     'machine=', 'num_cpus=', 'pmap=', 'parallel=', 'metric=','returnall=',
                     'savetime=', 'noisevals=', 'regvals=', 'maxvt=', 'noisestreams=',
-                    'squarenodes='])
+                    'squarenodes=', 'resonly='])
         except getopt.GetoptError:
             print('Error: Some options not recognized')
             sys.exit(2)
@@ -62,6 +62,14 @@ def get_run_opts(argv, runflag = True):
             elif opt == '-r':
                 noise_realizations = int(arg)
                 print('Noise Realizations: %d' % noise_realizations)
+            elif opt == '--resonly':
+                if arg == 'True':
+                    resonly = True
+                elif arg == 'False':
+                    resonly = False
+                else:
+                    raise ValueError
+                print('Only reservoir nodes in feature: %s' % arg)
             elif opt == '--squarenodes':
                 if arg == 'True':
                     squarenodes = True
@@ -191,7 +199,7 @@ def get_run_opts(argv, runflag = True):
         train_time, res_size, noise_realizations, save_time_rms, metric,\
                 return_all, machine, rho, sigma, leakage, tau, win_type, \
                 bias_type, res_per_test, num_tests, num_trains, savepred, \
-                noisetype, traintype, system, squarenodes = argv
+                noisetype, traintype, system, squarenodes, resonly = argv
     if return_all and savepred:
         print('Cannot return results for all parameters and full predictions due to memory constraints.')
         raise ValueError
@@ -210,6 +218,10 @@ def get_run_opts(argv, runflag = True):
         squarenodes_flag = 'squarenodes_'
     else:
         squarenodes_flag = ''
+    if resonly:
+        resonly_flag = 'resonly_'
+    else:
+        resonly_flag = ''
     if machine == 'skynet':
         root_folder = '/h/awikner/res-noise-stabilization/'
     elif machine == 'deepthought2':
@@ -220,12 +232,12 @@ def get_run_opts(argv, runflag = True):
 
     if not return_all:
         data_folder = 'Data/%s_noisetest_noisetype_%s_traintype_%s/' % (system, noisetype, traintype)
-        run_name = '%s_%s%s%srho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s_metric_%s' \
-             % (system,predflag, timeflag, squarenodes_flag, rho, sigma, leakage, win_type, bias_type, tau, res_size, \
+        run_name = '%s_%s%s%s%srho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s_metric_%s' \
+             % (system,resonly_flag,predflag, timeflag, squarenodes_flag, rho, sigma, leakage, win_type, bias_type, tau, res_size, \
              train_time, noise_realizations, noisetype, traintype, metric)
     elif return_all:
         data_folder = 'Data/%s_noisetest_noisetype_%s_traintype_%s/' % (system, noisetype, traintype)
-        run_name = '%s_%s%s%srho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s' % (system,predflag, timeflag, squarenodes_flag, rho, sigma, leakage, win_type, bias_type, tau,res_size, train_time, noise_realizations, noisetype, traintype)
+        run_name = '%s_%s%s%s%srho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s' % (system,resonly_flag,predflag, timeflag, squarenodes_flag, rho, sigma, leakage, win_type, bias_type, tau,res_size, train_time, noise_realizations, noisetype, traintype)
     if runflag:
         if not os.path.isdir(os.path.join(root_folder, data_folder)):
             os.mkdir(os.path.join(root_folder, data_folder))
