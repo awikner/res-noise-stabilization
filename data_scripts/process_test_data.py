@@ -4,7 +4,7 @@
 #SBATCH -J {{JOB_NAME}}
 #SBATCH --output=log_files/{{JOB_NAME}}.log
 #SBATCH -t 1:00:00
-#SBATCH -A physics-hi
+#SBATCH -A {{ACCOUNT}}
 # Launch on 12 cores distributed over as many nodes as needed
 #SBATCH --ntasks=1
 # Assume need 6 GB/core (6144 MB/core)
