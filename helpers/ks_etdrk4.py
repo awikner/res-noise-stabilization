@@ -35,9 +35,9 @@ def mean_numba_axis1(mat):
     return res
 
 @jit(nopython = True, fastmath = True)
-def precompute_KS_params(N, d, tau, M = 16, const = 0):
+def precompute_KS_params(N, d, tau, M = 16, const = 0, diss = 1e-3):
     k = np.concatenate((np.arange(int(N/2)), np.array([0.]), np.arange(-int(N/2)+1, 0)))*2*np.pi/d
-    L = (1+const)*k**2.0 - k**4.0
+    L = (1+const)*k**2.0 - k**4.0 - diss
     E = np.exp(tau*L)
     E2 = np.exp(tau/2*L)
     r = np.exp(1j * np.pi * (np.arange(1, M+1)-0.5)/M)
@@ -93,9 +93,9 @@ def kursiv_forecast_pred(u, params):
 
 
 @jit(nopython = True, fastmath = True)
-def kursiv_predict(u0, tau = 0.25, N = 64, d = 22, T = 100, params = np.array([[],[]], dtype = np.complex128), int_steps = 1):
+def kursiv_predict(u0, tau = 0.25, N = 64, d = 22, T = 100, params = np.array([[],[]], dtype = np.complex128), int_steps = 1, diss = 1e-3):
     if params.size == 0:
-        new_params = precompute_KS_params(N, d, tau)
+        new_params = precompute_KS_params(N, d, tau, diss=diss)
     else:
         new_params = params
     steps = T*int_steps
@@ -108,9 +108,9 @@ def kursiv_predict(u0, tau = 0.25, N = 64, d = 22, T = 100, params = np.array([[
     return np.ascontiguousarray(u_arr[:,::int_steps]), new_params
 
 @jit(nopython = True, fastmath = True)
-def kursiv_predict_pred(u0_array, tau = 0.25, N = 64, d = 22, T = 100, params = np.array([[],[]], dtype = np.complex128)):
+def kursiv_predict_pred(u0_array, tau = 0.25, N = 64, d = 22, T = 100, params = np.array([[],[]], dtype = np.complex128), diss = 1e-4):
     if params.size == 0:
-        new_params = precompute_KS_params(N, d, tau)
+        new_params = precompute_KS_params(N, d, tau, diss=diss)
     else:
         new_params = params
     steps = T

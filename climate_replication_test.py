@@ -581,11 +581,12 @@ def get_states(res, squarenodes, rk, noise, noisetype='none', noise_scaling=0, n
 
 @jit(nopython=True, fastmath = True)
 def get_squared(X, rsvr_size, squarenodes):
+    X_aug = np.copy(X)
     if not squarenodes:
-        return X
+        return X_aug
     else:
-        X[1:(rsvr_size+1)//2] = X[1:(rsvr_size+1)//2]**2.0
-        return X
+        X_aug[1:(rsvr_size+1)//2] = X_aug[1:(rsvr_size+1)//2]**2.0
+        return X_aug
 
 
 @jit(nopython=True, fastmath=True)
@@ -1218,6 +1219,8 @@ def testwrapped(res_X, Win, W_data, W_indices, W_indptr, W_shape, Wout, leakage,
                     print(rktest_u_arr_test[:5,k*max_valid_time+j,i])
                     """
                     check_vt = False
+            print('Valid Time')
+            print(valid_time[i,k])
             res_X = np.zeros((res_X.shape[0], max_valid_time+2))
             res_X, p = getXwrapped(np.ascontiguousarray(
                 rktest_u_arr_test[:, k*max_valid_time:(k+1)*max_valid_time+1, i]), res_X, Win, W_data, W_indices, W_indptr, W_shape, leakage, noise_in)
