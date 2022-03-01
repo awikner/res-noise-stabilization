@@ -143,9 +143,10 @@ def wasserstein_distance_empirical(measured_samples, true_samples):
 
 
 class Reservoir:
-    def __init__(self, rk, res_gen, input_size, rsvr_size=300, spectral_radius=0.6, input_weight=1, leakage=1.0, win_type='full', bias_type='old', avg_degree = 3):
+    def __init__(self, rk, res_gen, res_itr, input_size, rsvr_size=300, spectral_radius=0.6, input_weight=1, leakage=1.0, win_type='full', bias_type='old', avg_degree = 3):
         # Define class for storing reservoir layers generated from input parameters and an input random number generator
         self.rsvr_size = rsvr_size
+        self.res_itr = res_itr
         """
         print('Spectral Radius: %0.2f' % spectral_radius)
         print('Input Weight: %0.2f' % input_weight)
@@ -158,7 +159,7 @@ class Reservoir:
         unnormalized_W = (res_gen.random((rsvr_size, rsvr_size))*2 - 1)
         for i in range(unnormalized_W[:, 0].size):
             for j in range(unnormalized_W[0].size):
-                if res_gen.random(1) > 10/rsvr_size:
+                if res_gen.random(1) > avg_degree/rsvr_size:
                     unnormalized_W[i][j] = 0
 
         max_eig = eigs(unnormalized_W, k=1,
@@ -1347,9 +1348,9 @@ def testwrapped(res_X, Win, W_data, W_indices, W_indptr, W_shape, Wout, leakage,
     #return stable_count, mean_rms, max_rms, variances, valid_time, mean_all, variances_all, preds, wass_dist, pmap_max, pmap_max_wass_dist
     return stable_count, mean_rms, max_rms, variances, valid_time, rms, preds, wass_dist,    pmap_max, pmap_max_wass_dist
 
-def generate_res(res_gen, squarenodes, rk, res_size, rho, sigma, leakage, win_type, bias_type, noise_stream, noisetype='none', noise_scaling=0, noise_realizations=1, traintype='normal', skip=150):
+def generate_res(res_gen, res_itr, squarenodes, rk, res_size, rho, sigma, leakage, win_type, bias_type, noise_stream, noisetype='none', noise_scaling=0, noise_realizations=1, traintype='normal', skip=150):
     # Function for generating a reservoir and obtaining matrices used for training the reservoir
-    reservoir = Reservoir(rk, res_gen, rk.u_arr_train.shape[0], rsvr_size=res_size,
+    reservoir = Reservoir(rk, res_gen, res_itr, rk.u_arr_train.shape[0], rsvr_size=res_size,
                 spectral_radius=rho, input_weight=sigma, leakage=leakage, win_type=win_type, bias_type=bias_type)
     # print('Train Data shape: (%d, %d)' % (rk.u_arr_train.shape[0], rk.u_arr_train.shape[1]))
     # print(rk.u_arr_train[-3:,-3:])
@@ -1393,7 +1394,7 @@ def get_res_results(itr, res_gen, squarenodes, rk, res_size, rho, sigma, leakage
     # a set of regularization values, and a set of noise magnitudes
     tic = time.perf_counter()
     print('Starting res %d' % itr)
-    reservoir, noise_in = generate_res(res_gen, squarenodes, rk, res_size, rho, sigma, leakage,
+    reservoir, noise_in = generate_res(res_gen, itr, squarenodes, rk, res_size, rho, sigma, leakage,
                                        win_type, bias_type, noise_stream, noisetype, noise, noise_realizations, traintype)
 
     toc = time.perf_counter()
