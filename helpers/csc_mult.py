@@ -42,6 +42,17 @@ def matrix_diag_sparse_mult(dmat, b_data, b_indices, b_indptr, b_shape):
 
     return data, indices, indptr, shape
 
+@jit(nopython = True, fastmath = True)
+def dense_to_sparse(W):
+    with objmode(data = 'double[:]', indices = 'int32[:]', indptr = 'int32[:]', shape = 'int64[:]'):
+        out = csc_matrix(W)
+        data = out.data
+        indices = out.indices
+        indptr = out.indptr
+        shape = np.array(list(out.shape))
+
+    return data, indices, indptr, shape
+
 
 @jit(nopython = True, fastmath = True)
 def mult_vec(data, indices, indptr, shape, mat):
