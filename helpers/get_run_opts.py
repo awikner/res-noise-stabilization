@@ -40,6 +40,10 @@ def get_run_opts(argv, runflag = True):
         noise_streams_per_test = 5
         noise_values_array = np.logspace(-3, 0, num = 19, base = 10)[5:11]
         alpha_values = np.append(0., np.logspace(-7, -3, 9))
+        import_res = False
+        import_train = False
+        import_test = False
+        import_noise = False
 
         try:
             opts, args = getopt.getopt(argv, "T:N:r:",
@@ -48,7 +52,8 @@ def get_run_opts(argv, runflag = True):
                     'sigma=', 'leakage=', 'bias_type=', 'debug=', 'win_type=',
                     'machine=', 'num_cpus=', 'pmap=', 'parallel=', 'metric=','returnall=',
                     'savetime=', 'noisevals=', 'regvals=', 'maxvt=', 'noisestreams=',
-                    'squarenodes=', 'resonly='])
+                    'squarenodes=', 'resonly=', 'importres=','importtrain=',
+                    'importtest=','importnoise='])
         except getopt.GetoptError:
             print('Error: Some options not recognized')
             sys.exit(2)
@@ -62,6 +67,38 @@ def get_run_opts(argv, runflag = True):
             elif opt == '-r':
                 noise_realizations = int(arg)
                 print('Noise Realizations: %d' % noise_realizations)
+            elif opt == '--importres':
+                if arg == 'True':
+                    import_res = True
+                elif arg == 'False':
+                    import_res = False
+                else:
+                    raise ValueError
+                print('Importing reservoir from file: %s' % arg)
+            elif opt == '--importtrain':
+                if arg == 'True':
+                    import_train = True
+                elif arg == 'False':
+                    import_train = False
+                else:
+                    raise ValueError
+                print('Importing training data from file: %s' % arg)
+            elif opt == '--importtest':
+                if arg == 'True':
+                    import_test = True
+                elif arg == 'False':
+                    import_test = False
+                else:
+                    raise ValueError
+                print('Importing test data from file: %s' % arg)
+            elif opt == '--importnoise':
+                if arg == 'True':
+                    import_noise = True
+                elif arg == 'False':
+                    import_noise = False
+                else:
+                    raise ValueError
+                print('Importing noise from file: %s' % arg)
             elif opt == '--resonly':
                 if arg == 'True':
                     resonly = True
@@ -199,13 +236,31 @@ def get_run_opts(argv, runflag = True):
         train_time, res_size, noise_realizations, save_time_rms, metric,\
                 return_all, machine, rho, sigma, leakage, tau, win_type, \
                 bias_type, res_per_test, num_tests, num_trains, savepred, \
-                noisetype, traintype, system, squarenodes, resonly = argv
+                noisetype, traintype, system, squarenodes, resonly, import_res,\
+                import_train, import_test, import_noise= argv
     if return_all and savepred:
         print('Cannot return results for all parameters and full predictions due to memory constraints.')
         raise ValueError
     if 'gradient' in traintype and squarenodes:
         print('Node State squaring not implemented for gradient regularization.')
         raise ValueError
+    if import_res:
+        iresflag = 'ires_'
+    else:
+        iresflag = ''
+    if import_train:
+        itrainflag = 'itrain_'
+    else:
+        itrainflag = ''
+    if import_test:
+        itestflag = 'itest_'
+    else:
+        itestflag = ''
+    if import_noise:
+        inoiseflag = 'inoise_'
+    else:
+        inoiseflag = ''
+
     if savepred:
         predflag = 'wpred_'
     else:
@@ -232,12 +287,12 @@ def get_run_opts(argv, runflag = True):
 
     if not return_all:
         data_folder = 'Data/%s_noisetest_noisetype_%s_traintype_%s/' % (system, noisetype, traintype)
-        run_name = '%s_%s%s%s%srho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s_metric_%s' \
-             % (system,resonly_flag,predflag, timeflag, squarenodes_flag, rho, sigma, leakage, win_type, bias_type, tau, res_size, \
+        run_name = '%s_%s%s%s%s%s%s%s%srho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s_metric_%s' \
+             % (system,resonly_flag,predflag, timeflag, squarenodes_flag, iresflag, itrainflag, itestflag, inoiseflag, rho, sigma, leakage, win_type, bias_type, tau, res_size, \
              train_time, noise_realizations, noisetype, traintype, metric)
     elif return_all:
         data_folder = 'Data/%s_noisetest_noisetype_%s_traintype_%s/' % (system, noisetype, traintype)
-        run_name = '%s_%s%s%s%srho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s' % (system,resonly_flag,predflag, timeflag, squarenodes_flag, rho, sigma, leakage, win_type, bias_type, tau,res_size, train_time, noise_realizations, noisetype, traintype)
+        run_name = '%s_%s%s%s%s%s%s%s%srho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s' % (system,resonly_flag,predflag, timeflag, squarenodes_flag, iresflag, itrainflag, itestflag, inoiseflag, rho, sigma, leakage, win_type, bias_type, tau,res_size, train_time, noise_realizations, noisetype, traintype)
     if runflag:
         if not os.path.isdir(os.path.join(root_folder, data_folder)):
             os.mkdir(os.path.join(root_folder, data_folder))
@@ -247,7 +302,7 @@ def get_run_opts(argv, runflag = True):
         return root_folder, data_folder, run_name, system, noisetype, traintype, savepred, save_time_rms, squarenodes, rho,\
             sigma, leakage, win_type, bias_type, tau, res_size, train_time, noise_realizations, noise_streams_per_test,\
             noise_values_array,alpha_values, res_per_test, num_trains, num_tests, debug_mode, pmap, metric, \
-            return_all, ifray, machine, max_valid_time
+            return_all, ifray, machine, max_valid_time, import_res, import_train, import_test, import_noise
     else:
         if not savepred:
             return os.path.join(os.path.join(root_folder, data_folder), run_name + '.bz2'), ''

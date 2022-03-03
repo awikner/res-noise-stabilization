@@ -39,7 +39,7 @@ def main(argv):
     root_folder, top_folder, run_name, system, noisetype, traintype, savepred, save_time_rms, squarenodes, rho,\
         sigma, leakage, win_type, bias_type, tau, res_size, train_time, noise_realizations, noise_streams_per_test,\
         noise_values_array, alpha_values, res_per_test, num_trains, num_tests, debug_mode, pmap, metric, return_all,\
-        ifray, machine, max_valid_time = get_run_opts(argv)
+        ifray, machine, max_valid_time, import_res, import_train, import_test, import_noise = get_run_opts(argv)
 
     raw_data_folder = os.path.join(os.path.join(root_folder, top_folder), run_name + '_folder')
     raw_data_size_str = str(subprocess.check_output('du -s %s' % raw_data_folder, shell = True))
