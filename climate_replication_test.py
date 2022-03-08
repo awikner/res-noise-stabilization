@@ -625,7 +625,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
                 noise_scaling, i, traintype)
             X = X[:, skip:(res_d - 2)]
             X_train = np.ascontiguousarray(np.concatenate(
-                (np.ones((1, d-(skip+1))), X, u_arr_train_noise[:, skip:-1]), axis=0))
+                (np.ones((1, d-(skip+1))), X, u_arr_train_noise[:, skip-1:-2]), axis=0))
             X_train = get_squared(X_train, rsvr_size, squarenodes)
             data_trstates += Y_train @ X_train.T
             states_trstates += X_train @ X_train.T
@@ -636,7 +636,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
             X, u_arr_train_noise = getXwrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_shape,leakage, noise[i], noisetype,noise_scaling, i, traintype)
             X = np.ascontiguousarray(X[:, skip:(res_d - 2)])
             X_train = np.ascontiguousarray(np.concatenate(
-                (np.ones((1, d-(skip+1))), X, u_arr_train_noise[:, skip:-1]), axis=0))
+                (np.ones((1, d-(skip+1))), X, u_arr_train_noise[:, skip-1:-2]), axis=0))
             X_train = get_squared(X_train, rsvr_size, squarenodes)
             if i == 0:
                 X_train_mean = np.zeros(X_train.shape)
@@ -656,7 +656,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
                 noise_scaling, i, traintype)
             X = X[:, skip:(res_d - 2)]
             X_train = np.ascontiguousarray(np.concatenate(
-                (np.ones((1, d-(skip+1))), X, u_arr_train_noise[:, skip:-1]), axis=0))
+                (np.ones((1, d-(skip+1))), X, u_arr_train_noise[:, skip-1:-2]), axis=0))
             X_train = get_squared(X_train, rsvr_size, squarenodes)
             if i == 0:
                 X_train_mean = np.zeros(X_train.shape)
@@ -670,7 +670,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
             u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_shape, leakage, noise[0])
         X_0 = np.ascontiguousarray(X_0[:, skip+1:(res_X[0].size - 1)])
         X_train_0 = np.ascontiguousarray(np.concatenate(
-            (np.ones((1, d-(skip+1))), X_0, u_arr_train[:, skip:-1]), axis=0))
+            (np.ones((1, d-(skip+1))), X_0, u_arr_train[:, skip-1:-2]), axis=0))
         X_train_0 = get_squared(X_train_0, rsvr_size, squarenodes)
         X_all = np.zeros(
             (X_train_0.shape[0], X_train_0.shape[1], noise_realizations))
@@ -678,7 +678,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
             X, u_arr_train_noise = getXwrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_shape,leakage, noise[i], noisetype,noise_scaling, i, traintype)
             X = np.ascontiguousarray(X[:, skip:(res_d - 2)])
             X_train = np.ascontiguousarray(np.concatenate(
-                (np.ones((1, d-(skip+1))), X, u_arr_train_noise[:, skip:-1]), axis=0))
+                (np.ones((1, d-(skip+1))), X, u_arr_train_noise[:, skip-1:-2]), axis=0))
             X_train = get_squared(X_train, rsvr_size, squarenodes)
             if i == 0:
                 X_train_mean = np.zeros(X_train.shape)
@@ -696,7 +696,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
             u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_shape, leakage, noise[0])
         X_0 = np.ascontiguousarray(X_0[:, skip+1:(res_X[0].size - 1)])
         X_train_0 = np.ascontiguousarray(np.concatenate(
-            (np.ones((1, d-(skip+1))), X_0, u_arr_train[:, skip:-1]), axis=0))
+            (np.ones((1, d-(skip+1))), X_0, u_arr_train[:, skip-1:-2]), axis=0))
         X_train_0 = get_squared(X_train_0, rsvr_size, squarenodes)
         X_all = np.zeros(
             (X_train_0.shape[0], X_train_0.shape[1], noise_realizations))
@@ -704,7 +704,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
             X, u_arr_train_noise = getXwrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_shape,     leakage, noise[i], noisetype,noise_scaling, i, traintype)
             X = np.ascontiguousarray(X[:, skip:(res_d - 2)])
             X_train = np.ascontiguousarray(np.concatenate(
-                (np.ones((1, d-(skip+1))), X, u_arr_train_noise[:, skip:-1]), axis=0))
+                (np.ones((1, d-(skip+1))), X, u_arr_train_noise[:, skip-1:-2]), axis=0))
             X_train = get_squared(X_train, rsvr_size, squarenodes)
             X_all[:, :, i] = X_train
         data_trstates = Y_train @ X_train_0.T
@@ -720,7 +720,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
             u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_shape, leakage, noise[0])
         X_0 = np.ascontiguousarray(X_0[:, skip+1:(res_X[0].size - 1)])
         X_train_0 = np.ascontiguousarray(np.concatenate(
-            (np.ones((1, d-(skip+1))), X_0, u_arr_train[:, skip:-1]), axis=0))
+            (np.ones((1, d-(skip+1))), X_0, u_arr_train[:, skip-1:-2]), axis=0))
         X_train_0 = get_squared(X_train_0, rsvr_size, squarenodes)
         X_all = np.zeros(
             (X_train_0.shape[0], X_train_0.shape[1], noise_realizations))
@@ -729,7 +729,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
                 noise_scaling, i, traintype)
             X = np.ascontiguousarray(X[:, skip:(res_d - 2)])
             X_train = np.ascontiguousarray(np.concatenate(
-                (np.ones((1, d-(skip+1))), X, u_arr_train_noise[:, skip:-1]), axis=0))
+                (np.ones((1, d-(skip+1))), X, u_arr_train_noise[:, skip-1:-2]), axis=0))
             X_train = get_squared(X_train, rsvr_size, squarenodes)
             if i == 0:
                 X_train_mean = np.zeros(X_train.shape)
@@ -765,7 +765,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
                 noise_scaling, i, 'normal')
             X = X[:, skip:(res_d - 2)]
             X_train = np.ascontiguousarray(np.concatenate(
-                (np.ones((1, d-(skip+1))), X, u_arr_train_noise[:, skip:-1]), axis=0))
+                (np.ones((1, d-(skip+1))), X, u_arr_train_noise[:, skip-1:-2]), axis=0))
             X_train = get_squared(X_train, rsvr_size, squarenodes)
             sync_len = 0
             inbound_data = np.where(np.logical_and(
@@ -804,7 +804,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
         X = X[:, skip:(res_d - 2)]
         D = D[:, skip:(res_d - 2)]
         X_train = np.concatenate(
-            (np.ones((1, d-(skip+1))), X, u_arr_train[:, skip:-1]), axis=0)
+            (np.ones((1, d-(skip+1))), X, u_arr_train[:, skip-1:-2]), axis=0)
         gradient_reg = np.zeros((rsvr_size+n+1, rsvr_size+n+1))
         for i in range(X.shape[1]):
             D_n = np.concatenate(
@@ -834,7 +834,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
         print(Win[:5,:5])
         """
         X_train = np.concatenate(
-            (np.ones((1, d-(skip+1))), X, u_arr_train[:, skip:-1]), axis=0)
+            (np.ones((1, d-(skip+1))), X, u_arr_train[:, skip-1:-2]), axis=0)
         gradient_reg = np.zeros((rsvr_size+n+1, rsvr_size+n+1))
         W_mat_data, W_mat_indices, W_mat_indptr, W_mat_shape = construct_jac_mat_csc(
             Win, W_data, W_indices, W_indptr, W_shape, rsvr_size, n)
@@ -889,7 +889,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
         X = X[:, skip:(res_d - 2)]
         D = D[:, skip:(res_d - 2)]
         X_train = np.concatenate(
-            (np.ones((1, d-(skip+1))), X, u_arr_train[:, skip:-1]), axis=0)
+            (np.ones((1, d-(skip+1))), X, u_arr_train[:, skip-1:-2]), axis=0)
         gradient_reg = np.zeros((rsvr_size+n+1, rsvr_size+n+1))
         W_mat_data, W_mat_indices, W_mat_indptr, W_mat_shape = construct_jac_mat_csc(
             Win, W_data, W_indices, W_indptr, W_shape, rsvr_size, n)
@@ -924,7 +924,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
         print(Win[:5,:5])
         """
         X_train = np.concatenate(
-            (np.ones((1, d-(skip+1))), X, u_arr_train[:, skip:-1]), axis=0)
+            (np.ones((1, d-(skip+1))), X, u_arr_train[:, skip-1:-2]), axis=0)
         gradient_reg = np.zeros((rsvr_size+n+1, rsvr_size+n+1))
         D_n = np.zeros((rsvr_size+n+1, n, k))
         E_n = np.zeros((rsvr_size+n+1, rsvr_size+n+1, k-1))
@@ -1010,7 +1010,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
                            W_shape, leakage, noise[0], noisetype, noise_scaling, 1, traintype)
         X = np.ascontiguousarray(X[:, skip:(res_d - 2)])
         X_train = np.ascontiguousarray(np.concatenate(
-            (np.ones((1, d-(skip+1))), X, u_arr_train[:, skip:-1]), axis=0))
+            (np.ones((1, d-(skip+1))), X, u_arr_train[:, skip-1:-2]), axis=0))
         data_trstates = Y_train @ X_train.T
         data_trstates[:, 1:rsvr_size+1] += noise_scaling**2/noise_realizations * \
             matrix_dot_left_T(W_mat_data, W_mat_indices,
@@ -1026,7 +1026,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
         X = X[:, skip:(res_d - 2)]
         D = D[:, skip:(res_d - 2)]
         X_train = np.concatenate(
-            (np.ones((1, d-(skip+1))), X, u_arr_train[:, skip:-1]), axis=0)
+            (np.ones((1, d-(skip+1))), X, u_arr_train[:, skip-1:-2]), axis=0)
         Dmean = mean_numba_axis1(D)
         temp_mat = np.diag(Dmean) @ Win[:, 1:]
         target_correction = matrix_dot_left_T(
@@ -1117,7 +1117,7 @@ def get_test_data(test_stream, tau, num_tests, rkTime, split, system='lorenz'):
             u0 = (test_stream[i].random(64)*2-1)*0.6
             u0 = u0 - np.mean(u0)
         u_arr_train_nonoise, rktest_u_arr_test[:, :, i], p, params = RungeKuttawrapped(x0=ic[0],
-             y0=ic[1], z0=30*ic[2], T=rkTime, ttsplit=split, u0=u0, system=system, params=params)
+             y0=ic[1], z0=30*ic[2], T=rkTime+transient, ttsplit=split+transient, u0=u0, system=system, params=params)
         rktest_u_arr_train_nonoise[:,:,i] = u_arr_train_nonoise[:,transient:]
         """
         print('Test data %d' % i)
