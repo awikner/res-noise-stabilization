@@ -21,7 +21,7 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 from scipy.linalg import solve, solve_sylvester
-from scipy.sparse.linalg import eigs, svds
+from scipy.sparse.linalg import eigs, svds, eigsh
 from scipy.sparse import random
 from matplotlib import pyplot as plt
 from numba import jit, njit, objmode
@@ -143,6 +143,14 @@ def wasserstein_distance_empirical(measured_samples, true_samples):
 
     return wass_dist
 
+@jit(fastmath = True, nopython = True)
+def numba_eigsh(A):
+    np.random.seed(0)
+    v0 = np.random.rand(A.shape[0])
+    with objmode(eigs_out = 'double[:]'):
+        eigs_out = eigsh(A, k=6, v0=v0, maxiter=1e5, return_eigenvectors=False)
+    return eigs_out
+
 
 class Reservoir:
     def __init__(self, rk, res_gen, res_itr, input_size, rsvr_size=300, spectral_radius=0.6, input_weight=1, leakage=1.0, win_type='full', bias_type='old', avg_degree = 3):
@@ -174,7 +182,7 @@ class Reservoir:
                 (W_sp.data, W_sp.indices, W_sp.indptr, np.array(list(W_sp.shape)))
         """
         unnormalized_W_sp = random(rsvr_size, rsvr_size, density = density, format = 'csc', data_rvs = res_gen.random)
-        max_eig = eigs(unnormalized_W_sp, k=1, return_eigenvectors = False, maxiter = 10**5)
+        max_eig = eigs(unnormalized_W_sp, k=1, return_eigenvectors = False, maxiter = 10**5, v0 = res_gen.random(rsvr_size))
         W_sp = unnormalized_W_sp*spectral_radius/np.abs(max_eig[0])
         self.W_data, self.W_indices, self.W_indptr, self.W_shape = \
             (W_sp.data, W_sp.indices, W_sp.indptr, np.array(list(W_sp.shape)))
@@ -470,13 +478,15 @@ def getXwrapped(u_training, res_X, Win, W_data, W_indices, W_indptr, W_shape, le
         return res_X, u_training_wnoise
 
     elif traintype in ['sylvester_wD'] or 'gradient' in traintype:
-        res_D = np.zeros((res_X.shape[0], u_training.shape[1]+1))
+        rsvr_size = res_X.shape[0]
+        res_D = np.zeros((rsvr_size, u_training.shape[1]+1))
         for i in range(0, u_training[0].size):
             res_internal = Win @ np.append(1., u_training[:, i])+mult_vec(
                 W_data, W_indices, W_indptr, W_shape, res_X[:, i])
             res_X[:, i+1] = (1.0 - leakage)*res_X[:, i] + \
                              leakage*np.tanh(res_internal)
             res_D[:, i+1] = leakage/(np.power(np.cosh(res_internal), 2.0))
+
         return res_X, res_D
     else:
         for i in range(0, u_training[0].size):
@@ -600,10 +610,16 @@ def get_squared(X, rsvr_size, squarenodes, dim = 0):
     if not squarenodes:
         return X_aug
     else:
-        if dim == 0:
-            X_out = np.hstack((X_aug[0], X_aug[1:rsvr_size+1],X_aug[1:rsvr_size+1]**2.0, X_aug[rsvr_size+1:]))
-        elif dim == 1:
-            X_out = np.vstack((X_aug[0].reshape(1,-1), X_aug[1:rsvr_size+1], X_aug[1:rsvr_size+1]**2.0, X_aug[rsvr_size+1:]))
+        X_out = np.vstack((X_aug[0].reshape(1,-1), X_aug[1:rsvr_size+1], X_aug[1:rsvr_size+1]**2.0, X_aug[rsvr_size+1:]))
+        return X_out
+
+@jit(nopython=True, fastmath = True)
+def get_squared_vec(X, rsvr_size, squarenodes):
+    X_aug = np.copy(X)
+    if not squarenodes:
+        return X_aug
+    else:
+        X_out = np.concatenate((np.array([X_aug[0]]), X_aug[1:rsvr_size+1],X_aug[1:rsvr_size+1]**2.0, X_aug[rsvr_size+1:]))
         return X_out
 
 
@@ -633,7 +649,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
             X = X[:, skip:(res_d - 2)]
             X_train = np.ascontiguousarray(np.concatenate(
                 (np.ones((1, d-(skip+1))), X, u_arr_train_noise[:, skip-1:-2]), axis=0))
-            X_train = get_squared(X_train, rsvr_size, squarenodes, 1)
+            X_train = get_squared(X_train, rsvr_size, squarenodes)
             data_trstates += Y_train @ X_train.T
             states_trstates += X_train @ X_train.T
         return [data_trstates, states_trstates, Y_train, X_train, gradient_reg]
@@ -644,7 +660,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
             X = np.ascontiguousarray(X[:, skip:(res_d - 2)])
             X_train = np.ascontiguousarray(np.concatenate(
                 (np.ones((1, d-(skip+1))), X, u_arr_train_noise[:, skip-1:-2]), axis=0))
-            X_train = get_squared(X_train, rsvr_size, squarenodes, 1)
+            X_train = get_squared(X_train, rsvr_size, squarenodes)
             if i == 0:
                 X_train_mean = np.zeros(X_train.shape)
                 X_all = np.zeros((X_train.shape[0], X_train.shape[1], noise_realizations))
@@ -664,7 +680,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
             X = X[:, skip:(res_d - 2)]
             X_train = np.ascontiguousarray(np.concatenate(
                 (np.ones((1, d-(skip+1))), X, u_arr_train_noise[:, skip-1:-2]), axis=0))
-            X_train = get_squared(X_train, rsvr_size, squarenodes, 1)
+            X_train = get_squared(X_train, rsvr_size, squarenodes)
             if i == 0:
                 X_train_mean = np.zeros(X_train.shape)
             X_train_mean += X_train/noise_realizations
@@ -678,7 +694,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
         X_0 = np.ascontiguousarray(X_0[:, skip+1:(res_X[0].size - 1)])
         X_train_0 = np.ascontiguousarray(np.concatenate(
             (np.ones((1, d-(skip+1))), X_0, u_arr_train[:, skip-1:-2]), axis=0))
-        X_train_0 = get_squared(X_train_0, rsvr_size, squarenodes, 1)
+        X_train_0 = get_squared(X_train_0, rsvr_size, squarenodes)
         X_all = np.zeros(
             (X_train_0.shape[0], X_train_0.shape[1], noise_realizations))
         for i in range(noise_realizations):
@@ -686,7 +702,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
             X = np.ascontiguousarray(X[:, skip:(res_d - 2)])
             X_train = np.ascontiguousarray(np.concatenate(
                 (np.ones((1, d-(skip+1))), X, u_arr_train_noise[:, skip-1:-2]), axis=0))
-            X_train = get_squared(X_train, rsvr_size, squarenodes, 1)
+            X_train = get_squared(X_train, rsvr_size, squarenodes)
             if i == 0:
                 X_train_mean = np.zeros(X_train.shape)
             X_train_mean += X_train/noise_realizations
@@ -704,7 +720,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
         X_0 = np.ascontiguousarray(X_0[:, skip+1:(res_X[0].size - 1)])
         X_train_0 = np.ascontiguousarray(np.concatenate(
             (np.ones((1, d-(skip+1))), X_0, u_arr_train[:, skip-1:-2]), axis=0))
-        X_train_0 = get_squared(X_train_0, rsvr_size, squarenodes, 1)
+        X_train_0 = get_squared(X_train_0, rsvr_size, squarenodes)
         X_all = np.zeros(
             (X_train_0.shape[0], X_train_0.shape[1], noise_realizations))
         for i in range(noise_realizations):
@@ -712,7 +728,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
             X = np.ascontiguousarray(X[:, skip:(res_d - 2)])
             X_train = np.ascontiguousarray(np.concatenate(
                 (np.ones((1, d-(skip+1))), X, u_arr_train_noise[:, skip-1:-2]), axis=0))
-            X_train = get_squared(X_train, rsvr_size, squarenodes, 1)
+            X_train = get_squared(X_train, rsvr_size, squarenodes)
             X_all[:, :, i] = X_train
         data_trstates = Y_train @ X_train_0.T
         states_trstates = X_train_0 @ X_train_0.T
@@ -728,7 +744,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
         X_0 = np.ascontiguousarray(X_0[:, skip+1:(res_X[0].size - 1)])
         X_train_0 = np.ascontiguousarray(np.concatenate(
             (np.ones((1, d-(skip+1))), X_0, u_arr_train[:, skip-1:-2]), axis=0))
-        X_train_0 = get_squared(X_train_0, rsvr_size, squarenodes, 1)
+        X_train_0 = get_squared(X_train_0, rsvr_size, squarenodes)
         X_all = np.zeros(
             (X_train_0.shape[0], X_train_0.shape[1], noise_realizations))
         for i in range(noise_realizations):
@@ -737,7 +753,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
             X = np.ascontiguousarray(X[:, skip:(res_d - 2)])
             X_train = np.ascontiguousarray(np.concatenate(
                 (np.ones((1, d-(skip+1))), X, u_arr_train_noise[:, skip-1:-2]), axis=0))
-            X_train = get_squared(X_train, rsvr_size, squarenodes, 1)
+            X_train = get_squared(X_train, rsvr_size, squarenodes)
             if i == 0:
                 X_train_mean = np.zeros(X_train.shape)
             X_train_mean += X_train/noise_realizations
@@ -773,7 +789,7 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
             X = X[:, skip:(res_d - 2)]
             X_train = np.ascontiguousarray(np.concatenate(
                 (np.ones((1, d-(skip+1))), X, u_arr_train_noise[:, skip-1:-2]), axis=0))
-            X_train = get_squared(X_train, rsvr_size, squarenodes, 1)
+            X_train = get_squared(X_train, rsvr_size, squarenodes)
             sync_len = 0
             inbound_data = np.where(np.logical_and(
                 Y_train[0] < ub, Y_train[0] > lb))[0]
@@ -812,10 +828,16 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
         D = D[:, skip:(res_d - 2)]
         X_train = np.concatenate(
             (np.ones((1, d-(skip+1))), X, u_arr_train[:, skip-1:-2]), axis=0)
-        gradient_reg = np.zeros((rsvr_size+n+1, res_feature_size+n+1))
+        X_train = get_squared(X_train, rsvr_size, squarenodes)
+        gradient_reg = np.zeros((res_feature_size+n+1, res_feature_size+n+1))
         for i in range(X.shape[1]):
-            D_n = np.concatenate(
-                (matrix_diag_mult(D[:, i], Win[:, 1:]), np.identity(n)), axis=0)
+            D_n_base = matrix_diag_mult(D[:, i], Win[:, 1:])
+            if squarenodes:
+                D_n = np.concatenate(
+                    (D_n_base, matrix_diag_mult(2*X[:,i], D_n_base), np.identity(n)), axis=0)
+            else:
+                D_n = np.concatenate(
+                     (D_n_base, np.identity(n)), axis=0)
             gradient_reg[1:,1:] += D_n @ D_n.T
         """
         print('Gradient reg:')
@@ -842,17 +864,33 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
         """
         X_train = np.concatenate(
             (np.ones((1, d-(skip+1))), X, u_arr_train[:, skip-1:-2]), axis=0)
+        X_train = get_squared(X_train, rsvr_size, squarenodes)
         gradient_reg = np.zeros((res_feature_size+n+1, res_feature_size+n+1))
         W_mat_data, W_mat_indices, W_mat_indptr, W_mat_shape = construct_jac_mat_csc(
-            Win, W_data, W_indices, W_indptr, W_shape, rsvr_size, n)
-        leakage_mat = np.concatenate((np.zeros((res_feature_size,1)), (1-leakage) *
-                                np.identity(res_feature_size), np.zeros((res_feature_size, n))), axis=1)
+            Win, W_data, W_indices, W_indptr, W_shape, rsvr_size, n, squarenodes)
+        if squarenodes:
+            leakage_mat = np.concatenate((np.zeros((rsvr_size,1)), (1-leakage) *
+                                np.identity(rsvr_size), np.zeros((rsvr_size, n+rsvr_size))), axis=1)
+        else:
+            leakage_mat = np.concatenate((np.zeros((rsvr_size,1)), (1-leakage) *
+                                 np.identity(rsvr_size), np.zeros((rsvr_size, n))), axis=1)
         for i in range(1, X.shape[1]):
             if i > 0:
-                D_n2 = np.concatenate((np.zeros((1, n)), matrix_diag_mult(
-                    D[:, i-1], Win[:, 1:]), np.identity(n)), axis=0)
-                E_n = np.concatenate((np.zeros((1, rsvr_size+n+1)), matrix_dot_left_T(W_mat_data, W_mat_indices, W_mat_indptr, W_mat_shape, np.diag(D[:, i])) + leakage_mat,
-                    np.zeros((n, rsvr_size+n+1))), axis=0)
+                D_n2_base = matrix_diag_mult(D[:, i-1], Win[:, 1:])
+                if squarenodes:
+                    D_n2 = np.concatenate((np.zeros((1, n)), D_n2_base, matrix_diag_mult(
+                        2*X[:,i-1], D_n2_base), np.identity(n)), axis=0)
+                else:
+                    D_n2 = np.concatenate((np.zeros((1, n)), D_n2_base, np.identity(n)), axis=0)
+                E_n_base = matrix_dot_left_T(W_mat_data, W_mat_indices,\
+                    W_mat_indptr, W_mat_shape, np.diag(D[:, i])) + leakage_mat
+                if squarenodes:
+                    E_n = np.concatenate((np.zeros((1, rsvr_size+n+1)),\
+                        E_n_base, matrix_diag_mult(2*X[:,i], E_n_base),\
+                        np.zeros((n, rsvr_size+n+1))), axis=0)
+                else:
+                    E_n = np.concatenate((np.zeros((1, rsvr_size+n+1)),\
+                        E_n_base, np.zeros((n, rsvr_size+n+1))), axis=0)
                 E_nD_n2 = E_n @ D_n2
                 """
                 if i == 1:
@@ -863,8 +901,12 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
                     print(E_nD_n2[:5,:5])
                 """
                 gradient_reg += E_nD_n2 @ E_nD_n2.T
-            D_n = np.concatenate(
-                (matrix_diag_mult(D[:, i], Win[:, 1:]), np.identity(n)), axis=0)
+            D_n_base = matrix_diag_mult(D[:, i], Win[:, 1:])
+            if squarenodes:
+                D_n = np.concatenate(
+                        (D_n_base, matrix_diag_mult(2*X[:,i], D_n_base), np.identity(n)), axis=0)
+            else:
+                D_n = np.concatenate((D_n_base, np.identity(n)), axis=0)
             """
             if i == 1:
                 print('D_n:')
@@ -932,24 +974,36 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
         """
         X_train = np.concatenate(
             (np.ones((1, d-(skip+1))), X, u_arr_train[:, skip-1:-2]), axis=0)
-        gradient_reg = np.zeros((rsvr_size+n+1, rsvr_size+n+1))
-        D_n = np.zeros((rsvr_size+n+1, n, k))
-        E_n = np.zeros((rsvr_size+n+1, rsvr_size+n+1, k-1))
-        reg_components = np.zeros((rsvr_size+n+1, n, k))
+        X_train = get_squared(X_train, rsvr_size, squarenodes)
+        gradient_reg = np.zeros((res_feature_size+n+1, res_feature_size+n+1))
+        D_n = np.zeros((res_feature_size+n+1, n, k))
+        E_n = np.zeros((res_feature_size+n+1, res_feature_size+n+1, k-1))
+        reg_components = np.zeros((res_feature_size+n+1, n, k))
         W_mat_data, W_mat_indices, W_mat_indptr, W_mat_shape = construct_jac_mat_csc(
-            Win, W_data, W_indices, W_indptr, W_shape, rsvr_size, n)
-        leakage_mat = np.concatenate((np.zeros(
-            (rsvr_size, 1)), (1-leakage)*np.identity(rsvr_size), np.zeros((rsvr_size, n))), axis=1)
-        """
+            Win, W_data, W_indices, W_indptr, W_shape, rsvr_size, n, squarenodes)
+        if squarenodes:
+            leakage_mat = np.concatenate((np.zeros((rsvr_size,1)), (1-leakage) *
+                                np.identity(rsvr_size), np.zeros((rsvr_size, n+rsvr_size))), axis=1)
+        else:
+            leakage_mat = np.concatenate((np.zeros((rsvr_size,1)), (1-leakage) *
+                                np.identity(rsvr_size), np.zeros((rsvr_size, n))), axis=1)
+
         with objmode(tic = 'double'):
             tic = time.perf_counter()
-        """
+
+
         for i in range(k):
-            D_n[1:rsvr_size+1, :, i] = matrix_diag_mult(D[:, i], Win[:, 1:])
-            D_n[rsvr_size+1:, :, i] = np.identity(n)
+            D_n_base = matrix_diag_mult(D[:, i], Win[:, 1:])
+            if squarenodes:
+                D_n[1+rsvr_size:1+res_feature_size,:,i] = matrix_diag_mult(2*X[:,i], D_n_base)
+            D_n[1:rsvr_size+1, :, i] = D_n_base
+            D_n[res_feature_size+1:, :, i] = np.identity(n)
         for i in range(1, k):
-            E_n[1:rsvr_size+1, :, i-1] = matrix_diag_sparse_mult_add(
-                D[:, i], W_mat_data, W_mat_indices, W_mat_indptr, W_mat_shape, leakage_mat)
+            E_n_base = matrix_diag_sparse_mult_add(
+                 D[:, i], W_mat_data, W_mat_indices, W_mat_indptr, W_mat_shape, leakage_mat)
+            if squarenodes:
+                E_n[1+rsvr_size:1+res_feature_size,:,i-1] = matrix_diag_mult(2*X[:,i], E_n_base)
+            E_n[1:rsvr_size+1, :, i-1] = E_n_base
         reg_components[:, :, k-1] = D_n[:, :, -1]
         """
         print('D_n:')
@@ -968,8 +1022,30 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
 
         for i in range(k, X.shape[1]):
             for j in range(k):
-                gradient_reg += reg_components[:,
-                    :, j] @ reg_components[:, :, j].T
+                sparsity = np.sum(reg_components[:,:,j].flatten()==0.)/(reg_components[:,:,j].size)
+                print(sparsity)
+                gradient_reg += reg_components[:, :, j] @ reg_components[:, :, j].T
+            if i % 200 == 0:
+                """
+                with objmode(reg_eigs = 'double[:]'):
+                    reg_eigs_complex, tmp = np.linalg.eig(gradient_reg)
+                    reg_eigs = np.real(reg_eigs_complex)
+                print('Normalized Regularization eigenvalues')
+                print(reg_eigs[:6]/i)
+                """
+                with objmode():
+                    #np.random.seed(0)
+                    #start = np.random.rand(gradient_reg.shape[0])
+                    #rank = np.linalg.matrix_rank(gradient_reg, hermitian = True)
+                    runtime = time.perf_counter() - tic
+                    #print('Regularization matrix rank at i = %d' % i)
+                    #print(rank)
+                    print('Regularization runtime at i = %d: %0.2f sec.' % (i, runtime))
+                    #reg_name = '/lustre/awikner1/res-noise-stabilization/gradient_regularization_%d.csv' % i
+                    #np.savetxt(reg_name, gradient_reg, delimiter = ',')
+
+
+
             """
             if i == k:
                 print('Init Gradient reg:')
@@ -978,13 +1054,19 @@ def get_states_wrapped(u_arr_train, res_X, Win, W_data, W_indices, W_indptr, W_s
                 print('Second Gradient reg:')
                 print(gradient_reg[:5,:5])
             """
-            E_n[1:rsvr_size+1, :, k-2] = matrix_diag_sparse_mult_add(
-                D[:, i], W_mat_data, W_mat_indices, W_mat_indptr, W_mat_shape, leakage_mat)
+            E_n_base = matrix_diag_sparse_mult_add(
+                 D[:, i], W_mat_data, W_mat_indices, W_mat_indptr, W_mat_shape, leakage_mat)
+            if squarenodes:
+                E_n[1+rsvr_size:1+res_feature_size,:,k-2] = matrix_diag_mult(2*X[:,i], E_n_base)
+            E_n[1:rsvr_size+1, :, k-2] = E_n_base
             for j in range(k-1):
                 reg_components[:, :, j] = matrix_sparse_mult(
                     E_n[:, :, k-2], reg_components[:, :, j+1])
-            reg_components[1:rsvr_size+1, :, k - 1] = matrix_diag_mult(D[:, i], Win[:, 1:])
-            reg_components[1+rsvr_size:, :, k-1] = np.identity(n)
+            D_n_base = matrix_diag_mult(D[:, i], Win[:, 1:])
+            if squarenodes:
+                reg_components[1+rsvr_size:1+res_feature_size,:,k-1] = matrix_diag_mult(2*X[:,i], D_n_base)
+            reg_components[1:rsvr_size+1, :, k - 1] = D_n_base
+            reg_components[1+res_feature_size:, :, k-1] = np.identity(n)
             """
             if i == k:
                 print('Reg components @ 2,1')
@@ -1085,8 +1167,8 @@ def predictwrapped(res_X, Win, W_data, W_indices, W_indptr, W_shape, Wout, leaka
     for i in range(0, steps):
         X[:, i+1] = (1-leakage)*X[:, i] + leakage*np.tanh(Win @ np.append(1.,
                      Y[:, i]) + mult_vec(W_data, W_indices, W_indptr, W_shape, X[:, i]))
-        Y[:, i+1] = Wout @ get_squared(np.concatenate((np.array([1.]), X[:, i+1], Y[:, i])),\
-                X.shape[0], squarenodes, 0)
+        Y[:, i+1] = Wout @ get_squared_vec(np.concatenate((np.array([1.]), X[:, i+1], Y[:, i])),\
+                X.shape[0], squarenodes)
 
     return Y
 
@@ -1402,9 +1484,12 @@ def optim_func(res, squarenodes, noise_in, noise, rktest_u_arr_train_nonoise, rk
         # print('Noise mag: %e' % noise)
         # print('Gradient reg:')
         # print(res.gradient_reg[:5,:5])
-        #res.Wout = np.transpose(solve(np.transpose(
-        #    res.states_trstates + noise**2.0*res.gradient_reg+idenmat), np.transpose(res.data_trstates)))
-        res.Wout =  matlab_mrdivide(res.states_trstates + noise**2.0*res.gradient_reg + idenmat, res.data_trstates)
+        print(res.states_trstates.shape)
+        print(res.gradient_reg.shape)
+        print(idenmat.shape)
+        res.Wout = np.transpose(solve(np.transpose(
+            res.states_trstates + noise**2.0*res.gradient_reg+idenmat), np.transpose(res.data_trstates)))
+        #res.Wout =  matlab_mrdivide(res.states_trstates + noise**2.0*res.gradient_reg + idenmat, res.data_trstates)
     else:
         res.Wout = solve_sylvester(
             res.left_mat, res.states_trstates+idenmat, res.data_trstates)
