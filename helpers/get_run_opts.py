@@ -241,9 +241,6 @@ def get_run_opts(argv, runflag = True):
     if return_all and savepred:
         print('Cannot return results for all parameters and full predictions due to memory constraints.')
         raise ValueError
-    if 'gradient' in traintype and squarenodes:
-        print('Node State squaring not implemented for gradient regularization.')
-        raise ValueError
     if import_res:
         iresflag = 'ires_'
     else:

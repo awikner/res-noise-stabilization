@@ -63,10 +63,13 @@ def mult_vec(data, indices, indptr, shape, mat):
     return out
 
 @jit(nopython = True, fastmath = True)
-def construct_jac_mat_csc(Win, data_in, indices_in, indptr_in, shape_in, rsvr_size, n):
+def construct_jac_mat_csc(Win, data_in, indices_in, indptr_in, shape_in, rsvr_size, n, squarenodes = False):
     with objmode(data = 'double[:]', indices = 'int32[:]', indptr = 'int32[:]', shape = 'int64[:]'):
         W_conv = csc_matrix((data_in, indices_in, indptr_in), shape = (shape_in[0], shape_in[1])).toarray()
-        mat    = csc_matrix(np.concatenate((Win[:,0].reshape(-1,1), W_conv, np.zeros((rsvr_size,n))), axis = 1))
+        if squarenodes:
+            mat    = csc_matrix(np.concatenate((Win[:,0].reshape(-1,1), W_conv, np.zeros((rsvr_size,n+rsvr_size))), axis = 1))
+        else:
+            mat    = csc_matrix(np.concatenate((Win[:,0].reshape(-1,1), W_conv, np.zeros((rsvr_size,n))), axis = 1))
         data   = mat.data
         indices = mat.indices
         indptr = mat.indptr
