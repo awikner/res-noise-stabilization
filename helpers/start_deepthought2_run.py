@@ -35,7 +35,7 @@ def start_deepthought2_run(system = 'KS', traintype = 'normal', noisetype = 'gau
         program_ext  = 'resonly_'
         resonly_str = 'True'
     else:
-        program_str = 'climate_replication_test.py'
+        program_str = 'climate_replication_test_sparse.py'
         program_ext = ''
         resonly_str = 'False'
 
@@ -101,7 +101,7 @@ def start_deepthought2_run(system = 'KS', traintype = 'normal', noisetype = 'gau
     options_str = '--resonly=%s --savepred=%s --system=%s --noisetype=%s --traintype=%s -r %d --rho=%f --sigma=%f --leakage=%f --win_type=%s --bias_type=%s --tau=%f -N %d -T %d --res=%d --tests=%d --trains=%d --debug=%s --squarenodes=%s --metric=%s --returnall=%s --savetime=%s --noisevals=%s --regvals=%s --maxvt=%d --machine=%s --parallel=%s --importres=%s --importtrain=%s --importtest=%s --importnoise=%s' % (resonly_str, savepred_str, system, noisetype, traintype, noise_realizations,  rho,sigma, leakage, win_type, bias_type, tau, res_size, trainlen, num_res, num_tests, num_trains,
             debug_str, squarenodes_str, metric, returnall_str,
             savetime_str, noise_values_str, reg_values_str, max_valid_time, machine, parallel_str, import_res_str, import_train_str, import_test_str, import_noise_str)
-    input_str = 'python slurm-launch.py --exp-name %s --command "python -u %s %s" --num-nodes %d %s --load-env "conda activate reservoir-rls" -t %s -A %s %s' % (testname, program_str, options_str, num_nodes, cpus_str, runtime, account, debug_part_str)
+    input_str = 'python slurm-launch.py --exp-name %s --command "python -u %s %s" --num-nodes %d %s --load-env "conda activate res39" -t %s -A %s %s' % (testname, program_str, options_str, num_nodes, cpus_str, runtime, account, debug_part_str)
     print(input_str)
     run_out = subprocess.check_output(input_str, shell=True)
     time.sleep(1)
