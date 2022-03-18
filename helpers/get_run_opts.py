@@ -12,7 +12,7 @@ def get_run_opts(argv, runflag = True):
 
     if runflag:
         train_time = 3000
-        #discard_time = 500
+        discard_time = 500
         res_size = 1000
         res_per_test = 20
         noise_realizations = 1
@@ -45,7 +45,7 @@ def get_run_opts(argv, runflag = True):
         import_train = False
         import_test = False
         import_noise = False
-        #reg_train_fracs = 1
+        reg_train_fracs = 1
 
         try:
             opts, args = getopt.getopt(argv, "T:N:r:",
@@ -55,7 +55,7 @@ def get_run_opts(argv, runflag = True):
                     'machine=', 'num_cpus=', 'pmap=', 'parallel=', 'metric=','returnall=',
                     'savetime=', 'noisevals=', 'regvals=', 'maxvt=', 'noisestreams=',
                     'squarenodes=', 'resonly=', 'importres=','importtrain=',
-                    'importtest=','importnoise='])#,'regtrainfracs=','discardlen='])
+                    'importtest=','importnoise=','regtrainfracs=','discardlen='])
         except getopt.GetoptError:
             print('Error: Some options not recognized')
             sys.exit(2)
@@ -69,14 +69,12 @@ def get_run_opts(argv, runflag = True):
             elif opt == '-r':
                 noise_realizations = int(arg)
                 print('Noise Realizations: %d' % noise_realizations)
-            """
             elif opt == '--discardlen':
                 discard_time = int(arg)
                 print('Discard iterations: %d' % discard_time)
             elif opt == '--regtrainfracs':
                 reg_train_fracs = int(arg)
                 print('Fractions of training data to be used for creating regularization: %d' % reg_train_fracs)
-            """
             elif opt == '--importres':
                 if arg == 'True':
                     import_res = True
@@ -251,6 +249,13 @@ def get_run_opts(argv, runflag = True):
     if return_all and savepred:
         print('Cannot return results for all parameters and full predictions due to memory constraints.')
         raise ValueError
+    if reg_train_fracs > 1 and (traintype in ['normal','normalres1','normalres2','rmean','rmeanres1',\
+            'rmeanres2','rplusq','rplusqres1','rplusqres2'] or 'confined' in traintype):
+        print('Traintypes "normal", "rmean", and "rplusq" are not compatible with fractional regularization training.')
+        raise ValueError
+    if traintype in ['gradient','gradient12','gradient2']:
+        print('Use of gradient, gradient12, and gradient2 is depracated. Please use gradientk instead.')
+        raise ValueError
     if import_res:
         iresflag = 'ires_'
     else:
@@ -309,7 +314,7 @@ def get_run_opts(argv, runflag = True):
         return root_folder, data_folder, run_name, system, noisetype, traintype, savepred, save_time_rms, squarenodes, rho,\
             sigma, leakage, win_type, bias_type, tau, res_size, train_time, noise_realizations, noise_streams_per_test,\
             noise_values_array,alpha_values, res_per_test, num_trains, num_tests, debug_mode, pmap, metric, \
-            return_all, ifray, machine, max_valid_time, import_res, import_train, import_test, import_noise #, res_train_frac, dicard_time
+            return_all, ifray, machine, max_valid_time, import_res, import_train, import_test, import_noise, reg_train_fracs, discard_time
     else:
         if not savepred:
             return os.path.join(os.path.join(root_folder, data_folder), run_name + '.bz2'), ''
