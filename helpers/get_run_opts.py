@@ -245,7 +245,8 @@ def get_run_opts(argv, runflag = True):
                 return_all, machine, rho, sigma, leakage, tau, win_type, \
                 bias_type, res_per_test, num_tests, num_trains, savepred, \
                 noisetype, traintype, system, squarenodes, resonly, import_res,\
-                import_train, import_test, import_noise = argv
+                import_train, import_test, import_noise, reg_train_fracs,\
+                discard_time = argv
     if return_all and savepred:
         print('Cannot return results for all parameters and full predictions due to memory constraints.')
         raise ValueError
