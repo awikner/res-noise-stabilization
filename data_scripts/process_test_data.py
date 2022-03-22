@@ -39,7 +39,7 @@ def main(argv):
     root_folder, top_folder, run_name, system, noisetype, traintype, savepred, save_time_rms, squarenodes, rho,\
         sigma, leakage, win_type, bias_type, tau, res_size, train_time, noise_realizations, noise_streams_per_test,\
         noise_values_array, alpha_values, res_per_test, num_trains, num_tests, debug_mode, pmap, metric, return_all,\
-        ifray, machine, max_valid_time, import_res, import_train, import_test, import_noise, res_train_frac,\
+        ifray, machine, max_valid_time, import_res, import_train, import_test, import_noise, reg_train_frac,\
         discard_time = get_run_opts(argv)
 
     raw_data_folder = os.path.join(os.path.join(root_folder, top_folder), run_name + '_folder')
@@ -49,10 +49,25 @@ def main(argv):
 
 
 
-    noise_vals      = np.loadtxt(os.path.join(raw_data_folder, 'test_noise_values.csv'), delimiter = ',')
-    alpha_values    = np.loadtxt(os.path.join(raw_data_folder, 'test_alpha_values.csv'), delimiter = ',')
-    time_test       = np.loadtxt(os.path.join(raw_data_folder, 'test_time_split.csv'), delimiter = ',')
-    reg_train_times = np.loadtxt(os.path.join(raw_data_folder, 'reg_train_times.csv'), delimiter = ',')
+    noise_vals      = np.loadtxt(os.path.join(raw_data_folder, 'test_noise_values.csv'), delimiter = ',', ndmin = 1)
+    if not isinstance(noise_vals, np.ndarray):
+        noise_vals = np.array([noise_vals])
+
+    alpha_values    = np.loadtxt(os.path.join(raw_data_folder, 'test_alpha_values.csv'), delimiter = ',', ndmin = 1)
+    if not isinstance(alpha_values, np.ndarray):
+         alpha_values = np.array([alpha_values])
+
+    time_test       = np.loadtxt(os.path.join(raw_data_folder, 'test_time_split.csv'), delimiter = ',', ndmin = 1)
+
+    reg_train_times = np.loadtxt(os.path.join(raw_data_folder, 'reg_train_times.csv'), delimiter = ',', ndmin = 1)
+    if not isinstance(reg_train_times, np.ndarray):
+         reg_train_times = np.array([reg_train_times])
+
+
+    print("Regularization training times:")
+    print(reg_train_times)
+    print(type(reg_train_times))
+    print(reg_train_times.shape)
 
     rkTime       = int(time_test[0])
     split        = int(time_test[1])
@@ -94,25 +109,29 @@ def main(argv):
     if pmap:
         pmap_max_wass_dist = np.zeros((res_per_test, train_vals.size, num_tests, noise_vals.size, alpha_values.size-1))
 
+    print(np.arange(res_per_test, dtype = int))
+    print(np.arange(num_trains, dtype = int))
+    print(list(enumerate(noise_vals)))
+    print(list(enumerate(reg_train_times)))
     print('Loading in raw data...')
     load_tic = time.perf_counter()
     for i,j,(k, noise),(l,reg_train_time) in product(np.arange(res_per_test, dtype = int),\
             np.arange(num_trains, dtype = int), enumerate(noise_vals), enumerate(reg_train_times)):
-        stable_frac[i,j,k,:,l]    = np.loadtxt(os.path.join(raw_data_folder, 'stable_frac_res%d_train%d_noise%e_regrain%d.csv' % (i,j,noise,reg_train_time)), delimiter = ',')
-        train_mean_rms[i,j,k,:,l] = np.loadtxt(os.path.join(raw_data_folder, 'train_mean_rms_res%d_train%d_noise%e_regrain%d.csv' % (i,j,noise,reg_train_time)), delimiter = ',')
-        train_max_rms[i,j,k,:,l]  = np.loadtxt(os.path.join(raw_data_folder, 'train_max_rms_res%d_train%d_noise%e_regrain%d.csv' % (i,j,noise,reg_train_time)), delimiter = ',')
-        mean_rms[i,j,:,k,:,l]     = np.loadtxt(os.path.join(raw_data_folder, 'mean_rms_res%d_train%d_noise%e_regrain%d.csv'% (i,j,noise,reg_train_time)), delimiter = ',')
-        max_rms[i,j,:,k,:,l]      = np.loadtxt(os.path.join(raw_data_folder, 'max_rms_res%d_train%d_noise%e_regrain%d.csv' % (i,j,noise,reg_train_time)), delimiter = ',')
-        variances[i,j,:,k,:,l]    = np.loadtxt(os.path.join(raw_data_folder, 'variance_res%d_train%d_noise%e_regrain%d.csv'% (i,j,noise,reg_train_time)), delimiter = ',')
+        stable_frac[i,j,k,:,l]    = np.loadtxt(os.path.join(raw_data_folder, 'stable_frac_res%d_train%d_noise%e_regtrain%d.csv' % (i,j,noise,reg_train_time)), delimiter = ',')
+        train_mean_rms[i,j,k,:,l] = np.loadtxt(os.path.join(raw_data_folder, 'train_mean_rms_res%d_train%d_noise%e_regtrain%d.csv' % (i,j,noise,reg_train_time)), delimiter = ',')
+        train_max_rms[i,j,k,:,l]  = np.loadtxt(os.path.join(raw_data_folder, 'train_max_rms_res%d_train%d_noise%e_regtrain%d.csv' % (i,j,noise,reg_train_time)), delimiter = ',')
+        mean_rms[i,j,:,k,:,l]     = np.transpose(np.loadtxt(os.path.join(raw_data_folder, 'mean_rms_res%d_train%d_noise%e_regtrain%d.csv'% (i,j,noise,reg_train_time)), delimiter = ','))
+        max_rms[i,j,:,k,:,l]      = np.transpose(np.loadtxt(os.path.join(raw_data_folder, 'max_rms_res%d_train%d_noise%e_regtrain%d.csv' % (i,j,noise,reg_train_time)), delimiter = ','))
+        variances[i,j,:,k,:,l]    = np.transpose(np.loadtxt(os.path.join(raw_data_folder, 'variance_res%d_train%d_noise%e_regtrain%d.csv'% (i,j,noise,reg_train_time)), delimiter = ','))
         for m in range(num_tests):
-            valid_time[i,j,m,k,:,:,l]    = np.loadtxt(os.path.join(raw_data_folder, 'valid_time_res%d_train%d_test%d_noise%e_regrain%d.csv' % (i,j,m,noise,reg_train_time)), delimiter = ',')
+            valid_time[i,j,m,k,:,:,l]    = np.transpose(np.loadtxt(os.path.join(raw_data_folder, 'valid_time_res%d_train%d_test%d_noise%e_regtrain%d.csv' % (i,j,m,noise,reg_train_time)), delimiter = ','))
         if pmap:
-            pmap_max_wass_dist[i,j,:,k,:,l] = np.loadtxt(os.path.join(raw_data_folder, 'pmap_max_wass_dist_res%d_train%d_noise%e_regrain%d.csv' % (i,j,noise,reg_train_time)), delimiter = ',')
+            pmap_max_wass_dist[i,j,:,k,:,l] = np.transpose(np.loadtxt(os.path.join(raw_data_folder, 'pmap_max_wass_dist_res%d_train%d_noise%e_regtrain%d.csv' % (i,j,noise,reg_train_time)), delimiter = ','))
         if save_time_rms:
             for m in list(range(num_tests)):
                 #mean_all[i,j,l,k] = np.loadtxt(os.path.join(raw_data_folder, 'mean_all_res%d_train%d_test%d_noise%e.csv' % (i,j,l,noise)), delimiter = ',')
                 #variances_all[i,j,l,k] = np.loadtxt(os.path.join(raw_data_folder, 'variances_all_res%d_train%d_test%d_noise%e.csv' % (i,j,l,noise)), delimiter = ',')
-                rms[i,j,m,k,:,:,l] = np.loadtxt(os.path.join(raw_data_folder, 'rms_res%d_train%d_test%d_noise%e_regrain%d.csv' % (i,j,m,noise,reg_train_time)), delimiter = ',')
+                rms[i,j,m,k,:,:,l] =np.transpose(np.loadtxt(os.path.join(raw_data_folder, 'rms_res%d_train%d_test%d_noise%e_regtrain%d.csv' % (i,j,m,noise,reg_train_time)), delimiter = ','))
     load_toc = time.perf_counter()
     print('All data loaded in %0.2f sec.' % (load_toc - load_tic))
 
@@ -322,7 +341,7 @@ def main(argv):
         reg_train_times_set_idx = reg_train_times_set_idx.flatten()
         noise_vals_set = noise_vals[noise_vals_set_idx]
         reg_train_times_set = reg_train_times[reg_train_times_set_idx]
-        pred_files = ['pred_res%d_train%d_test%d_noise%e_regrain%d_reg%e.csv' % (i,j,k,noise,reg_train_time,reg) \
+        pred_files = ['pred_res%d_train%d_test%d_noise%e_regtrain%d_reg%e.csv' % (i,j,k,noise,reg_train_time,reg) \
                          for i,j,k,(noise, reg_train_time, reg) in product(list(range(res_per_test)), list(range(num_trains)), \
                          list(range(num_tests)), zip(noise_vals_set, reg_train_times_set, \
                          alpha_values[best_j[noise_vals_set_idx, reg_train_times_set_idx]]))]

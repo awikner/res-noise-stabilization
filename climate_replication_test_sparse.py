@@ -298,7 +298,7 @@ class RungeKutta:
         self.u_arr_test = u_arr[:, ttsplit:]
 
 
-#@jit(nopython=True, fastmath=True)
+@jit(nopython=True, fastmath=True)
 def RungeKuttawrapped(x0=2, y0=2, z0=23, h=0.01, tau=0.1, T=300, ttsplit=5000, u0=0, system='lorenz', params=np.array([[], []], dtype=np.complex128)):
     # Numba function for obtaining training and testing dynamical system time series data
     if system == 'lorenz':
@@ -325,7 +325,7 @@ def RungeKuttawrapped(x0=2, y0=2, z0=23, h=0.01, tau=0.1, T=300, ttsplit=5000, u
     return u_arr_train, u_arr_test, ttsplit, new_params
 
 
-#@jit(nopython=True, fastmath=True)
+@jit(nopython=True, fastmath=True)
 def RungeKuttawrapped_pred(h=0.01, tau=0.1, T=300, ttsplit=5000, u0_array=np.array([[], []], dtype=np.complex128), system='lorenz', params=np.array([[], []], dtype=np.complex128)):
     # Numba function for obtaining training and testing dynamical system time series data for a set of initial conditions.
     # This is used during test to compute the map error instead of a for loop over the entire prediction period.
@@ -361,7 +361,7 @@ def getX(res, rk, x0=1, y0=1, z0=1):
 
     return res.X
 
-#@jit(nopython=True, fastmath=True)
+@jit(nopython=True, fastmath=True)
 def getXwrapped(u_training, res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_indices, W_indptr, W_shape, leakage, noise, noisetype='none', noise_scaling=0, noise_realization=0, traintype='normal'):
     # Numba compatible function for obtaining reservoir states using various types of noise.
     # Generally returns an array of reservoir states and the noiseless training data used as input.
@@ -504,7 +504,7 @@ def getXwrapped(u_training, res_X, Win_data, Win_indices, Win_indptr, Win_shape,
 
 
 """
-#@jit(nopython = True, fastmath = True)
+@jit(nopython = True, fastmath = True)
 def getjacobian(Win, W, Wout, Dn):
     jacsize  = Wout.shape[1]-1
     res_size = Win.shape[0]
@@ -612,7 +612,7 @@ def get_states(res, squarenodes, rk, reg_train_times, noise, noisetype='none', n
             np.ascontiguousarray(rk.u_arr_train), reg_train_times, res.X, res.Win_data, res.Win_indices, res.Win_indptr, res.Win_shape, res.W_data, res.W_indices, res.W_indptr, res.W_shape, res.leakage,
             skip, noise, noisetype, noise_scaling, noise_realizations, traintype, squarenodes)
 
-#@jit(nopython=True, fastmath = True)
+@jit(nopython=True, fastmath = True)
 def get_squared(X, rsvr_size, squarenodes, dim = 0):
     X_aug = np.copy(X)
     if not squarenodes:
@@ -621,7 +621,7 @@ def get_squared(X, rsvr_size, squarenodes, dim = 0):
         X_out = np.vstack((X_aug[0].reshape(1,-1), X_aug[1:rsvr_size+1], X_aug[1:rsvr_size+1]**2.0, X_aug[rsvr_size+1:]))
         return X_out
 
-#@jit(nopython=True, fastmath = True)
+@jit(nopython=True, fastmath = True)
 def get_squared_vec(X, rsvr_size, squarenodes):
     X_aug = np.copy(X)
     if not squarenodes:
@@ -631,7 +631,7 @@ def get_squared_vec(X, rsvr_size, squarenodes):
         return X_out
 
 
-#@jit(nopython=True, fastmath=True)
+@jit(nopython=True, fastmath=True)
 def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_indices, W_indptr, W_shape, leakage, skip, noise, noisetype='none',
         noise_scaling=0, noise_realizations=1, traintype='normal', squarenodes = False, q=0):
     # Numba compatible function to obtain the matrices used to train the reservoir using either linear regression or a sylvester equation.
@@ -648,12 +648,13 @@ def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indice
     states_trstates = np.zeros((reg_train_times.size, res_feature_size+n+1, res_feature_size+n+1))
     gradient_reg    = np.zeros((reg_train_times.size, res_feature_size+n+1, res_feature_size+n+1))
     Y_train = np.ascontiguousarray(u_arr_train[:, skip:-1])
+    print('Y_train:')
+    print(Y_train[-5,-5])
     reg_train_fracs = Y_train.shape[1]/reg_train_times
+    print('Reg train fracs:')
+    print(reg_train_fracs)
     if traintype in ['normal', 'normalres1', 'normalres2']:
         # Normal multi-noise training that sums all reservoir state outer products
-        data_trstates = np.zeros((n, res_feature_size+1+n), dtype=np.float64)
-        states_trstates = np.zeros(
-            (n+res_feature_size+1, n+res_feature_size+1), dtype=np.float64)
         for i in range(noise_realizations):
             X, u_arr_train_noise = getXwrapped(u_arr_train, res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_indices, W_indptr, W_shape, leakage, noise[i], noisetype,
                 noise_scaling, i, traintype)
@@ -663,7 +664,7 @@ def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indice
             X_train = get_squared(X_train, rsvr_size, squarenodes)
             data_trstates += Y_train @ X_train.T
             states_trstates[0] += X_train @ X_train.T
-        return [data_trstates, states_trstates, Y_train, X_train, gradient_reg]
+        return data_trstates, states_trstates, Y_train, X_train, gradient_reg
     elif traintype in ['rmeanq','rmeanqres1','rmeanqres2']:
         # Training using the mean and the rescaled sum of the perturbations from the mean
         for i in range(noise_realizations):
@@ -689,7 +690,7 @@ def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indice
                 for k in range(j, reg_train_times.size):
                     states_trstates[k] += (Q_fit @ Q_fit.T)*reg_train_fracs[k]/noise_realizations
             prev_reg_train_time = reg_train_time
-        return [data_trstates, states_trstates, Y_train, X_train, gradient_reg]
+        return data_trstates, states_trstates, Y_train, X_train, gradient_reg
     elif traintype in ['rmean', 'rmeanres1', 'rmeanres2']:
         # Training using the mean only
         for i in range(noise_realizations):
@@ -704,7 +705,7 @@ def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indice
             X_train_mean += X_train/noise_realizations
         data_trstates = Y_train @ X_train_mean.T
         states_trstates[0] = X_train_mean @ X_train_mean.T
-        return [data_trstates, states_trstates, Y_train, X_train, gradient_reg]
+        return data_trstates, states_trstates, Y_train, X_train, gradient_reg
     elif traintype in ['rqmean','rqmeanres1','rqmeanres2']:
         # Training using the noiseless reservoir and the rescaled perturbations from the mean
         X_0, u_arr_train_noise = getXwrapped(
@@ -737,7 +738,7 @@ def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indice
                 for k in range(j, reg_train_times.size):
                     states_trstates[k] += (Q_fit @ Q_fit.T)*reg_train_fracs[k]/noise_realizations
             prev_reg_train_time = reg_train_time
-        return [data_trstates, states_trstates, Y_train, X_train, gradient_reg]
+        return data_trstates, states_trstates, Y_train, X_train, gradient_reg
     elif traintype in ['rq','rqres1','rqres2']:
         # Training using the noiseless reservoir and the rescaled perturbations from the noiseless reservoir
         X_0, u_arr_train_noise = getXwrapped(
@@ -767,7 +768,7 @@ def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indice
                 for k in range(j, reg_train_times.size):
                     states_trstates[k] += (Q_fit @ Q_fit.T)*reg_train_fracs[k]/noise_realizations
             prev_reg_train_time = reg_train_time
-        return [data_trstates, states_trstates, Y_train, X_train, gradient_reg]
+        return data_trstates, states_trstates, Y_train, X_train, gradient_reg
     elif traintype in ['rplusq', 'rplusqres1', 'rplusqres2']:
         # Training using the sum of the outer products of the sum of the noiseless reservoir and
         # the perturbation from the mean
@@ -798,7 +799,7 @@ def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indice
                 X_fit, X_all[:, :, i] - X_train_mean + X_train_0, axis=1)
         data_trstates = Y_fit @ X_fit.T
         states_trstates[0] = X_fit @ X_fit.T
-        return [data_trstates, states_trstates, Y_train, X_train, gradient_reg]
+        return data_trstates, states_trstates, Y_train, X_train, gradient_reg
     elif 'confined' in traintype:
         if 'upper' in traintype:
             with objmode(ub='double'):
@@ -812,9 +813,6 @@ def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indice
             with objmode(ub='double'):
                 ub = float(traintype.replace('confined', ''))
             lb = -ub
-        data_trstates = np.zeros((n, res_feature_size+1+n), dtype=np.float64)
-        states_trstates = np.zeros(
-            (n+res_feature_size+1, n+res_feature_size+1), dtype=np.float64)
         for i in range(noise_realizations):
             X, u_arr_train_noise = getXwrapped(u_arr_train, res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_indices, W_indptr, W_shape, leakage, noise[i], noisetype,
                 noise_scaling, i, 'normal')
@@ -851,7 +849,7 @@ def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indice
             """
         data_trstates += Y_train @ X_train.T
         states_trstates[0] += X_train @ X_train.T
-        return [data_trstates, states_trstates, Y_train, X_train, gradient_reg]
+        return data_trstates, states_trstates, Y_train, X_train, gradient_reg
     elif traintype == 'gradient':
         # Training using only the input jacobian (linearized 1-step noise)
         X, D = getXwrapped(u_arr_train, res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_indices, W_indptr,
@@ -880,7 +878,7 @@ def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indice
         """
         data_trstates = Y_train @ X_train.T
         states_trstates[0] = X_train @ X_train.T
-        return [data_trstates, states_trstates, Y_train, X_train, gradient_reg]
+        return data_trstates, states_trstates, Y_train, X_train, gradient_reg
     elif traintype == 'gradient12':
         # Training using the input and reservoir jacobian (linearized 2-step noise)
         X, D = getXwrapped(u_arr_train, res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_indices, W_indptr,
@@ -968,7 +966,7 @@ def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indice
         """
         data_trstates = Y_train @ X_train.T
         states_trstates[0] = X_train @ X_train.T
-        return [data_trstates, states_trstates, Y_train, X_train, gradient_reg]
+        return data_trstates, states_trstates, Y_train, X_train, gradient_reg
     elif traintype == 'gradient2':
         # Linearized 2-step noise with no 1-step noise
         X, D = getXwrapped(u_arr_train, res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_indices, W_indptr,
@@ -994,7 +992,7 @@ def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indice
             gradient_reg += E_nD_n2 @ E_nD_n2.T
         data_trstates = Y_train @ X_train.T
         states_trstates[0] = X_train @ X_train.T
-        return [data_trstates, states_trstates, Y_train, X_train, gradient_reg]
+        return data_trstates, states_trstates, Y_train, X_train, gradient_reg
     elif 'gradientk' in traintype:
         # Linearized k-step noise
         k = str_to_int(traintype.replace('gradientk', ''))
@@ -1234,8 +1232,6 @@ def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indice
         print('Gradient reg:')
         print(gradient_reg[:5,:5])
         """
-        data_trstates = Y_train @ X_train.T
-        states_trstates = X_train @ X_train.T
         """
         with objmode(toc = 'double'):
             toc = time.perf_counter()
@@ -1243,8 +1239,18 @@ def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indice
         print(toc - tic)
         """
         data_trstates = Y_train @ X_train.T
-        states_trstates = X_train @ X_train.T
-        return [data_trstates, states_trstates, Y_train, X_train, gradient_reg]
+        states_trstates[0] = X_train @ X_train.T
+        for i in range(1, reg_train_times.size):
+            states_trstates[i] = np.ascontiguousarray(states_trstates[0])
+        print('Target matrix:')
+        print(data_trstates[:5,:5])
+        print('Information matrix:')
+        print(states_trstates[0,:5,:5])
+        print('Gradient regularization:')
+        print(gradient_reg[0,:5,:5])
+        print('X_train:')
+        print(X_train[:5,:5])
+        return data_trstates, states_trstates, Y_train, X_train, gradient_reg
     elif traintype == 'sylvester':
         # Sylvester regularization w/o derivative
         X, p = getXwrapped(u_arr_train, res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_indices, W_indptr,
@@ -1260,7 +1266,7 @@ def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indice
         left_mat_base = -noise_scaling**2/noise_realizations * \
             (Win[:, 1:].T @ Win[:, 1:])
         left_mat = left_mat_base.reshape(1, left_mat_base.shape[0], left_mat_base.shape[1])
-        return [data_trstates, states_trstates, Y_train, X_train, left_mat]
+        return data_trstates, states_trstates, Y_train, X_train, left_mat
     elif traintype == 'sylvester_wD':
         # Sylvester regularization with derivative
         X, D = getXwrapped(u_arr_train, res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_indices, W_indptr,
@@ -1279,17 +1285,17 @@ def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indice
         left_mat = left_mat_base.reshape(1, left_mat_base.shape[0], left_mat_base.shape[1])
         data_trstates = Y_train @ X_train.T
         data_trstates[:, 1:rsvr_size+1] += target_correction
-        states_trstates = X_train @ X_train.T
-        return [data_trstates, states_trstates, Y_train, X_train, left_mat]
+        states_trstates[0] = X_train @ X_train.T
+        return data_trstates, states_trstates, Y_train, X_train, left_mat
     else:
         # Noiseless training
         data_trstates = np.zeros((n, rsvr_size+1+n), dtype=np.float64)
         states_trstates[0] = np.zeros(
             (n+rsvr_size+1, n+rsvr_size+1), dtype=np.float64)
-        return [data_trstates, states_trstates, Y_train, X_train, gradient_reg]
+        return data_trstates, states_trstates, Y_train, X_train, gradient_reg
 
 
-#@jit(nopython=True, fastmath=True)
+@jit(nopython=True, fastmath=True)
 def getD(u_arr_train, res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_indices, W_indptr, W_shape, leakage, noise, skip, noisetype='none',
          noise_scaling=0, noise_realizations=1, traintype='normal', squarenodes = False):
     n, d = u_arr_train.shape
@@ -1309,7 +1315,7 @@ def predict(res, u0,  steps=1000, squarenodes = False):
     return Y
 
 
-#@jit(nopython=True, fastmath=True)
+@jit(nopython=True, fastmath=True)
 def predictwrapped(res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_indices, W_indptr, W_shape, Wout, leakage, u0, steps, squarenodes = False):
     # Numba compatible prediction function
     Y = np.empty((Win_shape[1]-1, steps + 1))
@@ -1370,12 +1376,12 @@ def get_test_data(test_stream, tau, num_tests, rkTime, split, system='lorenz'):
     return rktest_u_arr_train_nonoise, rktest_u_arr_test, params
 
 
-def test(res, squarenodes, noise_in, rktest_u_arr_train_nonoise, rktest_u_arr_test, true_pmap_max, num_tests=100, rkTime=1000, split=3000, showMapError=False, showTrajectories=False, showHist=False, system='lorenz', params=np.array([[], []], dtype=np.complex128), pmap=False, max_valid_time = 500, savepred = False, save_time_rms = False):
+def test(res, Wout_itr, squarenodes, noise_in, rktest_u_arr_train_nonoise, rktest_u_arr_test, true_pmap_max, num_tests=100, rkTime=1000, split=3000, showMapError=False, showTrajectories=False, showHist=False, system='lorenz', params=np.array([[], []], dtype=np.complex128), pmap=False, max_valid_time = 500, savepred = False, save_time_rms = False):
     # Wrapper function for the numba compatible test function.
 
     # tic = time.perf_counter()
     stable_count, mean_rms, max_rms, variances, valid_time, rms, preds, wass_dist,           pmap_max, pmap_max_wass_dist = testwrapped(
-        res.X, res.Win_data, res.Win_indices, res.Win_indptr, res.Win_shape, res.W_data, res.W_indices, res.W_indptr, res.W_shape, res.Wout, res.leakage,             rktest_u_arr_train_nonoise, rktest_u_arr_test, true_pmap_max, num_tests, rkTime, split, noise_in,showMapError, showTrajectories, showHist, system, params=params, pmap=pmap, max_valid_time = max_valid_time, squarenodes = squarenodes, savepred = savepred, save_time_rms = save_time_rms)
+        res.X, res.Win_data, res.Win_indices, res.Win_indptr, res.Win_shape, res.W_data, res.W_indices, res.W_indptr, res.W_shape, res.Wout[Wout_itr], res.leakage,             rktest_u_arr_train_nonoise, rktest_u_arr_test, true_pmap_max, num_tests, rkTime, split, noise_in,showMapError, showTrajectories, showHist, system, params=params, pmap=pmap, max_valid_time = max_valid_time, squarenodes = squarenodes, savepred = savepred, save_time_rms = save_time_rms)
     # toc = time.perf_counter()
     # runtime = toc - tic
     # print("Test " + str(i) + " valid time: " + str(j))
@@ -1383,7 +1389,7 @@ def test(res, squarenodes, noise_in, rktest_u_arr_train_nonoise, rktest_u_arr_te
     return stable_count/num_tests, mean_rms, max_rms, variances, valid_time, rms, preds, wass_dist, pmap_max, pmap_max_wass_dist
 
 
-#@jit(nopython=True, fastmath=True)
+@jit(nopython=True, fastmath=True)
 def testwrapped(res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_indices, W_indptr, W_shape, Wout, leakage, rktest_u_arr_train_nonoise, rktest_u_arr_test,   true_pmap_max, num_tests, rkTime, split, noise_in, showMapError=True,   showTrajectories=True, showHist=True, system='lorenz', tau=0.1, params=np.array([[], []], dtype=np.complex128), pmap=False, max_valid_time = 500, squarenodes = False, savepred = False, save_time_rms = False):
     # Numba compatable function for testing trained reservoir performance against true system time series
     stable_count = 0
@@ -1615,7 +1621,8 @@ def testwrapped(res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_i
     print("Var. of x dim: " + str(np.mean(variances)))
     print()
     """
-
+    print('Mean rms shape:')
+    print(mean_rms.shape)
     #return stable_count, mean_rms, max_rms, variances, valid_time, mean_all, variances_all, preds, wass_dist, pmap_max, pmap_max_wass_dist
     return stable_count, mean_rms, max_rms, variances, valid_time, rms, preds, wass_dist,    pmap_max, pmap_max_wass_dist
 
@@ -1643,6 +1650,8 @@ def optim_func(res, squarenodes, noise_in, noise, rktest_u_arr_train_nonoise, rk
         res_feature_size = res.rsvr_size
     idenmat = np.identity(
         res_feature_size+1+rktest_u_arr_train_nonoise.shape[0])*alpha
+    print('Gradient reg shape')
+    print(res.gradient_reg.shape)
     num_reg_train_times = res.gradient_reg.shape[0]
     res.Wout = np.zeros((num_reg_train_times, rktest_u_arr_train_nonoise.shape[0],\
             rktest_u_arr_train_nonoise.shape[0]+1+res_feature_size))
@@ -1674,12 +1683,11 @@ def optim_func(res, squarenodes, noise_in, noise, rktest_u_arr_train_nonoise, rk
         train_rms = np.sqrt(np.mean((res.Wout[i] @ res.X_train - res.Y_train)**2.0, axis = 0))
         train_mean_rms = np.mean(train_rms)
         train_max_rms  = np.max(train_rms)
-        if i == 0:
-            results[i], mean_rms[i], max_rms[i], variances[i], valid_time[i],  rms[i], preds[i], \
-                wass_dist[i], pmap_max[i], pmap_max_wass_dist[i] = test(res, squarenodes, noise_in, \
-                rktest_u_arr_train_nonoise, rktest_u_arr_test,   true_pmap_max, num_tests=num_tests, rkTime=rkTime,\
-                split=split, showMapError=True, showTrajectories=True, showHist=True, system=system, params=params,\
-                pmap = pmap, max_valid_time = max_valid_time, savepred = savepred, save_time_rms = save_time_rms)
+        results[i], mean_rms[i], max_rms[i], variances[i], valid_time[i],  rms[i], preds[i], \
+            wass_dist[i], pmap_max[i], pmap_max_wass_dist[i] = test(res, i, squarenodes, noise_in, \
+            rktest_u_arr_train_nonoise, rktest_u_arr_test,   true_pmap_max, num_tests=num_tests, rkTime=rkTime,\
+            split=split, showMapError=True, showTrajectories=True, showHist=True, system=system, params=params,\
+            pmap = pmap, max_valid_time = max_valid_time, savepred = savepred, save_time_rms = save_time_rms)
 
     return -1*results, mean_rms, max_rms, variances, valid_time, rms, preds, wass_dist, pmap_max, pmap_max_wass_dist, train_mean_rms, train_max_rms
 
@@ -1721,6 +1729,8 @@ def get_res_results(itr, res_gen, squarenodes, rk, reg_train_times, res_size, rh
     stable_frac_out        = np.zeros((noise_array.size, alpha_values.size, reg_train_times.size), dtype = object)
     train_mean_rms_out     = np.zeros((noise_array.size, alpha_values.size, reg_train_times.size), dtype = object)
     train_max_rms_out      = np.zeros((noise_array.size, alpha_values.size, reg_train_times.size), dtype = object)
+    print('Mean RMS out shape:')
+    print(mean_rms_out.shape)
     for i, noise in enumerate(noise_array):
         """
         stable_frac = np.zeros((alpha_values.size))
@@ -1896,12 +1906,15 @@ def get_res_results(itr, res_gen, squarenodes, rk, reg_train_times, res_size, rh
                 itr, np.copy(wass_dist_0), np.copy(wass_dist), np.copy(pmap_max_wass_dist), np.copy(train_mean_rms),\
                 np.copy(train_max_rms)))  # pmap_max, np.copy(pmap_max_wass_dist)))
         """
+        #print(type(mean_rms_out[0,0,1]))
+        #print('Mean rms shape:')
+        #print(mean_rms_out[0,0,1].shape)
         noise_toc = time.perf_counter()
         print('Noise test time: %f sec.' % (noise_toc - noise_tic))
     toc = time.perf_counter()
     runtime = toc - tic
     print('Iteration runtime: %f sec.' % runtime)
-    return stable_frac_out, mean_rms_out, max_rms_out, variances_out, valid_time_out, rms_out, pred_out, wass_dist_out,\
+    return stable_frac_out, mean_rms_out, max_rms_out, variances_out, valid_time_out, rms_out, preds_out, wass_dist_out,\
             pmap_max_wass_dist_out, train_mean_rms_out, train_max_rms_out, train_seed, noise_array, itr
 
 
@@ -1965,6 +1978,15 @@ def find_stability(noisetype, noise, traintype, train_seed, train_gen, res_itr, 
             traintype, rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests, alpha_values, \
             rkTime_test, split_test, system, tau, params, savepred, save_time_rms, debug_mode, \
             train_seed, true_pmap_max, pmap, max_valid_time)
+    print(type(stable_frac_out))
+    print(stable_frac_out.shape)
+    #print(type(stable_frac_out[0,:,1]))
+    #print(stable_frac_out[0,:,1].shape)
+
+    print(type(mean_rms_out))
+    print(mean_rms_out.shape)
+    #print(type(mean_rms_out[0,:,1]))
+    #print(mean_rms_out[0,:,1].shape)
 
     if not isinstance(noise, np.ndarray):
         noise_array = np.array([noise])
@@ -1972,74 +1994,75 @@ def find_stability(noisetype, noise, traintype, train_seed, train_gen, res_itr, 
         noise_array = noise
 
 
-    for (i, noise_val), (j, reg_train_time) in product(enumerate(noise_all), enumerate(reg_train_times_all)):
+    for (i, noise_val), (j, reg_train_time) in product(enumerate(noise_array), enumerate(reg_train_times)):
+        print((i,j))
         stable_frac = np.zeros(alpha_values.size)
-        for k, array_elem in stable_frac_out[i,:,j]:
+        for k, array_elem in enumerate(stable_frac_out[i,:,j]):
             stable_frac[k] = array_elem
         np.savetxt(os.path.join(raw_data_folder, 'stable_frac_res%d_train%d_noise%e_regtrain%d.csv' % (res_itr, train_seed, noise_val, reg_train_time)),\
             stable_frac, delimiter = ',')
 
         mean_rms = np.zeros((alpha_values.size, *mean_rms_out[i,0,j].shape))
-        for k, array_elem in mean_rms_out[i,:,j]:
+        for k, array_elem in enumerate(mean_rms_out[i,:,j]):
             mean_rms[k] = array_elem
         np.savetxt(os.path.join(raw_data_folder, 'mean_rms_res%d_train%d_noise%e_regtrain%d.csv' % (res_itr, train_seed, noise_val, reg_train_time)),\
             mean_rms, delimiter = ',')
 
         max_rms = np.zeros((alpha_values.size, *max_rms_out[i,0,j].shape))
-        for k, array_elem in max_rms_out[i,:,j]:
+        for k, array_elem in enumerate(max_rms_out[i,:,j]):
             max_rms[k] = array_elem
         np.savetxt(os.path.join(raw_data_folder, 'max_rms_res%d_train%d_noise%e_regtrain%d.csv' % (res_itr, train_seed, noise_val, reg_train_time)),\
             max_rms, delimiter = ',')
 
         variances = np.zeros((alpha_values.size, *variances_out[i,0,j].shape))
-        for k, array_elem in variances_out[i,:,j]:
+        for k, array_elem in enumerate(variances_out[i,:,j]):
             variances[k] = array_elem
         np.savetxt(os.path.join(raw_data_folder, 'variance_res%d_train%d_noise%e_regtrain%d.csv' % (res_itr, train_seed, noise_val, reg_train_time)),\
             variances, delimiter = ',')
 
         valid_time = np.zeros((alpha_values.size, *valid_time_out[i,0,j].shape))
-        for k, array_elem in valid_time_out[i,:,j]:
+        for k, array_elem in enumerate(valid_time_out[i,:,j]):
             valid_time[k] = array_elem
-        for j in range(num_tests):
-            np.savetxt(os.path.join(raw_data_folder, 'valid_time_res%d_train%d_test%d_noise%e_regtrain%d.csv' % (res_itr, train_seed, j, noise_val, reg_train_time)),\
-                valid_time[:,j], delimiter = ',')
+        for k in range(num_tests):
+            np.savetxt(os.path.join(raw_data_folder, 'valid_time_res%d_train%d_test%d_noise%e_regtrain%d.csv' % (res_itr, train_seed, k, noise_val, reg_train_time)),\
+                valid_time[:,k], delimiter = ',')
 
         train_mean_rms = np.zeros((alpha_values.size, *train_mean_rms_out[i,0,j].shape))
-        for k, array_elem in train_mean_rms_out[i,:,j]:
+        for k, array_elem in enumerate(train_mean_rms_out[i,:,j]):
             train_mean_rms[k] = array_elem
         np.savetxt(os.path.join(raw_data_folder, 'train_mean_rms_res%d_train%d_noise%e_regtrain%d.csv' % (res_itr, train_seed, noise_val, reg_train_time)),\
             train_mean_rms, delimiter = ',')
 
         train_max_rms = np.zeros((alpha_values.size, *train_max_rms_out[i,0,j].shape))
-        for k, array_elem in train_max_rms_out[i,:,j]:
+        for k, array_elem in enumerate(train_max_rms_out[i,:,j]):
             train_max_rms[k] = array_elem
         np.savetxt(os.path.join(raw_data_folder, 'train_max_rms_res%d_train%d_noise%e_regtrain%d.csv' % (res_itr, train_seed, noise_val, reg_train_time)),\
             train_max_rms, delimiter = ',')
 
         if pmap:
             pmap_max_wass_dist = np.zeros((alpha_values.size, *pmap_max_wass_dist_out[i,0,j].shape))
-            for k, array_elem in pmap_max_wass_dist_out[i,:,j]:
+            for k, array_elem in enumerate(pmap_max_wass_dist_out[i,:,j]):
                 pmap_max_wass_dist[k] = array_elem
             np.savetxt(os.path.join(raw_data_folder, 'pmap_max_wass_dist_res%d_train%d_noise%e_regtrain%d.csv' % (res_itr, train_seed, noise_val, reg_train_time)),\
                 pmap_max_wass_dist, delimiter = ',')
         if save_time_rms:
             rms = np.zeros((alpha_values.size, *rms_out[i,0,j].shape))
-            for k, array_elem in rms_out[i,:,j]:
+            for k, array_elem in enumerate(rms_out[i,:,j]):
                 rms[k] = array_elem
-            for j in range(num_tests):
+            for k in range(num_tests):
                 #np.savetxt(os.path.join(raw_data_folder, 'mean_all_res%d_train%d_test%d_noise%e.csv' % (res_itr, train_seed, j, noise_val)),\
                 #    np.hstack((out[i][10][j].reshape(-1,1), out[i][11][j])), delimiter = ',')
                 #np.savetxt(os.path.join(raw_data_folder, 'variances_all_res%d_train%d_test%d_noise%e.csv' % (res_itr, train_seed, j, noise_val)),\
                 #    np.hstack((out[i][12][j].reshape(-1,1), out[i][13][j])), delimiter = ',')
-                np.savetxt(os.path.join(raw_data_folder, 'rms_res%d_train%d_test%d_noise%e_regtrain%d.csv' % (res_itr, train_seed, j, noise_val, reg_train_time)),\
-                        rms[:,j], delimiter = ',')
+                np.savetxt(os.path.join(raw_data_folder, 'rms_res%d_train%d_test%d_noise%e_regtrain%d.csv' % (res_itr, train_seed, k, noise_val, reg_train_time)),\
+                        rms[:,k], delimiter = ',')
         if savepred:
             pred = np.zeros((alpha_values.size, *pred_out[i,0,j].shape))
-            for k, array_elem in pred_out[i,:,j]:
+            for k, array_elem in enumerate(pred_out[i,:,j]):
                 pred[k] = array_elem
-            for j, (k, reg) in product(range(num_tests), enumerate(alpha_values)):
+            for l, (k, reg) in product(range(num_tests), enumerate(alpha_values)):
                 np.savetxt(os.path.join(raw_data_folder, 'pred_res%d_train%d_test%d_noise%e_regtrain%d_reg%e.csv' %\
-                        (res_itr, train_seed, j, noise_val, reg_train_time, reg)), pred[k,j], delimiter = ',')
+                        (res_itr, train_seed, l, noise_val, reg_train_time, reg)), pred[k,l], delimiter = ',')
 
     # toc_global = time.perf_counter()
     # print('Total Runtime: %s sec.' % (toc_global - tic_global))
