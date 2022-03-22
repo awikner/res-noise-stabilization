@@ -133,6 +133,7 @@ dmypy.json
 *.png
 *.txt
 *.bz2
+*.svg
 
 # Non-template data processing files
 data_scripts/process_test_data_*.py
