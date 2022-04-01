@@ -28,6 +28,7 @@ from numba import jit, njit, objmode
 from numba.experimental import jitclass
 from numba.types import int32, int64, double
 from numba.typed import List
+from copy import copy, deepcopy
 import time
 
 """
@@ -167,31 +168,35 @@ class Reservoir:
         """
 
         density = avg_degree/rsvr_size
-        """
-        unnormalized_W = (res_gen.random((rsvr_size, rsvr_size))*2 - 1)
+
+        unnormalized_W = res_gen.random((rsvr_size, rsvr_size))
         for i in range(unnormalized_W[:, 0].size):
             for j in range(unnormalized_W[0].size):
-                if res_gen.random(1) > avg_degree/rsvr_size:
+                if res_gen.random(1) > density:
                     unnormalized_W[i][j] = 0
 
         max_eig = eigs(unnormalized_W, k=1,
-                       return_eigenvectors=False, maxiter=10**5)
+                       return_eigenvectors=False, maxiter=10**5, v0 = res_gen.random(rsvr_size))
 
         W_sp = csc_matrix(np.ascontiguousarray(
             spectral_radius/np.abs(max_eig[0])*unnormalized_W))
         self.W_data, self.W_indices, self.W_indptr, self.W_shape = \
                 (W_sp.data, W_sp.indices, W_sp.indptr, np.array(list(W_sp.shape)))
+        print('Avg. degree of W:')
+        print(self.W_data.size/rsvr_size)
         """
         unnormalized_W_sp = random(rsvr_size, rsvr_size, density = density, format = 'csc', data_rvs = res_gen.random)
         max_eig = eigs(unnormalized_W_sp, k=1, return_eigenvectors = False, maxiter = 10**5, v0 = res_gen.random(rsvr_size))
         W_sp = unnormalized_W_sp*spectral_radius/np.abs(max_eig[0])
+        np.savetxt('/lustre/awikner1/res-noise-stabilization/lorenz_Amat_res%d.csv' % rsvr_size, W_sp.toarray(), delimiter = ',')
         self.W_data, self.W_indices, self.W_indptr, self.W_shape = \
             (np.ascontiguousarray(W_sp.data), np.ascontiguousarray(W_sp.indices),\
             np.ascontiguousarray(W_sp.indptr), np.array(list(W_sp.shape)))
         """
+
         print('Adjacency matrix section:')
         print(self.W_data[:4])
-        """
+
         if win_type == 'dense':
             if bias_type != 'new_random':
                 raise ValueError
@@ -213,7 +218,7 @@ class Reservoir:
                         (i+1), var+1] = (res_gen.random(q)*2-1)*input_weight
             elif bias_type == 'new_random':
                 Win = np.zeros((rsvr_size, input_size+1))
-                #Win[:, 0] = (res_gen.random(rsvr_size)*2-1)*input_weight
+                Win[:, 0] = (res_gen.random(rsvr_size)*2-1)*input_weight
                 q = int(rsvr_size//input_vars.size)
                 for i, var in enumerate(input_vars):
                     Win[q*i:q*(i+1), var+1] = (res_gen.random(q)*2-1)*input_weight
@@ -225,8 +230,8 @@ class Reservoir:
                 for i in range(leftover_nodes):
                     Win[rsvr_size - leftover_nodes + i, input_vars[res_gen.integers(input_vars.size)]] = \
                         (res_gen.random()*2-1)*input_weight
-                print('Win nonzero elements:')
-                print(np.sum(Win.flatten() != 0.))
+                #print('Win nonzero elements:')
+                #print(np.sum(Win.flatten() != 0.))
             elif bias_type == 'new_new_random':
                 Win = np.zeros((rsvr_size, input_size+1))
                 Win[:, 0] = (res_gen.random(rsvr_size)*2-1)*input_weight
@@ -251,6 +256,7 @@ class Reservoir:
                     1] = (res_gen.random(leftover_nodes)*2-1)*input_weight
 
         #self.Win = np.ascontiguousarray(Win)
+        #np.savetxt('/lustre/awikner1/res-noise-stabilization/lorenz_Win_res%d.csv' % rsvr_size, Win, delimiter = ',')
         Win_sp = csc_matrix(Win)
         self.Win_data, self.Win_indices, self.Win_indptr, self.Win_shape =\
                 np.ascontiguousarray(Win_sp.data),\
@@ -611,6 +617,8 @@ def get_states(res, squarenodes, rk, reg_train_times, noise, noisetype='none', n
         res.data_trstates, res.states_trstates, res.Y_train, res.X_train, res.gradient_reg= get_states_wrapped(
             np.ascontiguousarray(rk.u_arr_train), reg_train_times, res.X, res.Win_data, res.Win_indices, res.Win_indptr, res.Win_shape, res.W_data, res.W_indices, res.W_indptr, res.W_shape, res.leakage,
             skip, noise, noisetype, noise_scaling, noise_realizations, traintype, squarenodes)
+        #np.savetxt('/lustre/awikner1/res-noise-stabilization/lorenz_X_train_res%d_noise%e.csv' % (res.rsvr_size, noise_scaling), res.X_train, delimiter = ',')
+        #np.savetxt('/lustre/awikner1/res-noise-stabilization/lorenz_Y_train_res%d_noise%e.csv' % (res.rsvr_size, noise_scaling), res.Y_train, delimiter = ',')
 
 @jit(nopython=True, fastmath = True)
 def get_squared(X, rsvr_size, squarenodes, dim = 0):
@@ -648,8 +656,9 @@ def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indice
     states_trstates = np.zeros((reg_train_times.size, res_feature_size+n+1, res_feature_size+n+1))
     gradient_reg    = np.zeros((reg_train_times.size, res_feature_size+n+1, res_feature_size+n+1))
     Y_train = np.ascontiguousarray(u_arr_train[:, skip:-1])
-    print('Y_train:')
-    print(Y_train[-5,-5])
+    #print('Y_train:')
+    #print(Y_train[-5,-5])
+    print(reg_train_times)
     reg_train_fracs = Y_train.shape[1]/reg_train_times
     print('Reg train fracs:')
     print(reg_train_fracs)
@@ -682,14 +691,18 @@ def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indice
         states_trstates[0] = X_train_mean @ X_train_mean.T
         for i in range(1, reg_train_times.size):
             states_trstates[i] = np.copy(states_trstates[0])
-        prev_reg_train_time = 0
-        for j, reg_train_time in enumerate(reg_train_times):
+        for (j, reg_train_time), prev_reg_train_time in zip(enumerate(reg_train_times),\
+                np.append(np.zeros(1, dtype = np.int64), reg_train_times[:-1])):
             for i in range(noise_realizations):
                 Q_fit = X_all[:, prev_reg_train_time:reg_train_time, i] - \
                         X_train_mean[:,prev_reg_train_time:reg_train_time]
+                Q_fit_2 = Q_fit @ Q_fit.T
                 for k in range(j, reg_train_times.size):
-                    states_trstates[k] += (Q_fit @ Q_fit.T)*reg_train_fracs[k]/noise_realizations
-            prev_reg_train_time = reg_train_time
+                    states_trstates[k] += Q_fit_2*reg_train_fracs[k]/noise_realizations
+        #for j in range(reg_train_times.size-1):
+        #print('Information matrix equals full information matrix at train time:')
+        #print(reg_train_times[j])
+        #print(np.all(states_trstates[-1] == states_trstates[j]))
         return data_trstates, states_trstates, Y_train, X_train, gradient_reg
     elif traintype in ['rmean', 'rmeanres1', 'rmeanres2']:
         # Training using the mean only
@@ -996,6 +1009,7 @@ def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indice
     elif 'gradientk' in traintype:
         # Linearized k-step noise
         k = str_to_int(traintype.replace('gradientk', ''))
+        reg_train_fracs = Y_train.shape[1]/(reg_train_times-(k-1))
         sparse_cutoff = 0.89
         break_flag = False
         #print(k)
@@ -1090,9 +1104,12 @@ def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indice
                 else:
                     gradient_reg_base += matrix_sparse_sparseT_mult(reg_comp_datas[j], reg_comp_indices[j],\
                         reg_comp_indptrs[j], reg_comp_shape)
-            assign_grad_reg = i+1 == reg_train_times
+            assign_grad_reg = (i == reg_train_times)
             if np.any(assign_grad_reg):
-                gradient_reg[i+1 == reg_train_times] = gradient_reg_base*reg_train_fracs[i+1 == reg_train_times]
+                print(assign_grad_reg)
+                print(gradient_reg[assign_grad_reg].shape)
+                print((gradient_reg_base*reg_train_fracs[assign_grad_reg]).shape)
+                gradient_reg[assign_grad_reg] = gradient_reg_base*reg_train_fracs[assign_grad_reg]
             if assign_grad_reg[-1]:
                 break_flag = True
                 break
@@ -1227,7 +1244,8 @@ def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indice
                         reg_comp_indptrs[j], reg_comp_shape)
             assign_grad_reg = i+1 == reg_train_times
             if np.any(assign_grad_reg):
-                gradient_reg[i+1 == reg_train_times] = gradient_reg_base*reg_train_fracs[i+1 == reg_train_times]
+                print(assign_grad_reg)
+                gradient_reg[assign_grad_reg] = gradient_reg_base*reg_train_fracs[assign_grad_reg]
         """
         print('Gradient reg:')
         print(gradient_reg[:5,:5])
@@ -1243,13 +1261,13 @@ def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indice
         for i in range(1, reg_train_times.size):
             states_trstates[i] = np.ascontiguousarray(states_trstates[0])
         print('Target matrix:')
-        print(data_trstates[:5,:5])
-        print('Information matrix:')
-        print(states_trstates[0,:5,:5])
-        print('Gradient regularization:')
-        print(gradient_reg[0,:5,:5])
-        print('X_train:')
-        print(X_train[:5,:5])
+        #print(data_trstates[:5,:5])
+        #print('Information matrix:')
+        #print(states_trstates[0,:5,:5])
+        #print('Gradient regularization:')
+        #print(gradient_reg[0,:5,:5])
+        #print('X_train:')
+        #print(X_train[:5,:5])
         return data_trstates, states_trstates, Y_train, X_train, gradient_reg
     elif traintype == 'sylvester':
         # Sylvester regularization w/o derivative
@@ -1621,8 +1639,8 @@ def testwrapped(res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_i
     print("Var. of x dim: " + str(np.mean(variances)))
     print()
     """
-    print('Mean rms shape:')
-    print(mean_rms.shape)
+    #print('Mean rms shape:')
+    #print(mean_rms.shape)
     #return stable_count, mean_rms, max_rms, variances, valid_time, mean_all, variances_all, preds, wass_dist, pmap_max, pmap_max_wass_dist
     return stable_count, mean_rms, max_rms, variances, valid_time, rms, preds, wass_dist,    pmap_max, pmap_max_wass_dist
 
@@ -1650,8 +1668,8 @@ def optim_func(res, squarenodes, noise_in, noise, rktest_u_arr_train_nonoise, rk
         res_feature_size = res.rsvr_size
     idenmat = np.identity(
         res_feature_size+1+rktest_u_arr_train_nonoise.shape[0])*alpha
-    print('Gradient reg shape')
-    print(res.gradient_reg.shape)
+    #print('Gradient reg shape')
+    #print(res.gradient_reg.shape)
     num_reg_train_times = res.gradient_reg.shape[0]
     res.Wout = np.zeros((num_reg_train_times, rktest_u_arr_train_nonoise.shape[0],\
             rktest_u_arr_train_nonoise.shape[0]+1+res_feature_size))
@@ -1675,12 +1693,16 @@ def optim_func(res, squarenodes, noise_in, noise, rktest_u_arr_train_nonoise, rk
             #print(idenmat.shape)
             res.Wout[i] = np.transpose(solve(np.transpose(
                 res.states_trstates[i] + noise**2.0*res.gradient_reg[i]+idenmat), np.transpose(res.data_trstates)))
+            #np.savetxt('/lustre/awikner1/res-noise-stabilization/lorenz_Wout_res%d_noise%e_reg%e.csv' % (res.rsvr_size, noise, alpha),\
+            #        res.Wout[i], delimiter = ',')
             #res.Wout =  matlab_mrdivide(res.states_trstates + noise**2.0*res.gradient_reg + idenmat, res.data_trstates)
         else:
             res.Wout[i] = solve_sylvester(
                 res.left_mat[i], res.states_trstates[i]+idenmat, res.data_trstates)
-
-        train_rms = np.sqrt(np.mean((res.Wout[i] @ res.X_train - res.Y_train)**2.0, axis = 0))
+        train_preds = res.Wout[i] @ res.X_train
+        #np.savetxt('/lustre/awikner1/res-noise-stabilization/lorenz_train_preds_res%d_noise%e_reg%e.csv' % (res.rsvr_size, noise, alpha),\
+        #        train_preds, delimiter = ',')
+        train_rms = np.sqrt(np.mean((train_preds - res.Y_train)**2.0, axis = 0))
         train_mean_rms = np.mean(train_rms)
         train_max_rms  = np.max(train_rms)
         results[i], mean_rms[i], max_rms[i], variances[i], valid_time[i],  rms[i], preds[i], \
@@ -2088,8 +2110,8 @@ def main(argv):
     root_folder, top_folder, run_name, system, noisetype, traintype, savepred, save_time_rms, squarenodes, rho,\
         sigma, leakage, win_type, bias_type, tau, res_size, train_time, noise_realizations, \
         noise_streams_per_test, noise_values_array,alpha_values, res_per_test, num_trains, num_tests,\
-        debug_mode, pmap, metric, return_all, ifray, machine,max_valid_time, tmp, tmp1, tmp2, tmp3\
-        ,reg_train_fracs, discard_time = get_run_opts(argv)
+        debug_mode, pmap, metric, return_all, ifray, machine,max_valid_time, tmp, tmp1, tmp2, tmp3,\
+        reg_train_times, discard_time = get_run_opts(argv)
 
     raw_data_folder = os.path.join(os.path.join(root_folder, top_folder), run_name + '_folder')
     if machine == 'skynet':
@@ -2110,8 +2132,10 @@ def main(argv):
             'rplusq','rplusqres1','rplusqres2']:
         alpha_values = alpha_values*noise_realizations
     # alpha_values = np.array([0,1e-6,1e-4])
-    reg_train_times = np.array([int((train_time-discard_time)*i) for i in \
-            np.arange(1./reg_train_fracs, 1+1./reg_train_fracs, 1./reg_train_fracs)])
+    #reg_train_times = np.array([int((train_time-discard_time)*i) for i in \
+    #        np.arange(1./reg_train_fracs, 1+1./reg_train_fracs, 1./reg_train_fracs)])
+    if reg_train_times is None:
+        reg_train_times = np.array([train_time - discard_time])
     np.savetxt(os.path.join(raw_data_folder, 'reg_train_times.csv'),   reg_train_times,    delimiter = ',')
     np.savetxt(os.path.join(raw_data_folder, 'test_noise_values.csv'), noise_values_array, delimiter = ',')
     np.savetxt(os.path.join(raw_data_folder, 'test_alpha_values.csv'), alpha_values      , delimiter = ',')
@@ -2197,6 +2221,7 @@ def main(argv):
         rtn = rtn.flatten()
 
         for i in range(num_trains*res_per_test*noise_values_array.size):
+            print(res_seeds[rtn[i]])
             res_streams[i]   = np.random.default_rng(res_seeds[rtn[i]])
             train_streams[i] = np.random.default_rng(train_seeds[tnr[i]])
             test_streams[i]  = np.array([np.random.default_rng(j) for j in test_seeds])
