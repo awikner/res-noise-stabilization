@@ -1,9 +1,9 @@
-#!/homes/awikner1/anaconda3/envs/reservoir-rls/bin/python -u
+#!/homes/awikner1/anaconda3/envs/res39/bin/python -u
 # Assume will be finished in no more than 18 hours
 #SBATCH -d afterok:{{JOB_ID}}
 #SBATCH -J {{JOB_NAME}}
 #SBATCH --output=log_files/{{JOB_NAME}}.log
-#SBATCH -t 1:00:00
+#SBATCH -t 4:00:00
 #SBATCH -A {{ACCOUNT}}
 # Launch on 12 cores distributed over as many nodes as needed
 #SBATCH --ntasks=1

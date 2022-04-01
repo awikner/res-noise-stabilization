@@ -45,7 +45,7 @@ def get_run_opts(argv, runflag = True):
         import_train = False
         import_test = False
         import_noise = False
-        reg_train_fracs = 1
+        reg_train_times = None
 
         try:
             opts, args = getopt.getopt(argv, "T:N:r:",
@@ -55,7 +55,7 @@ def get_run_opts(argv, runflag = True):
                     'machine=', 'num_cpus=', 'pmap=', 'parallel=', 'metric=','returnall=',
                     'savetime=', 'noisevals=', 'regvals=', 'maxvt=', 'noisestreams=',
                     'squarenodes=', 'resonly=', 'importres=','importtrain=',
-                    'importtest=','importnoise=','regtrainfracs=','discardlen='])
+                    'importtest=','importnoise=','regtraintimes=','discardlen='])
         except getopt.GetoptError:
             print('Error: Some options not recognized')
             sys.exit(2)
@@ -72,9 +72,6 @@ def get_run_opts(argv, runflag = True):
             elif opt == '--discardlen':
                 discard_time = int(arg)
                 print('Discard iterations: %d' % discard_time)
-            elif opt == '--regtrainfracs':
-                reg_train_fracs = int(arg)
-                print('Fractions of training data to be used for creating regularization: %d' % reg_train_fracs)
             elif opt == '--importres':
                 if arg == 'True':
                     import_res = True
@@ -143,6 +140,14 @@ def get_run_opts(argv, runflag = True):
                     reg_str += '%0.3e, ' % reg
                 reg_str = reg_str[:-2] + ' ]'
                 print('Regularization values: %s' % reg_str)
+            elif opt == '--regtraintimes':
+                if arg != 'None':
+                    reg_train_times = np.array([int(reg_train) for reg_train in arg.split(',')])
+                    reg_train_str = '[ '
+                    for reg_train in reg_train_times:
+                        reg_train_str += '%0.3e, ' % reg_train
+                    reg_train_str = reg_train_str[:-2] + ' ]'
+                    print('Regularization training times: %s' % reg_train_str)
             elif opt == '--savetime':
                 if str(arg) == 'True':
                     save_time_rms = True
@@ -245,15 +250,16 @@ def get_run_opts(argv, runflag = True):
                 return_all, machine, rho, sigma, leakage, tau, win_type, \
                 bias_type, res_per_test, num_tests, num_trains, savepred, \
                 noisetype, traintype, system, squarenodes, resonly, import_res,\
-                import_train, import_test, import_noise, reg_train_fracs,\
+                import_train, import_test, import_noise, reg_train_times,\
                 discard_time = argv
     if return_all and savepred:
         print('Cannot return results for all parameters and full predictions due to memory constraints.')
         raise ValueError
-    if reg_train_fracs > 1 and (traintype in ['normal','normalres1','normalres2','rmean','rmeanres1',\
-            'rmeanres2','rplusq','rplusqres1','rplusqres2'] or 'confined' in traintype):
-        print('Traintypes "normal", "rmean", and "rplusq" are not compatible with fractional regularization training.')
-        raise ValueError
+    if isinstance(reg_train_times, np.ndarray) or isinstance(reg_train_times, list):
+        if (reg_train_times[0] != train_time - discard_time or len(reg_train_times) != 1) and (traintype in ['normal','normalres1','normalres2','rmean','rmeanres1',\
+                'rmeanres2','rplusq','rplusqres1','rplusqres2'] or 'confined' in traintype):
+            print('Traintypes "normal", "rmean", and "rplusq" are not compatible with fractional regularization training.')
+            raise ValueError
     if traintype in ['gradient','gradient12','gradient2']:
         print('Use of gradient, gradient12, and gradient2 is depracated. Please use gradientk instead.')
         raise ValueError
@@ -315,7 +321,7 @@ def get_run_opts(argv, runflag = True):
         return root_folder, data_folder, run_name, system, noisetype, traintype, savepred, save_time_rms, squarenodes, rho,\
             sigma, leakage, win_type, bias_type, tau, res_size, train_time, noise_realizations, noise_streams_per_test,\
             noise_values_array,alpha_values, res_per_test, num_trains, num_tests, debug_mode, pmap, metric, \
-            return_all, ifray, machine, max_valid_time, import_res, import_train, import_test, import_noise, reg_train_fracs, discard_time
+            return_all, ifray, machine, max_valid_time, import_res, import_train, import_test, import_noise, reg_train_times, discard_time
     else:
         if not savepred:
             return os.path.join(os.path.join(root_folder, data_folder), run_name + '.bz2'), ''
