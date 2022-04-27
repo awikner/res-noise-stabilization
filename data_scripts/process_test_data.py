@@ -39,7 +39,7 @@ def main(argv):
     root_folder, top_folder, run_name, system, noisetype, traintype, savepred, save_time_rms, squarenodes, rho,\
         sigma, leakage, win_type, bias_type, tau, res_size, train_time, noise_realizations, noise_streams_per_test,\
         noise_values_array, alpha_values, res_per_test, num_trains, num_tests, debug_mode, pmap, metric, return_all,\
-        ifray, machine, max_valid_time, import_res, import_train, import_test, import_noise, reg_train_frac,\
+        ifray, machine, max_valid_time, prior, import_res, import_train, import_test, import_noise, reg_train_frac,\
         discard_time = get_run_opts(argv)
 
     raw_data_folder = os.path.join(os.path.join(root_folder, top_folder), run_name + '_folder')
@@ -335,7 +335,7 @@ def main(argv):
 
 
     if savepred:
-        noise_vals_set_idx, reg_train_times_set_Idx = np.meshgrid(np.arange(noise_vals.size, dtype = int),\
+        noise_vals_set_idx, reg_train_times_set_idx = np.meshgrid(np.arange(noise_vals.size, dtype = int),\
                 np.arange(reg_train_times, dtype = int))
         noise_vals_set_idx = noise_vals_set_idx.flatten()
         reg_train_times_set_idx = reg_train_times_set_idx.flatten()
@@ -353,6 +353,7 @@ def main(argv):
         pred_data_size = int(re.search('(.*)/lustre', raw_data_size_str).group(1)[2:-2])
         comp_data_size += pred_data_size*1000
     else:
+        os.system('find %s -type f -delete' % raw_data_folder)
         os.system('rm -rf %s' % raw_data_folder)
     print('Compressed data size: %0.3f kB' % (comp_data_size/1000))
     print('Data compressed by %0.3f percent' % ((1.-comp_data_size/(raw_data_size*1000))*100))

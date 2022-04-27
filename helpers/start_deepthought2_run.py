@@ -15,7 +15,7 @@ def start_deepthought2_run(system = 'KS', traintype = 'normal', noisetype = 'gau
         debug = False, num_nodes = 4, cpus_per_node = None, runtime = '2:00:00', \
         account = 'physics-hi',debug_part = False, just_process = False, parallel = True,\
         resonly_flag = False, import_res = False, import_train = False, import_test = False,\
-        import_noise = False, reg_train_times = None, discard_time = 500):
+        import_noise = False, reg_train_times = None, discard_time = 500, prior = 'zero'):
 
     if isinstance(reg_train_times, np.ndarray) or isinstance(reg_train_times, list):
         reg_train_times_str = '%d' % reg_train_times[0]
@@ -105,9 +105,9 @@ def start_deepthought2_run(system = 'KS', traintype = 'normal', noisetype = 'gau
 
     testname = '%s_%s%s_%s_%d_%dnodes_%dtrain_rho%0.1f_sigma%0.1e_leakage%0.1f_tau%0.3f' % \
             (system, program_ext, traintype, noisetype, noise_realizations, res_size, trainlen, rho, sigma, leakage,  tau)
-    options_str = '--resonly=%s --savepred=%s --system=%s --noisetype=%s --traintype=%s -r %d --rho=%f --sigma=%f --leakage=%f --win_type=%s --bias_type=%s --tau=%f -N %d -T %d --res=%d --tests=%d --trains=%d --debug=%s --squarenodes=%s --metric=%s --returnall=%s --savetime=%s --noisevals=%s --regvals=%s --maxvt=%d --machine=%s --parallel=%s --importres=%s --importtrain=%s --importtest=%s --importnoise=%s --regtraintimes=%s --discardlen=%d' % (resonly_str, savepred_str, system, noisetype, traintype, noise_realizations,  rho,sigma, leakage, win_type, bias_type, tau, res_size, trainlen, num_res, num_tests, num_trains,
+    options_str = '--resonly=%s --savepred=%s --system=%s --noisetype=%s --traintype=%s -r %d --rho=%f --sigma=%f --leakage=%f --win_type=%s --bias_type=%s --tau=%f -N %d -T %d --res=%d --tests=%d --trains=%d --debug=%s --squarenodes=%s --metric=%s --returnall=%s --savetime=%s --noisevals=%s --regvals=%s --maxvt=%d --machine=%s --parallel=%s --importres=%s --importtrain=%s --importtest=%s --importnoise=%s --regtraintimes=%s --discardlen=%d --prior=%s' % (resonly_str, savepred_str, system, noisetype, traintype, noise_realizations,  rho,sigma, leakage, win_type, bias_type, tau, res_size, trainlen, num_res, num_tests, num_trains,
             debug_str, squarenodes_str, metric, returnall_str,
-            savetime_str, noise_values_str, reg_values_str, max_valid_time, machine, parallel_str, import_res_str, import_train_str, import_test_str, import_noise_str, reg_train_times_str, discard_time)
+            savetime_str, noise_values_str, reg_values_str, max_valid_time, machine, parallel_str, import_res_str, import_train_str, import_test_str, import_noise_str, reg_train_times_str, discard_time, prior)
     input_str = 'python slurm-launch.py --exp-name %s --command "python -u %s %s" --num-nodes %d %s --load-env "conda activate res39" -t %s -A %s %s' % (testname, program_str, options_str, num_nodes, cpus_str, runtime, account, debug_part_str)
     print(input_str)
     run_out = subprocess.check_output(input_str, shell=True)

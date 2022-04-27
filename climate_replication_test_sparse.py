@@ -491,7 +491,7 @@ def getXwrapped(u_training, res_X, Win_data, Win_indices, Win_indptr, Win_shape,
         u_training_wnoise = u_training+noise
         return res_X, u_training_wnoise
 
-    elif traintype in ['sylvester_wD'] or 'gradient' in traintype:
+    elif traintype in ['sylvester_wD'] or 'gradient' in traintype or 'regzero' in traintype:
         rsvr_size = res_X.shape[0]
         res_D = np.zeros((rsvr_size, u_training.shape[1]+1))
         for i in range(0, u_training[0].size):
@@ -1006,7 +1006,7 @@ def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indice
         data_trstates = Y_train @ X_train.T
         states_trstates[0] = X_train @ X_train.T
         return data_trstates, states_trstates, Y_train, X_train, gradient_reg
-    elif 'gradientk' in traintype:
+    elif 'gradientk' in traintype and 'only' not in traintype:
         # Linearized k-step noise
         k = str_to_int(traintype.replace('gradientk', ''))
         reg_train_fracs = Y_train.shape[1]/(reg_train_times-(k-1))
@@ -1269,6 +1269,267 @@ def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indice
         #print('X_train:')
         #print(X_train[:5,:5])
         return data_trstates, states_trstates, Y_train, X_train, gradient_reg
+    elif 'gradientk' in traintype and 'only' in traintype:
+        # Linearized k-step noise
+        k = str_to_int(traintype.replace('gradientk', '').replace('only',''))
+        reg_train_fracs = Y_train.shape[1]/(reg_train_times-(k-1))
+        sparse_cutoff = 0.89
+        break_flag = False
+        #print(k)
+        X, D = getXwrapped(u_arr_train, res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_indices, W_indptr,
+                            W_shape, leakage, noise[0], noisetype, noise_scaling, 1, traintype)
+        X = X[:, skip:(res_d - 2)]
+        D = D[:, skip:(res_d - 2)]
+        X_train = np.concatenate(
+            (np.ones((1, d-(skip+1))), X, u_arr_train[:, skip-1:-2]), axis=0)
+        X_train = get_squared(X_train, rsvr_size, squarenodes)
+        gradient_reg_base = np.zeros((res_feature_size+n+1, res_feature_size+n+1))
+        #D_n = np.zeros((res_feature_size+n+1, n, k))
+        #E_n = np.zeros((res_feature_size+n+1, res_feature_size+n+1, k-1))
+        #reg_components = np.zeros((res_feature_size+n+1, n, k))
+        Win_nobias_data, Win_nobias_indices, Win_nobias_indptr, Win_nobias_shape = \
+            get_Win_nobias(Win_data, Win_indices, Win_indptr, Win_shape)
+        D_n_datas = List()
+        D_n_indices = List()
+        D_n_indptrs = List()
+        D_n_shape = np.array([res_feature_size+n+1, n])
+        E_n_datas = List()
+        E_n_indices = List()
+        E_n_indptrs = List()
+        E_n_shape = np.array([res_feature_size+n+1, res_feature_size+n+1])
+        #reg_comp_datas, reg_comp_indices, reg_comp_indptrs, reg_comp_shape = \
+        #    [np.zeros(1, dtype = np.double)]*k,\
+        #    [np.zeros(1, dtype = np.int32)]*k,\
+        #    [np.zeros(1, dtype = np.int32)]*k,\
+        reg_comp_datas   = List()
+        reg_comp_indices = List()
+        reg_comp_indptrs = List()
+        reg_comp_shape   = np.array([res_feature_size+n+1, n])
+        W_mat_data, W_mat_indices, W_mat_indptr, W_mat_shape = construct_jac_mat_csc_csc(
+            Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_indices, W_indptr, W_shape, rsvr_size, n, squarenodes)
+        leakage_data, leakage_indices, leakage_indptr, leakage_shape = construct_leakage_mat(rsvr_size, n, leakage, squarenodes)
+        #if squarenodes:
+        #    leakage_mat = np.concatenate((np.zeros((rsvr_size,1)), (1-leakage) *
+        #                        np.identity(rsvr_size), np.zeros((rsvr_size, n+rsvr_size))), axis=1)
+        #else:
+        #    leakage_mat = np.concatenate((np.zeros((rsvr_size,1)), (1-leakage) *
+        #                         np.identity(rsvr_size), np.zeros((rsvr_size, n))),   axis=1)
+        reg_sum_avg_runtime = 0.
+        E_n_avg_runtime = 0.
+        reg_mult_avg_runtime = 0.
+        D_n_avg_runtime = 0.
+        #with objmode(tic = 'double'):
+        #    tic = time.perf_counter()
+
+        for i in range(k):
+            D_n_data, D_n_idx, D_n_indptr = get_D_n(D[:,i], X[:,i], Win_nobias_data, Win_nobias_indices,\
+                Win_nobias_indptr, Win_nobias_shape, D_n_shape, rsvr_size, res_feature_size, n, squarenodes)
+            D_n_datas.append(np.ascontiguousarray(D_n_data))
+            D_n_indices.append(np.ascontiguousarray(D_n_idx))
+            D_n_indptrs.append(np.ascontiguousarray(D_n_indptr))
+        for i in range(1, k):
+            E_n_data, E_n_idx, E_n_indptr = get_E_n(D[:,i], X[:,i], E_n_shape, rsvr_size, W_mat_data,\
+                W_mat_indices, W_mat_indptr, W_mat_shape, leakage_data, leakage_indices, \
+                leakage_indptr, leakage_shape, squarenodes)
+            E_n_datas.append(np.ascontiguousarray(E_n_data))
+            E_n_indices.append(np.ascontiguousarray(E_n_idx))
+            E_n_indptrs.append(np.ascontiguousarray(E_n_indptr))
+        #reg_comp_datas[k-1], reg_comp_indices[k-1], reg_comp_indptrs[k-1] =\
+        #    np.copy(D_n_datas[-1]), np.copy(D_n_indices[-1]), np.copy(D_n_indptrs[-1])
+        #reg_components[:, :, k-1] = D_n[:, :, -1]
+
+        for i in range(k-1):
+            #reg_components[:, :, i] = D_n[:, :, i]
+            reg_comp_data, reg_comp_idx, reg_comp_indptr =\
+                np.copy(D_n_datas[i]), np.copy(D_n_indices[i]), np.copy(D_n_indptrs[i])
+            for j in range(i, k-1):
+                #reg_components[:, :, i] = matrix_sparse_mult(
+                #    E_n[:, :, j], reg_components[:, :, i])
+                reg_comp_data, reg_comp_idx, reg_comp_indptr, tmp = matrix_sparse_sparse_mult(\
+                    E_n_datas[j], E_n_indices[j], E_n_indptrs[j], E_n_shape,\
+                    reg_comp_data, reg_comp_idx, reg_comp_indptr, reg_comp_shape)
+            reg_comp_datas.append(np.ascontiguousarray(reg_comp_data))
+            reg_comp_indices.append(np.ascontiguousarray(reg_comp_idx))
+            reg_comp_indptrs.append(np.ascontiguousarray(reg_comp_indptr))
+        reg_comp_datas.append(np.ascontiguousarray(D_n_datas[-1]))
+        reg_comp_indices.append(np.ascontiguousarray(D_n_indices[-1]))
+        reg_comp_indptrs.append(np.ascontiguousarray(D_n_indptrs[-1]))
+        sparsity = np.array([reg_comp_datas[j].size/(reg_comp_shape[0]*reg_comp_shape[1]) for j in range(k)])
+
+        for i in range(k, X.shape[1]):
+            #with objmode(itr_tic = 'double'):
+            #    itr_tic = time.perf_counter()
+            if sparsity[j] < sparse_cutoff:
+                #gradient_reg += reg_components[:, :, j] @ reg_components[:, :, j].T
+                gradient_reg_base += matrix_sparse_sparseT_conv_mult(\
+                    reg_comp_datas[0], reg_comp_indices[0], reg_comp_indptrs[0], reg_comp_shape)
+            else:
+                gradient_reg_base += matrix_sparse_sparseT_mult(reg_comp_datas[0], reg_comp_indices[0],\
+                    reg_comp_indptrs[0], reg_comp_shape)
+            assign_grad_reg = (i == reg_train_times)
+            if np.any(assign_grad_reg):
+                print(assign_grad_reg)
+                print(gradient_reg[assign_grad_reg].shape)
+                print((gradient_reg_base*reg_train_fracs[assign_grad_reg]).shape)
+                gradient_reg[assign_grad_reg] = gradient_reg_base*reg_train_fracs[assign_grad_reg]
+            if assign_grad_reg[-1]:
+                break_flag = True
+                break
+            #print(gradient_reg[:5,:5])
+            """
+            with objmode(reg_sum_toc = 'double'):
+                reg_sum_toc = time.perf_counter()
+            if i > k:
+                reg_sum_avg_runtime = reg_sum_avg_runtime*(i-k)/(i-k+1)+(reg_sum_toc-itr_tic)/(i-k+1)
+            else:
+                reg_sum_avg_runtime = reg_sum_toc-itr_tic
+            """
+            """
+            if i % 200 == 0:
+                with objmode():
+                    runtime = time.perf_counter() - tic
+                    print('Runtime at i = %d: %0.2f sec.' % (i, runtime))
+                    print('Reg sum avg. runtime: %e' % reg_sum_avg_runtime)
+                    print('E_n calc. avg. runtime: %e' % E_n_avg_runtime)
+                    print('Reg mult avg. runtime: %e' % reg_mult_avg_runtime)
+                    print('D_n calc. avg. runtime: %e' % D_n_avg_runtime)
+            """
+            #with objmode(E_n_tic = 'double'):
+            #    E_n_tic = time.perf_counter()
+            #E_n_datas[k-2], E_n_indices[k-2], E_n_indptrs[k-2] = get_E_n(D[:,i], X[:,i], \
+            #    E_n_shape, rsvr_size, W_mat_data, W_mat_indices, W_mat_indptr, W_mat_shape,\
+            #    leakage_data, leakage_indices, leakage_indptr, leakage_shape,\
+            #    squarenodes)
+            E_n_data, E_n_idx, E_n_indptr = get_E_n(D[:,i], X[:,i], \
+                E_n_shape, rsvr_size, W_mat_data, W_mat_indices, W_mat_indptr, W_mat_shape,\
+                leakage_data, leakage_indices, leakage_indptr, leakage_shape,\
+                squarenodes)
+            E_n_datas[k-2] = np.ascontiguousarray(E_n_data)
+            E_n_indices[k-2] = np.ascontiguousarray(E_n_idx)
+            E_n_indptrs[k-2] = np.ascontiguousarray(E_n_indptr)
+            #E_n_base = matrix_diag_sparse_mult_add(
+            #    D[:, i], W_mat_data, W_mat_indices, W_mat_indptr, W_mat_shape,      leakage_mat)
+            #if squarenodes:
+            #    E_n[1+rsvr_size:1+res_feature_size,:,k-2] = matrix_diag_mult(2*X[:,  i], E_n_base)
+            #E_n[1:rsvr_size+1, :, k-2] = E_n_base
+            """
+            with objmode(E_n_toc = 'double'):
+                E_n_toc = time.perf_counter()
+            if i > k:
+                E_n_avg_runtime = E_n_avg_runtime*(i-k)/(i-k+1)+(E_n_toc-E_n_tic)/(i-k+1)
+            else:
+                E_n_avg_runtime = E_n_toc-E_n_tic
+            with objmode(reg_mult_tic = 'double'):
+                reg_mult_tic = time.perf_counter()
+            """
+
+            #reg_comp_datas_new, reg_comp_indices_new, reg_comp_indptrs_new = \
+            #    [np.zeros(1, dtype = np.double) for x in range(0)],\
+            #    [np.zeros(1, dtype = np.int32) for x in range(0)],\
+            #    [np.zeros(1, dtype = np.int32) for x in range(0)]
+            for j in range(k-1):
+                if sparsity[j+1] < sparse_cutoff:
+                    reg_comp_data, reg_comp_idx, reg_comp_indptr, tmp = matrix_sparse_sparse_conv_mult(\
+                        E_n_datas[k-2], E_n_indices[k-2], E_n_indptrs[k-2], E_n_shape,\
+                        reg_comp_datas[j+1], reg_comp_indices[j+1], reg_comp_indptrs[j+1], reg_comp_shape)
+                else:
+                    reg_comp_data, reg_comp_idx, reg_comp_indptr, tmp = matrix_sparse_sparse_mult(\
+                        E_n_datas[j], E_n_indices[j], E_n_indptrs[j], E_n_shape,\
+                        reg_comp_datas[j+1], reg_comp_indices[j+1], reg_comp_indptrs[j+1], reg_comp_shape)
+                reg_comp_datas[j], reg_comp_indices[j], reg_comp_indptrs[j] = \
+                    np.ascontiguousarray(reg_comp_data), np.ascontiguousarray(reg_comp_idx),\
+                    np.ascontiguousarray(reg_comp_indptr)
+                #reg_comp_datas_new.append(reg_comp_data)
+                #reg_comp_indices_new.append(reg_comp_idx)
+                #reg_comp_indptrs_new.append(reg_comp_indptr)
+                    #reg_components[:, :, j] = matrix_sparse_sparse_mult(
+                    #    E_n[:, :, k-2], reg_components[:, :, j+1])
+            """
+            with objmode(reg_mult_toc = 'double'):
+                reg_mult_toc = time.perf_counter()
+            if i > k:
+                reg_mult_avg_runtime = reg_mult_avg_runtime*(i-k)/(i-k+1)+(reg_mult_toc-reg_mult_tic)/(i-k+1)
+            else:
+                reg_mult_avg_runtime = reg_mult_toc-reg_mult_tic
+            with objmode(D_n_tic = 'double'):
+                D_n_tic = time.perf_counter()
+            """
+            #D_n_base = matrix_diag_mult(D[:, i], Win[:, 1:])
+            #if squarenodes:
+            #    reg_components[1+rsvr_size:1+res_feature_size,:,k-1] = matrix_diag_mult(2*X[:,i], D_n_base)
+            #reg_components[1:rsvr_size+1, :, k - 1] = D_n_base
+            #reg_components[1+res_feature_size:, :, k-1] = np.identity(n)
+            reg_comp_data, reg_comp_idx, reg_comp_indptr = get_D_n(D[:,i], X[:,i], \
+                Win_nobias_data, Win_nobias_indices, Win_nobias_indptr, Win_nobias_shape, D_n_shape, \
+                rsvr_size, res_feature_size, n, squarenodes)
+            reg_comp_datas[k-1], reg_comp_indices[k-1], reg_comp_indptrs[k-1] = \
+                np.ascontiguousarray(reg_comp_data), np.ascontiguousarray(reg_comp_idx),\
+                np.ascontiguousarray(reg_comp_indptr)
+            #reg_comp_datas_new.append(reg_comp_data)
+            #reg_comp_indices_new.append(reg_comp_idx)
+            #reg_comp_indptrs_new.append(reg_comp_indptr)
+            #reg_comp_datas, reg_comp_indices, reg_comp_indptrs = reg_comp_datas_new, reg_comp_indices_new, reg_comp_indptrs_new
+            """
+            with objmode(D_n_toc = 'double'):
+                D_n_toc = time.perf_counter()
+            if i > k:
+                D_n_avg_runtime = D_n_avg_runtime*(i-k)/(i-k+1)+(D_n_toc-D_n_tic)/(i-k+1)
+            else:
+                D_n_avg_runtime = D_n_toc-D_n_tic
+            """
+            """
+            if i == k:
+                print('Reg components @ 2,1')
+                print(reg_components[:5,:5, k -1])
+            if i == k:
+                print('Reg components @ 2,0')
+                print(reg_components[:5,:5, 0])
+            """
+            """
+            if i % 50 == 0:
+                with objmode(toc = 'double'):
+                    toc = time.perf_counter()
+                runtime = toc - tic
+                tic = toc
+                print('50 Iter Runtime: ')
+                print(runtime)
+            """
+        if not break_flag:
+            if sparsity[j] < sparse_cutoff:
+                #gradient_reg += reg_components[:, :, j] @ reg_components[:, :, j].T
+                gradient_reg_base += matrix_sparse_sparseT_conv_mult(\
+                    reg_comp_datas[0], reg_comp_indices[0], reg_comp_indptrs[0], reg_comp_shape)
+            else:
+                gradient_reg_base += matrix_sparse_sparseT_mult(reg_comp_datas[0], reg_comp_indices[0],\
+                    reg_comp_indptrs[0], reg_comp_shape)
+            assign_grad_reg = i+1 == reg_train_times
+            if np.any(assign_grad_reg):
+                print(assign_grad_reg)
+                gradient_reg[assign_grad_reg] = gradient_reg_base*reg_train_fracs[assign_grad_reg]
+        """
+        print('Gradient reg:')
+        print(gradient_reg[:5,:5])
+        """
+        """
+        with objmode(toc = 'double'):
+            toc = time.perf_counter()
+        print('Gradient reg. compute time in sec.')
+        print(toc - tic)
+        """
+        data_trstates = Y_train @ X_train.T
+        states_trstates[0] = X_train @ X_train.T
+        for i in range(1, reg_train_times.size):
+            states_trstates[i] = np.ascontiguousarray(states_trstates[0])
+        #print('Target matrix:')
+        #print(data_trstates[:5,:5])
+        #print('Information matrix:')
+        #print(states_trstates[0,:5,:5])
+        #print('Gradient regularization:')
+        #print(gradient_reg[0,:5,:5])
+        #print('X_train:')
+        #print(X_train[:5,:5])
+        return data_trstates, states_trstates, Y_train, X_train, gradient_reg
+
     elif traintype == 'sylvester':
         # Sylvester regularization w/o derivative
         X, p = getXwrapped(u_arr_train, res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_indices, W_indptr,
@@ -1305,6 +1566,272 @@ def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indice
         data_trstates[:, 1:rsvr_size+1] += target_correction
         states_trstates[0] = X_train @ X_train.T
         return data_trstates, states_trstates, Y_train, X_train, left_mat
+    elif 'regzero' in traintype:
+        # Linearized k-step noise
+        k = str_to_int(traintype.replace('regzerok', ''))
+        reg_train_fracs = Y_train.shape[1]/(reg_train_times-(k-1))
+        sparse_cutoff = 0.89
+        break_flag = False
+        #print(k)
+        X, tmp = getXwrapped(u_arr_train, res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_indices, W_indptr,
+                           W_shape, leakage, noise[0], noisetype, noise_scaling, 1, traintype)
+        X = X[:, skip:(res_d - 2)]
+        X_train = np.concatenate(
+            (np.ones((1, d-(skip+1))), X, u_arr_train[:, skip-1:-2]), axis=0)
+        X_train = get_squared(X_train, rsvr_size, squarenodes)
+        data_trstates = Y_train @ X_train.T
+        states_trstates[0] = X_train @ X_train.T
+        for i in range(1, reg_train_times.size):
+            states_trstates[i] = np.ascontiguousarray(states_trstates[0])
+        X_zero, D_zero = getXwrapped(np.zeros(u_arr_train.shape), res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_indices, W_indptr,
+                           W_shape, leakage, noise[0], noisetype, noise_scaling, 1, traintype)
+        X = X_zero[:, skip:(res_d - 2)]
+        D = D_zero[:, skip:(res_d - 2)]
+        gradient_reg_base = np.zeros((res_feature_size+n+1, res_feature_size+n+1))
+        #D_n = np.zeros((res_feature_size+n+1, n, k))
+        #E_n = np.zeros((res_feature_size+n+1, res_feature_size+n+1, k-1))
+        #reg_components = np.zeros((res_feature_size+n+1, n, k))
+        Win_nobias_data, Win_nobias_indices, Win_nobias_indptr, Win_nobias_shape = \
+            get_Win_nobias(Win_data, Win_indices, Win_indptr, Win_shape)
+        D_n_datas = List()
+        D_n_indices = List()
+        D_n_indptrs = List()
+        D_n_shape = np.array([res_feature_size+n+1, n])
+        E_n_datas = List()
+        E_n_indices = List()
+        E_n_indptrs = List()
+        E_n_shape = np.array([res_feature_size+n+1, res_feature_size+n+1])
+        #reg_comp_datas, reg_comp_indices, reg_comp_indptrs, reg_comp_shape = \
+        #    [np.zeros(1, dtype = np.double)]*k,\
+        #    [np.zeros(1, dtype = np.int32)]*k,\
+        #    [np.zeros(1, dtype = np.int32)]*k,\
+        reg_comp_datas   = List()
+        reg_comp_indices = List()
+        reg_comp_indptrs = List()
+        reg_comp_shape   = np.array([res_feature_size+n+1, n])
+        W_mat_data, W_mat_indices, W_mat_indptr, W_mat_shape = construct_jac_mat_csc_csc(
+            Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_indices, W_indptr, W_shape, rsvr_size, n, squarenodes)
+        leakage_data, leakage_indices, leakage_indptr, leakage_shape = construct_leakage_mat(rsvr_size, n, leakage, squarenodes)
+        #if squarenodes:
+        #    leakage_mat = np.concatenate((np.zeros((rsvr_size,1)), (1-leakage) *
+        #                        np.identity(rsvr_size), np.zeros((rsvr_size, n+rsvr_size))), axis=1)
+        #else:
+        #    leakage_mat = np.concatenate((np.zeros((rsvr_size,1)), (1-leakage) *
+        #                         np.identity(rsvr_size), np.zeros((rsvr_size, n))),   axis=1)
+        reg_sum_avg_runtime = 0.
+        E_n_avg_runtime = 0.
+        reg_mult_avg_runtime = 0.
+        D_n_avg_runtime = 0.
+        #with objmode(tic = 'double'):
+        #    tic = time.perf_counter()
+
+        for i in range(k):
+            D_n_data, D_n_idx, D_n_indptr = get_D_n(D[:,i], X[:,i], Win_nobias_data, Win_nobias_indices,\
+                Win_nobias_indptr, Win_nobias_shape, D_n_shape, rsvr_size, res_feature_size, n, squarenodes)
+            D_n_datas.append(np.ascontiguousarray(D_n_data))
+            D_n_indices.append(np.ascontiguousarray(D_n_idx))
+            D_n_indptrs.append(np.ascontiguousarray(D_n_indptr))
+        for i in range(1, k):
+            E_n_data, E_n_idx, E_n_indptr = get_E_n(D[:,i], X[:,i], E_n_shape, rsvr_size, W_mat_data,\
+                W_mat_indices, W_mat_indptr, W_mat_shape, leakage_data, leakage_indices, \
+                leakage_indptr, leakage_shape, squarenodes)
+            E_n_datas.append(np.ascontiguousarray(E_n_data))
+            E_n_indices.append(np.ascontiguousarray(E_n_idx))
+            E_n_indptrs.append(np.ascontiguousarray(E_n_indptr))
+        #reg_comp_datas[k-1], reg_comp_indices[k-1], reg_comp_indptrs[k-1] =\
+        #    np.copy(D_n_datas[-1]), np.copy(D_n_indices[-1]), np.copy(D_n_indptrs[-1])
+        #reg_components[:, :, k-1] = D_n[:, :, -1]
+
+        for i in range(k-1):
+            #reg_components[:, :, i] = D_n[:, :, i]
+            reg_comp_data, reg_comp_idx, reg_comp_indptr =\
+                np.copy(D_n_datas[i]), np.copy(D_n_indices[i]), np.copy(D_n_indptrs[i])
+            for j in range(i, k-1):
+                #reg_components[:, :, i] = matrix_sparse_mult(
+                #    E_n[:, :, j], reg_components[:, :, i])
+                reg_comp_data, reg_comp_idx, reg_comp_indptr, tmp = matrix_sparse_sparse_mult(\
+                    E_n_datas[j], E_n_indices[j], E_n_indptrs[j], E_n_shape,\
+                    reg_comp_data, reg_comp_idx, reg_comp_indptr, reg_comp_shape)
+            reg_comp_datas.append(np.ascontiguousarray(reg_comp_data))
+            reg_comp_indices.append(np.ascontiguousarray(reg_comp_idx))
+            reg_comp_indptrs.append(np.ascontiguousarray(reg_comp_indptr))
+        reg_comp_datas.append(np.ascontiguousarray(D_n_datas[-1]))
+        reg_comp_indices.append(np.ascontiguousarray(D_n_indices[-1]))
+        reg_comp_indptrs.append(np.ascontiguousarray(D_n_indptrs[-1]))
+        sparsity = np.array([reg_comp_datas[j].size/(reg_comp_shape[0]*reg_comp_shape[1]) for j in range(k)])
+
+        for i in range(k, X.shape[1]):
+            #with objmode(itr_tic = 'double'):
+            #    itr_tic = time.perf_counter()
+            for j in range(k):
+                if sparsity[j] < sparse_cutoff:
+                    #gradient_reg += reg_components[:, :, j] @ reg_components[:, :, j].T
+                    gradient_reg_base += matrix_sparse_sparseT_conv_mult(\
+                        reg_comp_datas[j], reg_comp_indices[j], reg_comp_indptrs[j], reg_comp_shape)
+                else:
+                    gradient_reg_base += matrix_sparse_sparseT_mult(reg_comp_datas[j], reg_comp_indices[j],\
+                        reg_comp_indptrs[j], reg_comp_shape)
+            assign_grad_reg = (i == reg_train_times)
+            if np.any(assign_grad_reg):
+                print(assign_grad_reg)
+                print(gradient_reg[assign_grad_reg].shape)
+                print((gradient_reg_base*reg_train_fracs[assign_grad_reg]).shape)
+                gradient_reg[assign_grad_reg] = gradient_reg_base*reg_train_fracs[assign_grad_reg]
+            if assign_grad_reg[-1]:
+                break_flag = True
+                break
+            #print(gradient_reg[:5,:5])
+            """
+            with objmode(reg_sum_toc = 'double'):
+                reg_sum_toc = time.perf_counter()
+            if i > k:
+                reg_sum_avg_runtime = reg_sum_avg_runtime*(i-k)/(i-k+1)+(reg_sum_toc-itr_tic)/(i-k+1)
+            else:
+                reg_sum_avg_runtime = reg_sum_toc-itr_tic
+            """
+            """
+            if i % 200 == 0:
+                with objmode():
+                    runtime = time.perf_counter() - tic
+                    print('Runtime at i = %d: %0.2f sec.' % (i, runtime))
+                    print('Reg sum avg. runtime: %e' % reg_sum_avg_runtime)
+                    print('E_n calc. avg. runtime: %e' % E_n_avg_runtime)
+                    print('Reg mult avg. runtime: %e' % reg_mult_avg_runtime)
+                    print('D_n calc. avg. runtime: %e' % D_n_avg_runtime)
+            """
+            #with objmode(E_n_tic = 'double'):
+            #    E_n_tic = time.perf_counter()
+            #E_n_datas[k-2], E_n_indices[k-2], E_n_indptrs[k-2] = get_E_n(D[:,i], X[:,i], \
+            #    E_n_shape, rsvr_size, W_mat_data, W_mat_indices, W_mat_indptr, W_mat_shape,\
+            #    leakage_data, leakage_indices, leakage_indptr, leakage_shape,\
+            #    squarenodes)
+            E_n_data, E_n_idx, E_n_indptr = get_E_n(D[:,i], X[:,i], \
+                E_n_shape, rsvr_size, W_mat_data, W_mat_indices, W_mat_indptr, W_mat_shape,\
+                leakage_data, leakage_indices, leakage_indptr, leakage_shape,\
+                squarenodes)
+            E_n_datas[k-2] = np.ascontiguousarray(E_n_data)
+            E_n_indices[k-2] = np.ascontiguousarray(E_n_idx)
+            E_n_indptrs[k-2] = np.ascontiguousarray(E_n_indptr)
+            #E_n_base = matrix_diag_sparse_mult_add(
+            #    D[:, i], W_mat_data, W_mat_indices, W_mat_indptr, W_mat_shape,      leakage_mat)
+            #if squarenodes:
+            #    E_n[1+rsvr_size:1+res_feature_size,:,k-2] = matrix_diag_mult(2*X[:,  i], E_n_base)
+            #E_n[1:rsvr_size+1, :, k-2] = E_n_base
+            """
+            with objmode(E_n_toc = 'double'):
+                E_n_toc = time.perf_counter()
+            if i > k:
+                E_n_avg_runtime = E_n_avg_runtime*(i-k)/(i-k+1)+(E_n_toc-E_n_tic)/(i-k+1)
+            else:
+                E_n_avg_runtime = E_n_toc-E_n_tic
+            with objmode(reg_mult_tic = 'double'):
+                reg_mult_tic = time.perf_counter()
+            """
+
+            #reg_comp_datas_new, reg_comp_indices_new, reg_comp_indptrs_new = \
+            #    [np.zeros(1, dtype = np.double) for x in range(0)],\
+            #    [np.zeros(1, dtype = np.int32) for x in range(0)],\
+            #    [np.zeros(1, dtype = np.int32) for x in range(0)]
+            for j in range(k-1):
+                if sparsity[j+1] < sparse_cutoff:
+                    reg_comp_data, reg_comp_idx, reg_comp_indptr, tmp = matrix_sparse_sparse_conv_mult(\
+                        E_n_datas[k-2], E_n_indices[k-2], E_n_indptrs[k-2], E_n_shape,\
+                        reg_comp_datas[j+1], reg_comp_indices[j+1], reg_comp_indptrs[j+1], reg_comp_shape)
+                else:
+                    reg_comp_data, reg_comp_idx, reg_comp_indptr, tmp = matrix_sparse_sparse_mult(\
+                        E_n_datas[j], E_n_indices[j], E_n_indptrs[j], E_n_shape,\
+                        reg_comp_datas[j+1], reg_comp_indices[j+1], reg_comp_indptrs[j+1], reg_comp_shape)
+                reg_comp_datas[j], reg_comp_indices[j], reg_comp_indptrs[j] = \
+                    np.ascontiguousarray(reg_comp_data), np.ascontiguousarray(reg_comp_idx),\
+                    np.ascontiguousarray(reg_comp_indptr)
+                #reg_comp_datas_new.append(reg_comp_data)
+                #reg_comp_indices_new.append(reg_comp_idx)
+                #reg_comp_indptrs_new.append(reg_comp_indptr)
+                    #reg_components[:, :, j] = matrix_sparse_sparse_mult(
+                    #    E_n[:, :, k-2], reg_components[:, :, j+1])
+            """
+            with objmode(reg_mult_toc = 'double'):
+                reg_mult_toc = time.perf_counter()
+            if i > k:
+                reg_mult_avg_runtime = reg_mult_avg_runtime*(i-k)/(i-k+1)+(reg_mult_toc-reg_mult_tic)/(i-k+1)
+            else:
+                reg_mult_avg_runtime = reg_mult_toc-reg_mult_tic
+            with objmode(D_n_tic = 'double'):
+                D_n_tic = time.perf_counter()
+            """
+            #D_n_base = matrix_diag_mult(D[:, i], Win[:, 1:])
+            #if squarenodes:
+            #    reg_components[1+rsvr_size:1+res_feature_size,:,k-1] = matrix_diag_mult(2*X[:,i], D_n_base)
+            #reg_components[1:rsvr_size+1, :, k - 1] = D_n_base
+            #reg_components[1+res_feature_size:, :, k-1] = np.identity(n)
+            reg_comp_data, reg_comp_idx, reg_comp_indptr = get_D_n(D[:,i], X[:,i], \
+                Win_nobias_data, Win_nobias_indices, Win_nobias_indptr, Win_nobias_shape, D_n_shape, \
+                rsvr_size, res_feature_size, n, squarenodes)
+            reg_comp_datas[k-1], reg_comp_indices[k-1], reg_comp_indptrs[k-1] = \
+                np.ascontiguousarray(reg_comp_data), np.ascontiguousarray(reg_comp_idx),\
+                np.ascontiguousarray(reg_comp_indptr)
+            #reg_comp_datas_new.append(reg_comp_data)
+            #reg_comp_indices_new.append(reg_comp_idx)
+            #reg_comp_indptrs_new.append(reg_comp_indptr)
+
+            #reg_comp_datas, reg_comp_indices, reg_comp_indptrs = reg_comp_datas_new, reg_comp_indices_new, reg_comp_indptrs_new
+            """
+            with objmode(D_n_toc = 'double'):
+                D_n_toc = time.perf_counter()
+            if i > k:
+                D_n_avg_runtime = D_n_avg_runtime*(i-k)/(i-k+1)+(D_n_toc-D_n_tic)/(i-k+1)
+            else:
+                D_n_avg_runtime = D_n_toc-D_n_tic
+            """
+            """
+            if i == k:
+                print('Reg components @ 2,1')
+                print(reg_components[:5,:5, k -1])
+            if i == k:
+                print('Reg components @ 2,0')
+                print(reg_components[:5,:5, 0])
+            """
+            """
+            if i % 50 == 0:
+                with objmode(toc = 'double'):
+                    toc = time.perf_counter()
+                runtime = toc - tic
+                tic = toc
+                print('50 Iter Runtime: ')
+                print(runtime)
+            """
+        if not break_flag:
+            for j in range(k):
+                if sparsity[j] < sparse_cutoff:
+                    #gradient_reg += reg_components[:, :, j] @ reg_components[:, :, j].T
+                    gradient_reg_base += matrix_sparse_sparseT_conv_mult(\
+                        reg_comp_datas[j], reg_comp_indices[j], reg_comp_indptrs[j], reg_comp_shape)
+                else:
+                    gradient_reg_base += matrix_sparse_sparseT_mult(reg_comp_datas[j], reg_comp_indices[j],\
+                        reg_comp_indptrs[j], reg_comp_shape)
+            assign_grad_reg = i+1 == reg_train_times
+            if np.any(assign_grad_reg):
+                print(assign_grad_reg)
+                gradient_reg[assign_grad_reg] = gradient_reg_base*reg_train_fracs[assign_grad_reg]
+        """
+        print('Gradient reg:')
+        print(gradient_reg[:5,:5])
+        """
+        """
+        with objmode(toc = 'double'):
+            toc = time.perf_counter()
+        print('Gradient reg. compute time in sec.')
+        print(toc - tic)
+        """
+        #print('Target matrix:')
+        #print(data_trstates[:5,:5])
+        #print('Information matrix:')
+        #print(states_trstates[0,:5,:5])
+        #print('Gradient regularization:')
+        #print(gradient_reg[0,:5,:5])
+        #print('X_train:')
+        #print(X_train[:5,:5])
+        return data_trstates, states_trstates, Y_train, X_train, gradient_reg
     else:
         # Noiseless training
         data_trstates = np.zeros((n, rsvr_size+1+n), dtype=np.float64)
@@ -1513,8 +2040,8 @@ def testwrapped(res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_i
                     print(rktest_u_arr_test[:5,k*max_valid_time+j,i])
                     """
                     check_vt = False
-            print('Valid Time')
-            print(valid_time[i,k])
+            #print('Valid Time')
+            #print(valid_time[i,k])
             res_X = np.zeros((res_X.shape[0], max_valid_time+2))
             res_X, p = getXwrapped(np.ascontiguousarray(
                 rktest_u_arr_test[:, k*max_valid_time:(k+1)*max_valid_time+1, i]), res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_indices, W_indptr, W_shape, leakage, noise_in)
@@ -1660,14 +2187,21 @@ def generate_res(res_gen, res_itr, squarenodes, rk, reg_train_times, res_size, r
     return reservoir, noise_in
 
 
-def optim_func(res, squarenodes, noise_in, noise, rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests, alpha,   true_pmap_max, rkTime=400, split=2000, traintype='normal', system='lorenz', params=np.array([[], []], dtype=np.complex128), pmap = False, max_valid_time = 500, savepred = False, save_time_rms = False):
+def optim_func(res, squarenodes, noise_in, noise, rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests, alpha,   true_pmap_max, rkTime=400, split=2000, traintype='normal', system='lorenz', params=np.array([[], []], dtype=np.complex128), pmap = False, max_valid_time = 500, savepred = False, save_time_rms = False, prior = 'zero'):
     # Function for training and testing the performance of a reservoir trained using a particular regularization parameter
     if squarenodes:
         res_feature_size = res.rsvr_size*2
     else:
         res_feature_size = res.rsvr_size
-    idenmat = np.identity(
-        res_feature_size+1+rktest_u_arr_train_nonoise.shape[0])*alpha
+    if prior == 'zero':
+        idenmat = np.identity(
+            res_feature_size+1+rktest_u_arr_train_nonoise.shape[0])*alpha
+        prior = np.zeros(res.data_trstates.shape)
+    elif prior == 'input_pass':
+        idenmat = np.identity(
+             res_feature_size+1+rktest_u_arr_train_nonoise.shape[0])*alpha
+        prior = np.concatenate((np.zeros((rktest_u_arr_train_nonoise.shape[0], 1+res_feature_size)), np.identity(rktest_u_arr_train_nonoise.shape[0])), axis = 1)
+
     #print('Gradient reg shape')
     #print(res.gradient_reg.shape)
     num_reg_train_times = res.gradient_reg.shape[0]
@@ -1692,7 +2226,7 @@ def optim_func(res, squarenodes, noise_in, noise, rktest_u_arr_train_nonoise, rk
             #print(res.gradient_reg.shape)
             #print(idenmat.shape)
             res.Wout[i] = np.transpose(solve(np.transpose(
-                res.states_trstates[i] + noise**2.0*res.gradient_reg[i]+idenmat), np.transpose(res.data_trstates)))
+                res.states_trstates[i] + noise**2.0*res.gradient_reg[i]+idenmat), np.transpose(res.data_trstates+prior)))
             #np.savetxt('/lustre/awikner1/res-noise-stabilization/lorenz_Wout_res%d_noise%e_reg%e.csv' % (res.rsvr_size, noise, alpha),\
             #        res.Wout[i], delimiter = ',')
             #res.Wout =  matlab_mrdivide(res.states_trstates + noise**2.0*res.gradient_reg + idenmat, res.data_trstates)
@@ -1715,7 +2249,7 @@ def optim_func(res, squarenodes, noise_in, noise, rktest_u_arr_train_nonoise, rk
 
 
 def get_res_results(itr, res_gen, squarenodes, rk, reg_train_times, res_size, rho, sigma, leakage, win_type, bias_type, noisetype, noise, noise_realizations, noise_stream, traintype,
-    rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests, alpha_values, rkTime_test, split_test, system, tau, params, savepred, save_time_rms, debug_mode, train_seed,   true_pmap_max, pmap, max_valid_time):
+    rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests, alpha_values, rkTime_test, split_test, system, tau, params, savepred, save_time_rms, debug_mode, train_seed,   true_pmap_max, pmap, max_valid_time, prior):
     # Function for generating, training, and testing the performance of a reservoir given an input set of testing data time series,
     # a set of regularization values, and a set of noise magnitudes
     tic = time.perf_counter()
@@ -1775,7 +2309,7 @@ def get_res_results(itr, res_gen, squarenodes, rk, reg_train_times, res_size, rh
         min_optim_func = lambda alpha: optim_func(reservoir, squarenodes, noise_in[0], noise, \
                 rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests, alpha,\
                 true_pmap_max, rkTime_test, split_test, traintype, system, params, pmap,\
-                max_valid_time, savepred, save_time_rms)
+                max_valid_time, savepred, save_time_rms,prior)
         func_vals = np.zeros(alpha_values.size)
         for j, alpha_value in enumerate(alpha_values):
             print('Regularization: ', alpha_values[j])
@@ -1940,7 +2474,7 @@ def get_res_results(itr, res_gen, squarenodes, rk, reg_train_times, res_size, rh
             pmap_max_wass_dist_out, train_mean_rms_out, train_max_rms_out, train_seed, noise_array, itr
 
 
-def find_stability(noisetype, noise, traintype, train_seed, train_gen, res_itr, res_gen, squarenodes, test_stream, noise_stream, rho, sigma, leakage, win_type, bias_type, train_time, reg_train_times, res_size, res_per_test, noise_realizations, num_tests, alpha_values, system, tau, savepred, save_time_rms, debug_mode, root_folder, pmap, max_valid_time, raw_data_folder):
+def find_stability(noisetype, noise, traintype, train_seed, train_gen, res_itr, res_gen, squarenodes, test_stream, noise_stream, rho, sigma, leakage, win_type, bias_type, train_time, reg_train_times, res_size, res_per_test, noise_realizations, num_tests, alpha_values, system, tau, savepred, save_time_rms, debug_mode, root_folder, pmap, max_valid_time, prior, raw_data_folder):
 
     # Main function for training and testing reservoir performance. This function first generates the training and testing data,
     # the passes to get_res_results to obtain th reservoir performance.
@@ -1999,7 +2533,7 @@ def find_stability(noisetype, noise, traintype, train_seed, train_gen, res_itr, 
             leakage, win_type, bias_type, noisetype, noise, noise_realizations, noise_stream, \
             traintype, rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests, alpha_values, \
             rkTime_test, split_test, system, tau, params, savepred, save_time_rms, debug_mode, \
-            train_seed, true_pmap_max, pmap, max_valid_time)
+            train_seed, true_pmap_max, pmap, max_valid_time,prior)
     print(type(stable_frac_out))
     print(stable_frac_out.shape)
     #print(type(stable_frac_out[0,:,1]))
@@ -2110,7 +2644,7 @@ def main(argv):
     root_folder, top_folder, run_name, system, noisetype, traintype, savepred, save_time_rms, squarenodes, rho,\
         sigma, leakage, win_type, bias_type, tau, res_size, train_time, noise_realizations, \
         noise_streams_per_test, noise_values_array,alpha_values, res_per_test, num_trains, num_tests,\
-        debug_mode, pmap, metric, return_all, ifray, machine,max_valid_time, tmp, tmp1, tmp2, tmp3,\
+        debug_mode, pmap, metric, return_all, ifray, machine,max_valid_time,prior, tmp, tmp1, tmp2, tmp3,\
         reg_train_times, discard_time = get_run_opts(argv)
 
     raw_data_folder = os.path.join(os.path.join(root_folder, top_folder), run_name + '_folder')
@@ -2160,6 +2694,13 @@ def main(argv):
         for i in range(res_per_test*num_trains):
             res_streams[i]   = np.random.default_rng(res_seeds[rt[i]])
             train_streams[i] = np.random.default_rng(train_seeds[tr[i]])
+        incomplete_idxs = []
+        for i in range(tr.size):
+            if not os.path.exists(os.path.join(raw_data_folder, 'train_max_rms_res%d_train%d_noise%e_regtrain%d.csv' % (rt[i], tr[i], noise_values_array[-1], reg_train_times[-1]))):
+                incomplete_idxs.append(i)
+        print('Total idxs: %d' % tr.size)
+        print('Incomplete idxs: %d' % len(incomplete_idxs))
+
         print('Starting Ray Computation')
         tic = time.perf_counter()
         if ifray:
@@ -2168,14 +2709,14 @@ def main(argv):
                 leakage, win_type, bias_type, train_time, reg_train_times,\
                 res_size, res_per_test, noise_realizations, num_tests, alpha_values,\
                 system, tau, savepred, save_time_rms, debug_mode, \
-                root_folder, pmap, max_valid_time, raw_data_folder) for i in range(tr.size)])
+                root_folder, pmap, max_valid_time,prior, raw_data_folder) for i in incomplete_idxs])
         else:
             out_base  = [find_stability_serial(noisetype, noise_values_array, traintype, \
                 tr[i], train_streams[i], rt[i], res_streams[i], squarenodes, test_streams[i], noise_streams, rho, sigma, \
                 leakage, win_type, bias_type, train_time, reg_train_times, \
                 res_size, res_per_test, noise_realizations, num_tests, alpha_values,\
                 system, tau, savepred, save_time_rms, debug_mode,\
-                root_folder, pmap, max_valid_time, raw_data_folder) for i in range(tr.size)]
+                root_folder, pmap, max_valid_time,prior, raw_data_folder) for i in incomplete_idxs]
 
         # print('Ray out len: %d' % len(out_base))
         # print('Out elem len: %d' % len(out_base[0]))
@@ -2221,11 +2762,15 @@ def main(argv):
         rtn = rtn.flatten()
 
         for i in range(num_trains*res_per_test*noise_values_array.size):
-            print(res_seeds[rtn[i]])
+            #print(res_seeds[rtn[i]])
             res_streams[i]   = np.random.default_rng(res_seeds[rtn[i]])
             train_streams[i] = np.random.default_rng(train_seeds[tnr[i]])
             test_streams[i]  = np.array([np.random.default_rng(j) for j in test_seeds])
             noise_streams[i] = np.array([np.random.default_rng(j) for j in noise_seeds])
+        incomplete_idxs = []
+        for i in range(tnr.size):
+            if not os.path.exists(os.path.join(raw_data_folder, 'train_max_rms_res%d_train%d_noise%e_regtrain%d.csv' % (rtn[i],  tnr[i], ntr[i], reg_train_times[-1]))):
+                incomplete_idxs.append(i)
 
 
         print('Starting Ray Computation')
@@ -2235,13 +2780,13 @@ def main(argv):
                 tnr[i], train_streams[i], rtn[i], res_streams[i], squarenodes, test_streams[i], noise_streams[i], \
                 rho, sigma, leakage, win_type, bias_type, train_time, reg_train_times,\
                 res_size, res_per_test, noise_realizations, num_tests, alpha_values,\
-                system, tau, savepred, save_time_rms, debug_mode, root_folder, pmap, max_valid_time, raw_data_folder) for i in range(tnr.size)])
+                system, tau, savepred, save_time_rms, debug_mode, root_folder, pmap, max_valid_time,prior, raw_data_folder) for i in incomplete_idxs])
         else:
             out_base  = [find_stability_serial(noisetype, ntr[i], traintype,\
                 tnr[i], train_streams[i], rtn[i], res_streams[i], squarenodes, test_streams[i], noise_streams[i], \
                 rho, sigma, leakage, win_type, bias_type, train_time, reg_train_times,\
                 res_size, res_per_test, noise_realizations, num_tests, alpha_values,\
-                system, tau, savepred, save_time_rms, debug_mode, root_folder, pmap, max_valid_time, raw_data_folder) for i in range(tnr.size)]
+                system, tau, savepred, save_time_rms, debug_mode, root_folder, pmap, max_valid_time,prior, raw_data_folder) for i in incomplete_idxs]
         """
         out = []
         for i in range(len(out_base)):
@@ -2255,16 +2800,19 @@ def main(argv):
         #    print('Res idx: %d' % rtn[k])
         #    print(out[k][8][0, -1, -1])
         """
-    rkTime, split = out_base[0]
-    np.savetxt(os.path.join(raw_data_folder, 'test_time_split.csv'), np.array([rkTime, split]), delimiter = ',')
+    if len(incomplete_idxs) != 0:
+        rkTime, split = out_base[0]
+        np.savetxt(os.path.join(raw_data_folder, 'test_time_split.csv'), np.array([rkTime, split]), delimiter = ',')
+        toc = time.perf_counter()
+        runtime = toc - tic
+        print('Runtime over all cores: %f sec.' %(runtime))
+        print('Ray finished.')
+        print('Results Saved')
+    else:
+        print('No incomplete runs were found. Ending job.')
 
     # print(len(results[0]))
     ray.shutdown()
-    toc = time.perf_counter()
-    runtime = toc - tic
-    print('Runtime over all cores: %f sec.' %(runtime))
-    print('Ray finished.')
-    print('Results Saved')
 
 
 if __name__ == "__main__":

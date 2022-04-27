@@ -46,6 +46,7 @@ def get_run_opts(argv, runflag = True):
         import_test = False
         import_noise = False
         reg_train_times = None
+        prior = 'zero'
 
         try:
             opts, args = getopt.getopt(argv, "T:N:r:",
@@ -55,7 +56,8 @@ def get_run_opts(argv, runflag = True):
                     'machine=', 'num_cpus=', 'pmap=', 'parallel=', 'metric=','returnall=',
                     'savetime=', 'noisevals=', 'regvals=', 'maxvt=', 'noisestreams=',
                     'squarenodes=', 'resonly=', 'importres=','importtrain=',
-                    'importtest=','importnoise=','regtraintimes=','discardlen='])
+                    'importtest=','importnoise=','regtraintimes=','discardlen=',
+                    'prior='])
         except getopt.GetoptError:
             print('Error: Some options not recognized')
             sys.exit(2)
@@ -69,6 +71,9 @@ def get_run_opts(argv, runflag = True):
             elif opt == '-r':
                 noise_realizations = int(arg)
                 print('Noise Realizations: %d' % noise_realizations)
+            elif opt == '--prior':
+                prior = str(arg)
+                print('Prior type: %s' % prior)
             elif opt == '--discardlen':
                 discard_time = int(arg)
                 print('Discard iterations: %d' % discard_time)
@@ -249,7 +254,7 @@ def get_run_opts(argv, runflag = True):
         train_time, res_size, noise_realizations, save_time_rms, metric,\
                 return_all, machine, rho, sigma, leakage, tau, win_type, \
                 bias_type, res_per_test, num_tests, num_trains, savepred, \
-                noisetype, traintype, system, squarenodes, resonly, import_res,\
+                noisetype, traintype, system, squarenodes, resonly, prior, import_res,\
                 import_train, import_test, import_noise, reg_train_times,\
                 discard_time = argv
     if return_all and savepred:
@@ -262,6 +267,9 @@ def get_run_opts(argv, runflag = True):
             raise ValueError
     if traintype in ['gradient','gradient12','gradient2']:
         print('Use of gradient, gradient12, and gradient2 is depracated. Please use gradientk instead.')
+        raise ValueError
+    if prior not in ['zero','input_pass']:
+        print('Prior type not recognized.')
         raise ValueError
     if import_res:
         iresflag = 'ires_'
@@ -279,7 +287,10 @@ def get_run_opts(argv, runflag = True):
         inoiseflag = 'inoise_'
     else:
         inoiseflag = ''
-
+    if prior == 'zero':
+        prior_str = ''
+    else:
+        prior_str = '_prior_%s' % prior
     if savepred:
         predflag = 'wpred_'
     else:
@@ -306,12 +317,12 @@ def get_run_opts(argv, runflag = True):
 
     if not return_all:
         data_folder = 'Data/%s_noisetest_noisetype_%s_traintype_%s/' % (system, noisetype, traintype)
-        run_name = '%s_%s%s%s%s%s%s%s%srho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s_metric_%s' \
+        run_name = '%s_%s%s%s%s%s%s%s%srho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s%s_metric_%s' \
              % (system,resonly_flag,predflag, timeflag, squarenodes_flag, iresflag, itrainflag, itestflag, inoiseflag, rho, sigma, leakage, win_type, bias_type, tau, res_size, \
-             train_time, noise_realizations, noisetype, traintype, metric)
+             train_time, noise_realizations, noisetype, traintype, prior_str, metric)
     elif return_all:
         data_folder = 'Data/%s_noisetest_noisetype_%s_traintype_%s/' % (system, noisetype, traintype)
-        run_name = '%s_%s%s%s%s%s%s%s%srho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s' % (system,resonly_flag,predflag, timeflag, squarenodes_flag, iresflag, itrainflag, itestflag, inoiseflag, rho, sigma, leakage, win_type, bias_type, tau,res_size, train_time, noise_realizations, noisetype, traintype)
+        run_name = '%s_%s%s%s%s%s%s%s%srho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s%s' % (system,resonly_flag,predflag, timeflag, squarenodes_flag, iresflag, itrainflag, itestflag, inoiseflag, rho, sigma, leakage, win_type, bias_type, tau,res_size, train_time, noise_realizations, noisetype, traintype, prior_str)
     if runflag:
         if not os.path.isdir(os.path.join(root_folder, data_folder)):
             os.mkdir(os.path.join(root_folder, data_folder))
@@ -321,7 +332,8 @@ def get_run_opts(argv, runflag = True):
         return root_folder, data_folder, run_name, system, noisetype, traintype, savepred, save_time_rms, squarenodes, rho,\
             sigma, leakage, win_type, bias_type, tau, res_size, train_time, noise_realizations, noise_streams_per_test,\
             noise_values_array,alpha_values, res_per_test, num_trains, num_tests, debug_mode, pmap, metric, \
-            return_all, ifray, machine, max_valid_time, import_res, import_train, import_test, import_noise, reg_train_times, discard_time
+            return_all, ifray, machine, max_valid_time, prior, import_res, import_train, import_test, import_noise, \
+            reg_train_times, discard_time
     else:
         if not savepred:
             return os.path.join(os.path.join(root_folder, data_folder), run_name + '.bz2'), ''
