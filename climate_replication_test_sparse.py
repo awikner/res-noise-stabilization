@@ -1064,13 +1064,14 @@ def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indice
             D_n_datas.append(np.ascontiguousarray(D_n_data))
             D_n_indices.append(np.ascontiguousarray(D_n_idx))
             D_n_indptrs.append(np.ascontiguousarray(D_n_indptr))
-        for i in range(1, k):
-            E_n_data, E_n_idx, E_n_indptr = get_E_n(D[:,i], X[:,i], E_n_shape, rsvr_size, W_mat_data,\
-                W_mat_indices, W_mat_indptr, W_mat_shape, leakage_data, leakage_indices, \
-                leakage_indptr, leakage_shape, squarenodes)
-            E_n_datas.append(np.ascontiguousarray(E_n_data))
-            E_n_indices.append(np.ascontiguousarray(E_n_idx))
-            E_n_indptrs.append(np.ascontiguousarray(E_n_indptr))
+        if k > 1:
+            for i in range(1, k):
+                E_n_data, E_n_idx, E_n_indptr = get_E_n(D[:,i], X[:,i], E_n_shape, rsvr_size, W_mat_data,\
+                    W_mat_indices, W_mat_indptr, W_mat_shape, leakage_data, leakage_indices, \
+                    leakage_indptr, leakage_shape, squarenodes)
+                E_n_datas.append(np.ascontiguousarray(E_n_data))
+                E_n_indices.append(np.ascontiguousarray(E_n_idx))
+                E_n_indptrs.append(np.ascontiguousarray(E_n_indptr))
         #reg_comp_datas[k-1], reg_comp_indices[k-1], reg_comp_indptrs[k-1] =\
         #    np.copy(D_n_datas[-1]), np.copy(D_n_indices[-1]), np.copy(D_n_indptrs[-1])
         #reg_components[:, :, k-1] = D_n[:, :, -1]
@@ -1079,12 +1080,13 @@ def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indice
             #reg_components[:, :, i] = D_n[:, :, i]
             reg_comp_data, reg_comp_idx, reg_comp_indptr =\
                 np.copy(D_n_datas[i]), np.copy(D_n_indices[i]), np.copy(D_n_indptrs[i])
-            for j in range(i, k-1):
-                #reg_components[:, :, i] = matrix_sparse_mult(
-                #    E_n[:, :, j], reg_components[:, :, i])
-                reg_comp_data, reg_comp_idx, reg_comp_indptr, tmp = matrix_sparse_sparse_mult(\
-                    E_n_datas[j], E_n_indices[j], E_n_indptrs[j], E_n_shape,\
-                    reg_comp_data, reg_comp_idx, reg_comp_indptr, reg_comp_shape)
+            if k > 1:
+                for j in range(i, k-1):
+                    #reg_components[:, :, i] = matrix_sparse_mult(
+                    #    E_n[:, :, j], reg_components[:, :, i])
+                    reg_comp_data, reg_comp_idx, reg_comp_indptr, tmp = matrix_sparse_sparse_mult(\
+                        E_n_datas[j], E_n_indices[j], E_n_indptrs[j], E_n_shape,\
+                        reg_comp_data, reg_comp_idx, reg_comp_indptr, reg_comp_shape)
             reg_comp_datas.append(np.ascontiguousarray(reg_comp_data))
             reg_comp_indices.append(np.ascontiguousarray(reg_comp_idx))
             reg_comp_indptrs.append(np.ascontiguousarray(reg_comp_indptr))
@@ -1138,13 +1140,14 @@ def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indice
             #    E_n_shape, rsvr_size, W_mat_data, W_mat_indices, W_mat_indptr, W_mat_shape,\
             #    leakage_data, leakage_indices, leakage_indptr, leakage_shape,\
             #    squarenodes)
-            E_n_data, E_n_idx, E_n_indptr = get_E_n(D[:,i], X[:,i], \
-                E_n_shape, rsvr_size, W_mat_data, W_mat_indices, W_mat_indptr, W_mat_shape,\
-                leakage_data, leakage_indices, leakage_indptr, leakage_shape,\
-                squarenodes)
-            E_n_datas[k-2] = np.ascontiguousarray(E_n_data)
-            E_n_indices[k-2] = np.ascontiguousarray(E_n_idx)
-            E_n_indptrs[k-2] = np.ascontiguousarray(E_n_indptr)
+            if k > 1:
+                E_n_data, E_n_idx, E_n_indptr = get_E_n(D[:,i], X[:,i], \
+                    E_n_shape, rsvr_size, W_mat_data, W_mat_indices, W_mat_indptr, W_mat_shape,\
+                    leakage_data, leakage_indices, leakage_indptr, leakage_shape,\
+                    squarenodes)
+                E_n_datas[k-2] = np.ascontiguousarray(E_n_data)
+                E_n_indices[k-2] = np.ascontiguousarray(E_n_idx)
+                E_n_indptrs[k-2] = np.ascontiguousarray(E_n_indptr)
             #E_n_base = matrix_diag_sparse_mult_add(
             #    D[:, i], W_mat_data, W_mat_indices, W_mat_indptr, W_mat_shape,      leakage_mat)
             #if squarenodes:
@@ -1166,17 +1169,18 @@ def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indice
             #    [np.zeros(1, dtype = np.int32) for x in range(0)],\
             #    [np.zeros(1, dtype = np.int32) for x in range(0)]
             for j in range(k-1):
-                if sparsity[j+1] < sparse_cutoff:
-                    reg_comp_data, reg_comp_idx, reg_comp_indptr, tmp = matrix_sparse_sparse_conv_mult(\
-                        E_n_datas[k-2], E_n_indices[k-2], E_n_indptrs[k-2], E_n_shape,\
-                        reg_comp_datas[j+1], reg_comp_indices[j+1], reg_comp_indptrs[j+1], reg_comp_shape)
-                else:
-                    reg_comp_data, reg_comp_idx, reg_comp_indptr, tmp = matrix_sparse_sparse_mult(\
-                        E_n_datas[j], E_n_indices[j], E_n_indptrs[j], E_n_shape,\
-                        reg_comp_datas[j+1], reg_comp_indices[j+1], reg_comp_indptrs[j+1], reg_comp_shape)
-                reg_comp_datas[j], reg_comp_indices[j], reg_comp_indptrs[j] = \
-                    np.ascontiguousarray(reg_comp_data), np.ascontiguousarray(reg_comp_idx),\
-                    np.ascontiguousarray(reg_comp_indptr)
+                if k > 1:
+                    if sparsity[j+1] < sparse_cutoff:
+                        reg_comp_data, reg_comp_idx, reg_comp_indptr, tmp = matrix_sparse_sparse_conv_mult(\
+                            E_n_datas[k-2], E_n_indices[k-2], E_n_indptrs[k-2], E_n_shape,\
+                            reg_comp_datas[j+1], reg_comp_indices[j+1], reg_comp_indptrs[j+1], reg_comp_shape)
+                    else:
+                        reg_comp_data, reg_comp_idx, reg_comp_indptr, tmp = matrix_sparse_sparse_mult(\
+                            E_n_datas[j], E_n_indices[j], E_n_indptrs[j], E_n_shape,\
+                            reg_comp_datas[j+1], reg_comp_indices[j+1], reg_comp_indptrs[j+1], reg_comp_shape)
+                    reg_comp_datas[j], reg_comp_indices[j], reg_comp_indptrs[j] = \
+                        np.ascontiguousarray(reg_comp_data), np.ascontiguousarray(reg_comp_idx),\
+                        np.ascontiguousarray(reg_comp_indptr)
                 #reg_comp_datas_new.append(reg_comp_data)
                 #reg_comp_indices_new.append(reg_comp_idx)
                 #reg_comp_indptrs_new.append(reg_comp_indptr)
@@ -1327,13 +1331,14 @@ def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indice
             D_n_datas.append(np.ascontiguousarray(D_n_data))
             D_n_indices.append(np.ascontiguousarray(D_n_idx))
             D_n_indptrs.append(np.ascontiguousarray(D_n_indptr))
-        for i in range(1, k):
-            E_n_data, E_n_idx, E_n_indptr = get_E_n(D[:,i], X[:,i], E_n_shape, rsvr_size, W_mat_data,\
-                W_mat_indices, W_mat_indptr, W_mat_shape, leakage_data, leakage_indices, \
-                leakage_indptr, leakage_shape, squarenodes)
-            E_n_datas.append(np.ascontiguousarray(E_n_data))
-            E_n_indices.append(np.ascontiguousarray(E_n_idx))
-            E_n_indptrs.append(np.ascontiguousarray(E_n_indptr))
+        if k > 1:
+            for i in range(1, k):
+                E_n_data, E_n_idx, E_n_indptr = get_E_n(D[:,i], X[:,i], E_n_shape, rsvr_size, W_mat_data,\
+                    W_mat_indices, W_mat_indptr, W_mat_shape, leakage_data, leakage_indices, \
+                    leakage_indptr, leakage_shape, squarenodes)
+                E_n_datas.append(np.ascontiguousarray(E_n_data))
+                E_n_indices.append(np.ascontiguousarray(E_n_idx))
+                E_n_indptrs.append(np.ascontiguousarray(E_n_indptr))
         #reg_comp_datas[k-1], reg_comp_indices[k-1], reg_comp_indptrs[k-1] =\
         #    np.copy(D_n_datas[-1]), np.copy(D_n_indices[-1]), np.copy(D_n_indptrs[-1])
         #reg_components[:, :, k-1] = D_n[:, :, -1]
@@ -1342,12 +1347,13 @@ def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indice
             #reg_components[:, :, i] = D_n[:, :, i]
             reg_comp_data, reg_comp_idx, reg_comp_indptr =\
                 np.copy(D_n_datas[i]), np.copy(D_n_indices[i]), np.copy(D_n_indptrs[i])
-            for j in range(i, k-1):
-                #reg_components[:, :, i] = matrix_sparse_mult(
-                #    E_n[:, :, j], reg_components[:, :, i])
-                reg_comp_data, reg_comp_idx, reg_comp_indptr, tmp = matrix_sparse_sparse_mult(\
-                    E_n_datas[j], E_n_indices[j], E_n_indptrs[j], E_n_shape,\
-                    reg_comp_data, reg_comp_idx, reg_comp_indptr, reg_comp_shape)
+            if k > 1:
+                for j in range(i, k-1):
+                    #reg_components[:, :, i] = matrix_sparse_mult(
+                    #    E_n[:, :, j], reg_components[:, :, i])
+                    reg_comp_data, reg_comp_idx, reg_comp_indptr, tmp = matrix_sparse_sparse_mult(\
+                        E_n_datas[j], E_n_indices[j], E_n_indptrs[j], E_n_shape,\
+                        reg_comp_data, reg_comp_idx, reg_comp_indptr, reg_comp_shape)
             reg_comp_datas.append(np.ascontiguousarray(reg_comp_data))
             reg_comp_indices.append(np.ascontiguousarray(reg_comp_idx))
             reg_comp_indptrs.append(np.ascontiguousarray(reg_comp_indptr))
@@ -1400,13 +1406,14 @@ def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indice
             #    E_n_shape, rsvr_size, W_mat_data, W_mat_indices, W_mat_indptr, W_mat_shape,\
             #    leakage_data, leakage_indices, leakage_indptr, leakage_shape,\
             #    squarenodes)
-            E_n_data, E_n_idx, E_n_indptr = get_E_n(D[:,i], X[:,i], \
-                E_n_shape, rsvr_size, W_mat_data, W_mat_indices, W_mat_indptr, W_mat_shape,\
-                leakage_data, leakage_indices, leakage_indptr, leakage_shape,\
-                squarenodes)
-            E_n_datas[k-2] = np.ascontiguousarray(E_n_data)
-            E_n_indices[k-2] = np.ascontiguousarray(E_n_idx)
-            E_n_indptrs[k-2] = np.ascontiguousarray(E_n_indptr)
+            if k > 1:
+                E_n_data, E_n_idx, E_n_indptr = get_E_n(D[:,i], X[:,i], \
+                    E_n_shape, rsvr_size, W_mat_data, W_mat_indices, W_mat_indptr, W_mat_shape,\
+                    leakage_data, leakage_indices, leakage_indptr, leakage_shape,\
+                    squarenodes)
+                E_n_datas[k-2] = np.ascontiguousarray(E_n_data)
+                E_n_indices[k-2] = np.ascontiguousarray(E_n_idx)
+                E_n_indptrs[k-2] = np.ascontiguousarray(E_n_indptr)
             #E_n_base = matrix_diag_sparse_mult_add(
             #    D[:, i], W_mat_data, W_mat_indices, W_mat_indptr, W_mat_shape,      leakage_mat)
             #if squarenodes:
@@ -1428,17 +1435,18 @@ def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indice
             #    [np.zeros(1, dtype = np.int32) for x in range(0)],\
             #    [np.zeros(1, dtype = np.int32) for x in range(0)]
             for j in range(k-1):
-                if sparsity[j+1] < sparse_cutoff:
-                    reg_comp_data, reg_comp_idx, reg_comp_indptr, tmp = matrix_sparse_sparse_conv_mult(\
-                        E_n_datas[k-2], E_n_indices[k-2], E_n_indptrs[k-2], E_n_shape,\
-                        reg_comp_datas[j+1], reg_comp_indices[j+1], reg_comp_indptrs[j+1], reg_comp_shape)
-                else:
-                    reg_comp_data, reg_comp_idx, reg_comp_indptr, tmp = matrix_sparse_sparse_mult(\
-                        E_n_datas[j], E_n_indices[j], E_n_indptrs[j], E_n_shape,\
-                        reg_comp_datas[j+1], reg_comp_indices[j+1], reg_comp_indptrs[j+1], reg_comp_shape)
-                reg_comp_datas[j], reg_comp_indices[j], reg_comp_indptrs[j] = \
-                    np.ascontiguousarray(reg_comp_data), np.ascontiguousarray(reg_comp_idx),\
-                    np.ascontiguousarray(reg_comp_indptr)
+                if k > 1:
+                    if sparsity[j+1] < sparse_cutoff:
+                        reg_comp_data, reg_comp_idx, reg_comp_indptr, tmp = matrix_sparse_sparse_conv_mult(\
+                            E_n_datas[k-2], E_n_indices[k-2], E_n_indptrs[k-2], E_n_shape,\
+                            reg_comp_datas[j+1], reg_comp_indices[j+1], reg_comp_indptrs[j+1], reg_comp_shape)
+                    else:
+                        reg_comp_data, reg_comp_idx, reg_comp_indptr, tmp = matrix_sparse_sparse_mult(\
+                            E_n_datas[j], E_n_indices[j], E_n_indptrs[j], E_n_shape,\
+                            reg_comp_datas[j+1], reg_comp_indices[j+1], reg_comp_indptrs[j+1], reg_comp_shape)
+                    reg_comp_datas[j], reg_comp_indices[j], reg_comp_indptrs[j] = \
+                        np.ascontiguousarray(reg_comp_data), np.ascontiguousarray(reg_comp_idx),\
+                        np.ascontiguousarray(reg_comp_indptr)
                 #reg_comp_datas_new.append(reg_comp_data)
                 #reg_comp_indices_new.append(reg_comp_idx)
                 #reg_comp_indptrs_new.append(reg_comp_indptr)
@@ -2187,8 +2195,9 @@ def generate_res(res_gen, res_itr, squarenodes, rk, reg_train_times, res_size, r
     return reservoir, noise_in
 
 
-def optim_func(res, squarenodes, noise_in, noise, rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests, alpha,   true_pmap_max, rkTime=400, split=2000, traintype='normal', system='lorenz', params=np.array([[], []], dtype=np.complex128), pmap = False, max_valid_time = 500, savepred = False, save_time_rms = False, prior = 'zero'):
+def optim_func(res, squarenodes, noise_in, noise, rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests, alpha, alpha_idx, true_pmap_max, rkTime=400, split=2000, traintype='normal', system='lorenz', params=np.array([[], []], dtype=np.complex128), pmap = False, max_valid_time = 500, savepred = False, save_time_rms = False, save_eigenvals = False, prior = 'zero'):
     # Function for training and testing the performance of a reservoir trained using a particular regularization parameter
+    num_eigenvals = 50
     if squarenodes:
         res_feature_size = res.rsvr_size*2
     else:
@@ -2200,7 +2209,7 @@ def optim_func(res, squarenodes, noise_in, noise, rktest_u_arr_train_nonoise, rk
     elif prior == 'input_pass':
         idenmat = np.identity(
              res_feature_size+1+rktest_u_arr_train_nonoise.shape[0])*alpha
-        prior = np.concatenate((np.zeros((rktest_u_arr_train_nonoise.shape[0], 1+res_feature_size)), np.identity(rktest_u_arr_train_nonoise.shape[0])), axis = 1)
+        prior = np.concatenate((np.zeros((rktest_u_arr_train_nonoise.shape[0], 1+res_feature_size)), np.identity(rktest_u_arr_train_nonoise.shape[0])), axis = 1)*alpha
 
     #print('Gradient reg shape')
     #print(res.gradient_reg.shape)
@@ -2217,6 +2226,7 @@ def optim_func(res, squarenodes, noise_in, noise, rktest_u_arr_train_nonoise, rk
     wass_dist          = np.zeros(num_reg_train_times, dtype = object)
     pmap_max           = np.zeros(num_reg_train_times, dtype = object)
     pmap_max_wass_dist = np.zeros(num_reg_train_times, dtype = object)
+    grad_eigenvals     = np.zeros(num_reg_train_times, dtype = object)
     for i in range(num_reg_train_times):
         if traintype not in ['sylvester', 'sylvester_wD']:
             # print('Noise mag: %e' % noise)
@@ -2239,17 +2249,22 @@ def optim_func(res, squarenodes, noise_in, noise, rktest_u_arr_train_nonoise, rk
         train_rms = np.sqrt(np.mean((train_preds - res.Y_train)**2.0, axis = 0))
         train_mean_rms = np.mean(train_rms)
         train_max_rms  = np.max(train_rms)
+        if save_eigenvals and alpha_idx == 0:
+            eigenvals_out = np.linalg.eigvalsh(res.gradient_reg[i])
+            grad_eigenvals[i] = eigenvals_out[eigenvals_out.size:eigenvals_out.size - num_eigenvals - 1: -1]
         results[i], mean_rms[i], max_rms[i], variances[i], valid_time[i],  rms[i], preds[i], \
             wass_dist[i], pmap_max[i], pmap_max_wass_dist[i] = test(res, i, squarenodes, noise_in, \
             rktest_u_arr_train_nonoise, rktest_u_arr_test,   true_pmap_max, num_tests=num_tests, rkTime=rkTime,\
             split=split, showMapError=True, showTrajectories=True, showHist=True, system=system, params=params,\
             pmap = pmap, max_valid_time = max_valid_time, savepred = savepred, save_time_rms = save_time_rms)
-
-    return -1*results, mean_rms, max_rms, variances, valid_time, rms, preds, wass_dist, pmap_max, pmap_max_wass_dist, train_mean_rms, train_max_rms
+    if alpha_idx == 0:
+        return -1*results, mean_rms, max_rms, variances, valid_time, rms, preds, wass_dist, pmap_max, pmap_max_wass_dist, train_mean_rms, train_max_rms, grad_eigenvals
+    else:
+        return -1*results, mean_rms, max_rms, variances, valid_time, rms, preds, wass_dist, pmap_max, pmap_max_wass_dist, train_mean_rms, train_max_rms
 
 
 def get_res_results(itr, res_gen, squarenodes, rk, reg_train_times, res_size, rho, sigma, leakage, win_type, bias_type, noisetype, noise, noise_realizations, noise_stream, traintype,
-    rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests, alpha_values, rkTime_test, split_test, system, tau, params, savepred, save_time_rms, debug_mode, train_seed,   true_pmap_max, pmap, max_valid_time, prior):
+    rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests, alpha_values, rkTime_test, split_test, system, tau, params, savepred, save_time_rms, save_eigenvals, debug_mode, train_seed,   true_pmap_max, pmap, max_valid_time, prior):
     # Function for generating, training, and testing the performance of a reservoir given an input set of testing data time series,
     # a set of regularization values, and a set of noise magnitudes
     tic = time.perf_counter()
@@ -2285,6 +2300,7 @@ def get_res_results(itr, res_gen, squarenodes, rk, reg_train_times, res_size, rh
     stable_frac_out        = np.zeros((noise_array.size, alpha_values.size, reg_train_times.size), dtype = object)
     train_mean_rms_out     = np.zeros((noise_array.size, alpha_values.size, reg_train_times.size), dtype = object)
     train_max_rms_out      = np.zeros((noise_array.size, alpha_values.size, reg_train_times.size), dtype = object)
+    grad_eigenvals_out     = np.zeros((noise_array.size, reg_train_times.size), dtype = object)
     print('Mean RMS out shape:')
     print(mean_rms_out.shape)
     for i, noise in enumerate(noise_array):
@@ -2306,19 +2322,25 @@ def get_res_results(itr, res_gen, squarenodes, rk, reg_train_times, res_size, rh
         pmap_max_wass_dist = np.zeros((num_tests, alpha_values.size))
         """
         noise_tic = time.perf_counter()
-        min_optim_func = lambda alpha: optim_func(reservoir, squarenodes, noise_in[0], noise, \
-                rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests, alpha,\
+        min_optim_func = lambda alpha, alpha_idx: optim_func(reservoir, squarenodes, noise_in[0], noise, \
+                rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests, alpha, alpha_idx,\
                 true_pmap_max, rkTime_test, split_test, traintype, system, params, pmap,\
-                max_valid_time, savepred, save_time_rms,prior)
+                max_valid_time, savepred, save_time_rms,save_eigenvals, prior)
         func_vals = np.zeros(alpha_values.size)
         for j, alpha_value in enumerate(alpha_values):
             print('Regularization: ', alpha_values[j])
             if debug_mode:
                 #out = min_optim_func(alpha_values[j])
-                stable_frac_out[i,j], mean_rms_out[i,j], max_rms_out[i,j], variances_out[i,j],\
+                if j == 0:
+                    stable_frac_out[i,j], mean_rms_out[i,j], max_rms_out[i,j], variances_out[i,j],\
                         valid_time_out[i,j], rms_out[i,j], preds_out[i,j], wass_dist_out[i,j],\
                         tmp, pmap_max_wass_dist_out[i,j], train_mean_rms_out[i,j], \
-                        train_max_rms_out[i,j] = min_optim_func(alpha_value)
+                        train_max_rms_out[i,j], grad_eigenvals_out[i] = min_optim_func(alpha_value, j)
+                else:
+                    stable_frac_out[i,j], mean_rms_out[i,j], max_rms_out[i,j], variances_out[i,j],\
+                        valid_time_out[i,j], rms_out[i,j], preds_out[i,j], wass_dist_out[i,j],\
+                        tmp, pmap_max_wass_dist_out[i,j], train_mean_rms_out[i,j], \
+                        train_max_rms_out[i,j] = min_optim_func(alpha_value, j)
                 """
                 train_mean_rms[j] = out[-2]
                 train_max_rms[j]  = out[-1]
@@ -2358,10 +2380,16 @@ def get_res_results(itr, res_gen, squarenodes, rk, reg_train_times, res_size, rh
                 """
             else:
                 try:
-                    stable_frac_out[i,j], mean_rms_out[i,j], max_rms_out[i,j], variances_out[i,j],\
-                        valid_time_out[i,j], rms_out[i,j], preds_out[i,j], wass_dist_out[i,j],\
-                        tmp, pmap_max_wass_dist_out[i,j], train_mean_rms_out[i,j], \
-                        train_max_rms_out[i,j] = min_optim_func(alpha_value)
+                    if j == 0:
+                        stable_frac_out[i,j], mean_rms_out[i,j], max_rms_out[i,j], variances_out[i,j],\
+                            valid_time_out[i,j], rms_out[i,j], preds_out[i,j], wass_dist_out[i,j],\
+                            tmp, pmap_max_wass_dist_out[i,j], train_mean_rms_out[i,j], \
+                            train_max_rms_out[i,j], grad_eigenvals_out[i] = min_optim_func(alpha_value, j)
+                    else:
+                        stable_frac_out[i,j], mean_rms_out[i,j], max_rms_out[i,j], variances_out[i,j],\
+                            valid_time_out[i,j], rms_out[i,j], preds_out[i,j], wass_dist_out[i,j],\
+                            tmp, pmap_max_wass_dist_out[i,j], train_mean_rms_out[i,j], \
+                            train_max_rms_out[i,j] = min_optim_func(alpha_value, j)
                     """
                     out = min_optim_func(alpha_values[j])
                     train_mean_rms[j] = out[-2]
@@ -2471,10 +2499,10 @@ def get_res_results(itr, res_gen, squarenodes, rk, reg_train_times, res_size, rh
     runtime = toc - tic
     print('Iteration runtime: %f sec.' % runtime)
     return stable_frac_out, mean_rms_out, max_rms_out, variances_out, valid_time_out, rms_out, preds_out, wass_dist_out,\
-            pmap_max_wass_dist_out, train_mean_rms_out, train_max_rms_out, train_seed, noise_array, itr
+            pmap_max_wass_dist_out, train_mean_rms_out, train_max_rms_out, grad_eigenvals_out, train_seed, noise_array, itr
 
 
-def find_stability(noisetype, noise, traintype, train_seed, train_gen, res_itr, res_gen, squarenodes, test_stream, noise_stream, rho, sigma, leakage, win_type, bias_type, train_time, reg_train_times, res_size, res_per_test, noise_realizations, num_tests, alpha_values, system, tau, savepred, save_time_rms, debug_mode, root_folder, pmap, max_valid_time, prior, raw_data_folder):
+def find_stability(noisetype, noise, traintype, train_seed, train_gen, res_itr, res_gen, squarenodes, test_stream, noise_stream, rho, sigma, leakage, win_type, bias_type, train_time, reg_train_times, res_size, res_per_test, noise_realizations, num_tests, alpha_values, system, tau, savepred, save_time_rms, save_eigenvals, debug_mode, root_folder, pmap, max_valid_time, prior, raw_data_folder):
 
     # Main function for training and testing reservoir performance. This function first generates the training and testing data,
     # the passes to get_res_results to obtain th reservoir performance.
@@ -2528,11 +2556,11 @@ def find_stability(noisetype, noise, traintype, train_seed, train_gen, res_itr, 
         true_pmap_max = np.zeros(100)
 
     stable_frac_out, mean_rms_out, max_rms_out, variances_out, valid_time_out, rms_out, pred_out, wass_dist_out,\
-            pmap_max_wass_dist_out, train_mean_rms_out, train_max_rms_out, train_seed, noise_array, itr\
+            pmap_max_wass_dist_out, train_mean_rms_out, train_max_rms_out, grad_eigenvals_out, train_seed, noise_array, itr\
             = get_res_results(res_itr, res_gen, squarenodes, rk, reg_train_times, res_size, rho, sigma, \
             leakage, win_type, bias_type, noisetype, noise, noise_realizations, noise_stream, \
             traintype, rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests, alpha_values, \
-            rkTime_test, split_test, system, tau, params, savepred, save_time_rms, debug_mode, \
+            rkTime_test, split_test, system, tau, params, savepred, save_time_rms, save_eigenvals, debug_mode, \
             train_seed, true_pmap_max, pmap, max_valid_time,prior)
     print(type(stable_frac_out))
     print(stable_frac_out.shape)
@@ -2612,6 +2640,10 @@ def find_stability(noisetype, noise, traintype, train_seed, train_gen, res_itr, 
                 #    np.hstack((out[i][12][j].reshape(-1,1), out[i][13][j])), delimiter = ',')
                 np.savetxt(os.path.join(raw_data_folder, 'rms_res%d_train%d_test%d_noise%e_regtrain%d.csv' % (res_itr, train_seed, k, noise_val, reg_train_time)),\
                         rms[:,k], delimiter = ',')
+        if save_eigenvals:
+            eigenvals = grad_eigenvals_out[i,j]
+            np.savetxt(os.path.join(raw_data_folder, 'gradreg_eigenvals_res%d_train%d_noise%e_regtrain%d.csv' % (res_itr, train_seed, noise_val, reg_train_time)),\
+                eigenvals, delimiter = ',')
         if savepred:
             pred = np.zeros((alpha_values.size, *pred_out[i,0,j].shape))
             for k, array_elem in enumerate(pred_out[i,:,j]):
@@ -2641,7 +2673,7 @@ def main(argv):
     # creates random number generators for the different reservoirs, trainings, noise arrays, and tests.
     # It then calls find_stability in a loop, processes the output from find_stability, and saves the output to a folder.
 
-    root_folder, top_folder, run_name, system, noisetype, traintype, savepred, save_time_rms, squarenodes, rho,\
+    root_folder, top_folder, run_name, system, noisetype, traintype, savepred, save_time_rms, save_eigenvals, squarenodes, rho,\
         sigma, leakage, win_type, bias_type, tau, res_size, train_time, noise_realizations, \
         noise_streams_per_test, noise_values_array,alpha_values, res_per_test, num_trains, num_tests,\
         debug_mode, pmap, metric, return_all, ifray, machine,max_valid_time,prior, tmp, tmp1, tmp2, tmp3,\
@@ -2708,14 +2740,14 @@ def main(argv):
                 tr[i], train_streams[i], rt[i], res_streams[i], squarenodes, test_streams[i], noise_streams, rho, sigma, \
                 leakage, win_type, bias_type, train_time, reg_train_times,\
                 res_size, res_per_test, noise_realizations, num_tests, alpha_values,\
-                system, tau, savepred, save_time_rms, debug_mode, \
+                system, tau, savepred, save_time_rms, save_eigenvals, debug_mode, \
                 root_folder, pmap, max_valid_time,prior, raw_data_folder) for i in incomplete_idxs])
         else:
             out_base  = [find_stability_serial(noisetype, noise_values_array, traintype, \
                 tr[i], train_streams[i], rt[i], res_streams[i], squarenodes, test_streams[i], noise_streams, rho, sigma, \
                 leakage, win_type, bias_type, train_time, reg_train_times, \
                 res_size, res_per_test, noise_realizations, num_tests, alpha_values,\
-                system, tau, savepred, save_time_rms, debug_mode,\
+                system, tau, savepred, save_time_rms, save_eigenvals, debug_mode,\
                 root_folder, pmap, max_valid_time,prior, raw_data_folder) for i in incomplete_idxs]
 
         # print('Ray out len: %d' % len(out_base))
@@ -2780,13 +2812,13 @@ def main(argv):
                 tnr[i], train_streams[i], rtn[i], res_streams[i], squarenodes, test_streams[i], noise_streams[i], \
                 rho, sigma, leakage, win_type, bias_type, train_time, reg_train_times,\
                 res_size, res_per_test, noise_realizations, num_tests, alpha_values,\
-                system, tau, savepred, save_time_rms, debug_mode, root_folder, pmap, max_valid_time,prior, raw_data_folder) for i in incomplete_idxs])
+                system, tau, savepred, save_time_rms, save_eigenvals, debug_mode, root_folder, pmap, max_valid_time,prior, raw_data_folder) for i in incomplete_idxs])
         else:
             out_base  = [find_stability_serial(noisetype, ntr[i], traintype,\
                 tnr[i], train_streams[i], rtn[i], res_streams[i], squarenodes, test_streams[i], noise_streams[i], \
                 rho, sigma, leakage, win_type, bias_type, train_time, reg_train_times,\
                 res_size, res_per_test, noise_realizations, num_tests, alpha_values,\
-                system, tau, savepred, save_time_rms, debug_mode, root_folder, pmap, max_valid_time,prior, raw_data_folder) for i in incomplete_idxs]
+                system, tau, savepred, save_time_rms, save_eigenvals, debug_mode, root_folder, pmap, max_valid_time,prior, raw_data_folder) for i in incomplete_idxs]
         """
         out = []
         for i in range(len(out_base)):
