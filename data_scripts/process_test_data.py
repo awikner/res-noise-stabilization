@@ -36,7 +36,7 @@ def main(argv):
 
     tic = time.perf_counter()
 
-    root_folder, top_folder, run_name, system, noisetype, traintype, savepred, save_time_rms, squarenodes, rho,\
+    root_folder, top_folder, run_name, system, noisetype, traintype, savepred, save_time_rms, save_eigenvals, squarenodes, rho,\
         sigma, leakage, win_type, bias_type, tau, res_size, train_time, noise_realizations, noise_streams_per_test,\
         noise_values_array, alpha_values, res_per_test, num_trains, num_tests, debug_mode, pmap, metric, return_all,\
         ifray, machine, max_valid_time, prior, import_res, import_train, import_test, import_noise, reg_train_frac,\
@@ -108,6 +108,8 @@ def main(argv):
         rms = np.zeros((res_per_test, train_vals.size, num_tests, noise_vals.size, (rkTime-split), alpha_values.size, reg_train_times.size))
     if pmap:
         pmap_max_wass_dist = np.zeros((res_per_test, train_vals.size, num_tests, noise_vals.size, alpha_values.size-1))
+    if save_eigenvals:
+        eigenvals_in = np.zeros((res_per_test, train_vals.size, noise_vals.size, reg_train_times.size), dtype = object)
 
     print(np.arange(res_per_test, dtype = int))
     print(np.arange(num_trains, dtype = int))
@@ -127,11 +129,19 @@ def main(argv):
             valid_time[i,j,m,k,:,:,l]    = np.transpose(np.loadtxt(os.path.join(raw_data_folder, 'valid_time_res%d_train%d_test%d_noise%e_regtrain%d.csv' % (i,j,m,noise,reg_train_time)), delimiter = ','))
         if pmap:
             pmap_max_wass_dist[i,j,:,k,:,l] = np.transpose(np.loadtxt(os.path.join(raw_data_folder, 'pmap_max_wass_dist_res%d_train%d_noise%e_regtrain%d.csv' % (i,j,noise,reg_train_time)), delimiter = ','))
+        if save_eigenvals:
+            eigenvals_in[i,j,k,l] = np.loadtxt(os.path.join(raw_data_folder, 'gradreg_eigenvals_res%d_train%d_noise%e_regtrain%d.csv' % (i,j,noise,reg_train_time)), delimiter = ',')
         if save_time_rms:
             for m in list(range(num_tests)):
                 #mean_all[i,j,l,k] = np.loadtxt(os.path.join(raw_data_folder, 'mean_all_res%d_train%d_test%d_noise%e.csv' % (i,j,l,noise)), delimiter = ',')
                 #variances_all[i,j,l,k] = np.loadtxt(os.path.join(raw_data_folder, 'variances_all_res%d_train%d_test%d_noise%e.csv' % (i,j,l,noise)), delimiter = ',')
                 rms[i,j,m,k,:,:,l] =np.transpose(np.loadtxt(os.path.join(raw_data_folder, 'rms_res%d_train%d_test%d_noise%e_regtrain%d.csv' % (i,j,m,noise,reg_train_time)), delimiter = ','))
+    if save_eigenvals:
+        eigenvals = np.zeros((res_per_test, train_vals.size, noise_vals.size, reg_train_times.size, eigenvals_in[0,0,0,0].size))
+        for i,j,k,l in product(np.arange(res_per_test,dtype=int), np.arange(train_vals.size,dtype = int), np.arange(noise_vals.size,dtype=int), np.arange(reg_train_times.size,dtype = int)):
+            eigenvals[i,j,k,l] = eigenvals_in[i,j,k,l]
+        print('Eigenvals shape:')
+        print(eigenvals.shape)
     load_toc = time.perf_counter()
     print('All data loaded in %0.2f sec.' % (load_toc - load_tic))
 
@@ -181,6 +191,15 @@ def main(argv):
 
         if pmap:
             data_out['pmap_max_wass_dist'] = pmap_max_wass_dist[all_res, all_train_idx, all_test, all_noise_idx, all_reg_idx, all_reg_train_idx]
+        if save_eigenvals:
+            print(data_out[all_test == 0].shape)
+            print(data_out[all_test == 0][['res','train','test','noise','reg','reg_train']])
+            print(eigenvals[all_res, all_train_idx, all_noise_idx, all_reg_train_idx].shape)
+            print(['eig%d' % (i+1) for i in range(eigenvals.shape[-1])])
+            eigenval_idx = (all_test == 0) & (all_reg_idx == 0)
+            data_out.at[eigenval_idx, ['eig%d' % (i+1) for i in range(eigenvals.shape[-1])]] = \
+                eigenvals[all_res[eigenval_idx],all_train_idx[eigenval_idx],all_noise_idx[eigenval_idx],\
+                all_reg_train_idx[eigenval_idx]]
         if save_time_rms:
             #data_out = pd.concat([data_out, pd.DataFrame(mean_all[all_res, all_train_idx, all_test, all_noise_idx, :, all_reg_idx],\
             #        columns = ['mean_all%d' % i for i in range((rkTime-split)+1)])], axis = 1)
@@ -214,8 +233,8 @@ def main(argv):
         save_toc = time.perf_counter()
         print('Time to compress and save data: %0.2f sec.' % ((save_toc-save_tic)))
 
-    elif return_all and savepred:
-        raise ValueError
+    #elif return_all and savepred:
+    #    raise ValueError
     else:
         best_stable_frac = np.zeros((res_per_test, train_vals.size, noise_vals.size, reg_train_times.size))
         best_train_mean_rms = np.zeros((res_per_test, train_vals.size, noise_vals.size, reg_train_times.size))

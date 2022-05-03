@@ -37,6 +37,7 @@ def get_run_opts(argv, runflag = True):
         num_cpus = 20
         metric = 'mss_var'
         return_all = False
+        save_eigenvals = False
         max_valid_time = 500
         noise_streams_per_test = 5
         noise_values_array = np.logspace(-3, 0, num = 19, base = 10)[5:11]
@@ -54,7 +55,7 @@ def get_run_opts(argv, runflag = True):
                     'tests=', 'trains=', 'savepred=', 'tau=', 'rho=',
                     'sigma=', 'leakage=', 'bias_type=', 'debug=', 'win_type=',
                     'machine=', 'num_cpus=', 'pmap=', 'parallel=', 'metric=','returnall=',
-                    'savetime=', 'noisevals=', 'regvals=', 'maxvt=', 'noisestreams=',
+                    'savetime=', 'saveeigenvals=','noisevals=', 'regvals=', 'maxvt=', 'noisestreams=',
                     'squarenodes=', 'resonly=', 'importres=','importtrain=',
                     'importtest=','importnoise=','regtraintimes=','discardlen=',
                     'prior='])
@@ -71,6 +72,14 @@ def get_run_opts(argv, runflag = True):
             elif opt == '-r':
                 noise_realizations = int(arg)
                 print('Noise Realizations: %d' % noise_realizations)
+            elif opt == '--saveeigenvals':
+                if arg == 'True':
+                    save_eigenvals = True
+                elif arg == 'False':
+                    save_eigenvals = False
+                else:
+                    raise ValueError
+                print('Save grad reg eigenvalues: %s' % arg)
             elif opt == '--prior':
                 prior = str(arg)
                 print('Prior type: %s' % prior)
@@ -251,15 +260,15 @@ def get_run_opts(argv, runflag = True):
             elif system in ['KS', 'KS_d2175']:
                 tau = 0.25
     else:
-        train_time, res_size, noise_realizations, save_time_rms, metric,\
+        train_time, res_size, noise_realizations, save_time_rms, save_eigenvals, metric,\
                 return_all, machine, rho, sigma, leakage, tau, win_type, \
                 bias_type, res_per_test, num_tests, num_trains, savepred, \
                 noisetype, traintype, system, squarenodes, resonly, prior, import_res,\
                 import_train, import_test, import_noise, reg_train_times,\
                 discard_time = argv
-    if return_all and savepred:
-        print('Cannot return results for all parameters and full predictions due to memory constraints.')
-        raise ValueError
+    #if return_all and savepred:
+    #    print('Cannot return results for all parameters and full predictions due to memory constraints.')
+    #    raise ValueError
     if isinstance(reg_train_times, np.ndarray) or isinstance(reg_train_times, list):
         if (reg_train_times[0] != train_time - discard_time or len(reg_train_times) != 1) and (traintype in ['normal','normalres1','normalres2','rmean','rmeanres1',\
                 'rmeanres2','rplusq','rplusqres1','rplusqres2'] or 'confined' in traintype):
@@ -272,19 +281,19 @@ def get_run_opts(argv, runflag = True):
         print('Prior type not recognized.')
         raise ValueError
     if import_res:
-        iresflag = 'ires_'
+        iresflag = '_ires'
     else:
         iresflag = ''
     if import_train:
-        itrainflag = 'itrain_'
+        itrainflag = '_itrain'
     else:
         itrainflag = ''
     if import_test:
-        itestflag = 'itest_'
+        itestflag = '_itest'
     else:
         itestflag = ''
     if import_noise:
-        inoiseflag = 'inoise_'
+        inoiseflag = '_inoise'
     else:
         inoiseflag = ''
     if prior == 'zero':
@@ -292,21 +301,25 @@ def get_run_opts(argv, runflag = True):
     else:
         prior_str = '_prior_%s' % prior
     if savepred:
-        predflag = 'wpred_'
+        predflag = '_wpred'
     else:
         predflag = ''
     if save_time_rms:
-        timeflag = 'savetime_'
+        timeflag = '_savetime'
     else:
         timeflag = ''
     if squarenodes:
-        squarenodes_flag = 'squarenodes_'
+        squarenodes_flag = '_squarenodes'
     else:
         squarenodes_flag = ''
     if resonly:
-        resonly_flag = 'resonly_'
+        resonly_flag = '_resonly'
     else:
         resonly_flag = ''
+    if save_eigenvals:
+        eigenval_flag = '_wgradeigs'
+    else:
+        eigenval_flag = ''
     if machine == 'skynet':
         root_folder = '/h/awikner/res-noise-stabilization/'
     elif machine == 'deepthought2':
@@ -317,19 +330,19 @@ def get_run_opts(argv, runflag = True):
 
     if not return_all:
         data_folder = 'Data/%s_noisetest_noisetype_%s_traintype_%s/' % (system, noisetype, traintype)
-        run_name = '%s_%s%s%s%s%s%s%s%srho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s%s_metric_%s' \
-             % (system,resonly_flag,predflag, timeflag, squarenodes_flag, iresflag, itrainflag, itestflag, inoiseflag, rho, sigma, leakage, win_type, bias_type, tau, res_size, \
+        run_name = '%s%s%s%s%s%s%s%s%s%s_rho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s%s_metric_%s' \
+             % (system,resonly_flag,predflag, timeflag, eigenval_flag, squarenodes_flag, iresflag, itrainflag, itestflag, inoiseflag, rho, sigma, leakage, win_type, bias_type, tau, res_size, \
              train_time, noise_realizations, noisetype, traintype, prior_str, metric)
     elif return_all:
         data_folder = 'Data/%s_noisetest_noisetype_%s_traintype_%s/' % (system, noisetype, traintype)
-        run_name = '%s_%s%s%s%s%s%s%s%srho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s%s' % (system,resonly_flag,predflag, timeflag, squarenodes_flag, iresflag, itrainflag, itestflag, inoiseflag, rho, sigma, leakage, win_type, bias_type, tau,res_size, train_time, noise_realizations, noisetype, traintype, prior_str)
+        run_name = '%s%s%s%s%s%s%s%s%s%s_rho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s%s' % (system,resonly_flag,predflag, timeflag, eigenval_flag, squarenodes_flag, iresflag, itrainflag, itestflag, inoiseflag, rho, sigma, leakage, win_type, bias_type, tau,res_size, train_time, noise_realizations, noisetype, traintype, prior_str)
     if runflag:
         if not os.path.isdir(os.path.join(root_folder, data_folder)):
             os.mkdir(os.path.join(root_folder, data_folder))
         if not os.path.isdir(os.path.join(os.path.join(root_folder, data_folder), run_name + '_folder')):
             os.mkdir(os.path.join(os.path.join(root_folder, data_folder), run_name + '_folder'))
 
-        return root_folder, data_folder, run_name, system, noisetype, traintype, savepred, save_time_rms, squarenodes, rho,\
+        return root_folder, data_folder, run_name, system, noisetype, traintype, savepred, save_time_rms, save_eigenvals, squarenodes, rho,\
             sigma, leakage, win_type, bias_type, tau, res_size, train_time, noise_realizations, noise_streams_per_test,\
             noise_values_array,alpha_values, res_per_test, num_trains, num_tests, debug_mode, pmap, metric, \
             return_all, ifray, machine, max_valid_time, prior, import_res, import_train, import_test, import_noise, \
