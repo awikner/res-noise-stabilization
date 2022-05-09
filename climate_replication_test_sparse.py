@@ -168,8 +168,11 @@ class Reservoir:
         """
 
         density = avg_degree/rsvr_size
-
-        unnormalized_W = res_gen.random((rsvr_size, rsvr_size))
+        
+        if win_type == 'full_0centered':
+            unnormalized_W = 2*res_gen.random((rsvr_size, rsvr_size))-1
+        else:
+            unnormalized_W = res_gen.random((rsvr_size, rsvr_size))
         for i in range(unnormalized_W[:, 0].size):
             for j in range(unnormalized_W[0].size):
                 if res_gen.random(1) > density:
@@ -202,7 +205,7 @@ class Reservoir:
                 raise ValueError
             Win = (res_gen.random(rsvr_size*(input_size+1)).reshape(rsvr_size, input_size+1)*2-1)*input_weight
         else:
-            if win_type == 'full':
+            if 'full' in win_type:
                 input_vars = np.arange(input_size)
             elif win_type == 'x':
                 input_vars = np.array([0])
@@ -2197,7 +2200,7 @@ def generate_res(res_gen, res_itr, squarenodes, rk, reg_train_times, res_size, r
 
 def optim_func(res, squarenodes, noise_in, noise, rktest_u_arr_train_nonoise, rktest_u_arr_test, num_tests, alpha, alpha_idx, true_pmap_max, rkTime=400, split=2000, traintype='normal', system='lorenz', params=np.array([[], []], dtype=np.complex128), pmap = False, max_valid_time = 500, savepred = False, save_time_rms = False, save_eigenvals = False, prior = 'zero'):
     # Function for training and testing the performance of a reservoir trained using a particular regularization parameter
-    num_eigenvals = 50
+    num_eigenvals = 500
     if squarenodes:
         res_feature_size = res.rsvr_size*2
     else:
