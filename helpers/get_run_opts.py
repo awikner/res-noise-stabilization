@@ -317,7 +317,7 @@ def get_run_opts(argv, runflag = True):
     else:
         resonly_flag = ''
     if save_eigenvals:
-        eigenval_flag = '_wgradeigs'
+        eigenval_flag = '_wmoregradeigs'
     else:
         eigenval_flag = ''
     if machine == 'skynet':
