@@ -2299,6 +2299,7 @@ def get_res_results(itr, res_gen, squarenodes, rk, reg_train_times, res_size, rh
     rms_out                = np.zeros((noise_array.size, alpha_values.size, reg_train_times.size), dtype = object)
     preds_out              = np.zeros((noise_array.size, alpha_values.size, reg_train_times.size), dtype = object)
     wass_dist_out          = np.zeros((noise_array.size, alpha_values.size, reg_train_times.size), dtype = object)
+    pmap_max_out           = np.zeros((noise_array.size, alpha_values.size, reg_train_times.size), dtype = object)
     pmap_max_wass_dist_out = np.zeros((noise_array.size, alpha_values.size, reg_train_times.size), dtype = object)
     stable_frac_out        = np.zeros((noise_array.size, alpha_values.size, reg_train_times.size), dtype = object)
     train_mean_rms_out     = np.zeros((noise_array.size, alpha_values.size, reg_train_times.size), dtype = object)
@@ -2337,12 +2338,12 @@ def get_res_results(itr, res_gen, squarenodes, rk, reg_train_times, res_size, rh
                 if j == 0:
                     stable_frac_out[i,j], mean_rms_out[i,j], max_rms_out[i,j], variances_out[i,j],\
                         valid_time_out[i,j], rms_out[i,j], preds_out[i,j], wass_dist_out[i,j],\
-                        tmp, pmap_max_wass_dist_out[i,j], train_mean_rms_out[i,j], \
+                        pmap_max_out[i,j], pmap_max_wass_dist_out[i,j], train_mean_rms_out[i,j], \
                         train_max_rms_out[i,j], grad_eigenvals_out[i] = min_optim_func(alpha_value, j)
                 else:
                     stable_frac_out[i,j], mean_rms_out[i,j], max_rms_out[i,j], variances_out[i,j],\
                         valid_time_out[i,j], rms_out[i,j], preds_out[i,j], wass_dist_out[i,j],\
-                        tmp, pmap_max_wass_dist_out[i,j], train_mean_rms_out[i,j], \
+                        pmap_max_out[i,j], pmap_max_wass_dist_out[i,j], train_mean_rms_out[i,j], \
                         train_max_rms_out[i,j] = min_optim_func(alpha_value, j)
                 """
                 train_mean_rms[j] = out[-2]
@@ -2386,12 +2387,12 @@ def get_res_results(itr, res_gen, squarenodes, rk, reg_train_times, res_size, rh
                     if j == 0:
                         stable_frac_out[i,j], mean_rms_out[i,j], max_rms_out[i,j], variances_out[i,j],\
                             valid_time_out[i,j], rms_out[i,j], preds_out[i,j], wass_dist_out[i,j],\
-                            tmp, pmap_max_wass_dist_out[i,j], train_mean_rms_out[i,j], \
+                            pmap_max_out[i,j], pmap_max_wass_dist_out[i,j], train_mean_rms_out[i,j], \
                             train_max_rms_out[i,j], grad_eigenvals_out[i] = min_optim_func(alpha_value, j)
                     else:
                         stable_frac_out[i,j], mean_rms_out[i,j], max_rms_out[i,j], variances_out[i,j],\
                             valid_time_out[i,j], rms_out[i,j], preds_out[i,j], wass_dist_out[i,j],\
-                            tmp, pmap_max_wass_dist_out[i,j], train_mean_rms_out[i,j], \
+                            pmap_max_out[i,j], pmap_max_wass_dist_out[i,j], train_mean_rms_out[i,j], \
                             train_max_rms_out[i,j] = min_optim_func(alpha_value, j)
                     """
                     out = min_optim_func(alpha_values[j])
@@ -2502,7 +2503,7 @@ def get_res_results(itr, res_gen, squarenodes, rk, reg_train_times, res_size, rh
     runtime = toc - tic
     print('Iteration runtime: %f sec.' % runtime)
     return stable_frac_out, mean_rms_out, max_rms_out, variances_out, valid_time_out, rms_out, preds_out, wass_dist_out,\
-            pmap_max_wass_dist_out, train_mean_rms_out, train_max_rms_out, grad_eigenvals_out, train_seed, noise_array, itr
+            pmap_max_out, pmap_max_wass_dist_out, train_mean_rms_out, train_max_rms_out, grad_eigenvals_out, train_seed, noise_array, itr
 
 
 def find_stability(noisetype, noise, traintype, train_seed, train_gen, res_itr, res_gen, squarenodes, test_stream, noise_stream, rho, sigma, leakage, win_type, bias_type, train_time, reg_train_times, res_size, res_per_test, noise_realizations, num_tests, alpha_values, system, tau, savepred, save_time_rms, save_eigenvals, debug_mode, root_folder, pmap, max_valid_time, prior, raw_data_folder):
@@ -2558,7 +2559,7 @@ def find_stability(noisetype, noise, traintype, train_seed, train_gen, res_itr, 
     else:
         true_pmap_max = np.zeros(100)
 
-    stable_frac_out, mean_rms_out, max_rms_out, variances_out, valid_time_out, rms_out, pred_out, wass_dist_out,\
+    stable_frac_out, mean_rms_out, max_rms_out, variances_out, valid_time_out, rms_out, pred_out, wass_dist_out, pmap_max_out,\
             pmap_max_wass_dist_out, train_mean_rms_out, train_max_rms_out, grad_eigenvals_out, train_seed, noise_array, itr\
             = get_res_results(res_itr, res_gen, squarenodes, rk, reg_train_times, res_size, rho, sigma, \
             leakage, win_type, bias_type, noisetype, noise, noise_realizations, noise_stream, \
@@ -2632,6 +2633,17 @@ def find_stability(noisetype, noise, traintype, train_seed, train_gen, res_itr, 
                 pmap_max_wass_dist[k] = array_elem
             np.savetxt(os.path.join(raw_data_folder, 'pmap_max_wass_dist_res%d_train%d_noise%e_regtrain%d.csv' % (res_itr, train_seed, noise_val, reg_train_time)),\
                 pmap_max_wass_dist, delimiter = ',')
+
+            pmap_max = np.zeros((alpha_values.size, num_tests), dtype = object)
+            for k, l in product(np.arange(alpha_values.size), np.arange(num_tests)):
+                pmap_max[k,l] = pmap_max_out[i,k,j][l]
+                pmap_len = [len(arr) for arr in pmap_max[k,l]]
+                max_pmap_len = max(pmap_len)
+                pmap_max_save = np.zeros((len(pmap_max[k,l]), max_pmap_len))
+                for m in range(len(pmap_max[k,l])):
+                    pmap_max_save[m,:pmap_len[m]] = pmap_max[k,l][m]
+                np.savetxt(os.path.join(raw_data_folder, 'pmap_max_res%d_train%d_test%d_noise%e_reg%e_regtrain%d.csv' % (res_itr, train_seed, l, noise_val, alpha_values[k], reg_train_time)),pmap_max_save, delimiter = ',')
+             
         if save_time_rms:
             rms = np.zeros((alpha_values.size, *rms_out[i,0,j].shape))
             for k, array_elem in enumerate(rms_out[i,:,j]):

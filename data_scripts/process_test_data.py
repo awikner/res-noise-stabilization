@@ -107,7 +107,7 @@ def main(argv):
         #variances_all = np.zeros((res_per_test, train_vals.size, num_tests, noise_vals.size, (rkTime-split)+1, alpha_values.size))
         rms = np.zeros((res_per_test, train_vals.size, num_tests, noise_vals.size, (rkTime-split), alpha_values.size, reg_train_times.size))
     if pmap:
-        pmap_max_wass_dist = np.zeros((res_per_test, train_vals.size, num_tests, noise_vals.size, alpha_values.size-1))
+        pmap_max_wass_dist = np.zeros((res_per_test, train_vals.size, num_tests, noise_vals.size, alpha_values.size, reg_train_times.size))
     if save_eigenvals:
         eigenvals_in = np.zeros((res_per_test, train_vals.size, noise_vals.size, reg_train_times.size), dtype = object)
 
@@ -372,8 +372,11 @@ def main(argv):
         pred_data_size = int(re.search('(.*)/lustre', raw_data_size_str).group(1)[2:-2])
         comp_data_size += pred_data_size*1000
     else:
-        os.system('find %s -type f -delete' % raw_data_folder)
-        os.system('rm -rf %s' % raw_data_folder)
+        if pmap:
+            os.system('find %s -type f ! -name "pmap_max_res*.csv" -delete' % raw_data_folder)  
+        else:
+            os.system('find %s -type f -delete' % raw_data_folder)
+            os.system('rm -rf %s' % raw_data_folder)
     print('Compressed data size: %0.3f kB' % (comp_data_size/1000))
     print('Data compressed by %0.3f percent' % ((1.-comp_data_size/(raw_data_size*1000))*100))
     toc = time.perf_counter()

@@ -260,7 +260,7 @@ def get_run_opts(argv, runflag = True):
             elif system in ['KS', 'KS_d2175']:
                 tau = 0.25
     else:
-        train_time, res_size, noise_realizations, save_time_rms, save_eigenvals, metric,\
+        train_time, res_size, noise_realizations, save_time_rms, save_eigenvals, pmap, metric,\
                 return_all, machine, rho, sigma, leakage, tau, win_type, \
                 bias_type, res_per_test, num_tests, num_trains, savepred, \
                 noisetype, traintype, system, squarenodes, resonly, prior, import_res,\
@@ -320,6 +320,10 @@ def get_run_opts(argv, runflag = True):
         eigenval_flag = '_wmoregradeigs'
     else:
         eigenval_flag = ''
+    if pmap:
+        pmap_flag = '_wpmap'
+    else:
+        pmap_flag = ''
     if machine == 'skynet':
         root_folder = '/h/awikner/res-noise-stabilization/'
     elif machine == 'deepthought2':
@@ -330,12 +334,12 @@ def get_run_opts(argv, runflag = True):
 
     if not return_all:
         data_folder = 'Data/%s_noisetest_noisetype_%s_traintype_%s/' % (system, noisetype, traintype)
-        run_name = '%s%s%s%s%s%s%s%s%s%s_rho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s%s_metric_%s' \
-             % (system,resonly_flag,predflag, timeflag, eigenval_flag, squarenodes_flag, iresflag, itrainflag, itestflag, inoiseflag, rho, sigma, leakage, win_type, bias_type, tau, res_size, \
+        run_name = '%s%s%s%s%s%s%s%s%s%s%s_rho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s%s_metric_%s' \
+             % (system,resonly_flag,predflag, timeflag, eigenval_flag, pmap_flag, squarenodes_flag, iresflag, itrainflag, itestflag, inoiseflag, rho, sigma, leakage, win_type, bias_type, tau, res_size, \
              train_time, noise_realizations, noisetype, traintype, prior_str, metric)
     elif return_all:
         data_folder = 'Data/%s_noisetest_noisetype_%s_traintype_%s/' % (system, noisetype, traintype)
-        run_name = '%s%s%s%s%s%s%s%s%s%s_rho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s%s' % (system,resonly_flag,predflag, timeflag, eigenval_flag, squarenodes_flag, iresflag, itrainflag, itestflag, inoiseflag, rho, sigma, leakage, win_type, bias_type, tau,res_size, train_time, noise_realizations, noisetype, traintype, prior_str)
+        run_name = '%s%s%s%s%s%s%s%s%s%s%s_rho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s%s' % (system,resonly_flag,predflag, timeflag, eigenval_flag, pmap_flag, squarenodes_flag, iresflag, itrainflag, itestflag, inoiseflag, rho, sigma, leakage, win_type, bias_type, tau,res_size, train_time, noise_realizations, noisetype, traintype, prior_str)
     if runflag:
         if not os.path.isdir(os.path.join(root_folder, data_folder)):
             os.mkdir(os.path.join(root_folder, data_folder))
