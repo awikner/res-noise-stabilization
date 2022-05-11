@@ -352,7 +352,7 @@ def get_run_opts(argv, runflag = True):
             return_all, ifray, machine, max_valid_time, prior, import_res, import_train, import_test, import_noise, \
             reg_train_times, discard_time
     else:
-        if not savepred:
+        if not savepred and not pmap:
             return os.path.join(os.path.join(root_folder, data_folder), run_name + '.bz2'), ''
         else:
             return os.path.join(os.path.join(root_folder, data_folder), run_name + '.bz2'), \
