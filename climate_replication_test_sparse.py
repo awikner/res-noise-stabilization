@@ -2011,9 +2011,9 @@ def testwrapped(res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_i
             for j in range(rktest_u_arr_test.shape[0]):
                 if j == 0:
                     pred_pmap_max_all = pred_pmap_max[j]
-                else:
-                    pred_pmap_max_all = np.append(
-                        pred_pmap_max_all, pred_pmap_max[j])
+                #else:
+                #    pred_pmap_max_all = np.append(
+                #        pred_pmap_max_all, pred_pmap_max[j])
             pmap_max_wass_dist[i] = wasserstein_distance_empirical(pred_pmap_max_all, true_pmap_max)
         else:
             pmap_max_wass_dist[i] = np.nan

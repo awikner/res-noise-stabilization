@@ -321,7 +321,7 @@ def get_run_opts(argv, runflag = True):
     else:
         eigenval_flag = ''
     if pmap:
-        pmap_flag = '_wpmap'
+        pmap_flag = '_wpmap0'
     else:
         pmap_flag = ''
     if machine == 'skynet':
