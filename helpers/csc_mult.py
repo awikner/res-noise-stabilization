@@ -32,6 +32,29 @@ def matrix_diag_sparse_mult_add(diag_mat, data, indices, indptr, shape, add_mat)
     return out
 
 @jit(nopython = True, fastmath = True)
+def matrix_diag_sparse_mult_add_sparse(diag_mat, data, indices, indptr, shape, add_mat_data, add_mat_indices,\
+    add_mat_indptr, add_mat_shape):
+    with objmode(data = 'double[:]', indices = 'int32[:]', indptr = 'int32[:]', shape = 'int32[:]'):
+        out = diags(diag_mat, format = 'csc').dot(csc_matrix((data, indices, indptr), shape = (shape[0], shape[1]))) + csc_matrix((add_mat_data, add_mat_indices, add_mat_indptr), shape = (shape[0], shape[1]))
+        data = out.data
+        indices = out.indices
+        indptr = out.indptr
+        shape = np.array(list(out.shape), dtype = np.int32)
+
+    return data, indices, indptr, shape
+
+@jit(nopython = True, fastmath = True)
+def matrix_diag_sparse_diag_mult(dmat, b_data, b_indices, b_indptr, b_shape, dmat_inv):
+    with objmode(data = 'double[:]', indices = 'int32[:]', indptr = 'int32[:]', shape = 'int32[:]'):
+        out = diags(dmat, format = 'csc').dot(csc_matrix((b_data, b_indices, b_indptr), shape = (b_shape[0], b_shape[1]))).dot(diags(dmag_inv, format = 'csc'))
+        data = out.data
+        indices = out.indices
+        indptr = out.indptr
+        shape = np.array(list(out.shape), dtype = np.int32)
+
+    return data, indices, indptr, shape
+
+@jit(nopython = True, fastmath = True)
 def matrix_diag_sparse_mult(dmat, b_data, b_indices, b_indptr, b_shape):
     with objmode(data = 'double[:]', indices = 'int32[:]', indptr = 'int32[:]', shape = 'int32[:]'):
         out = diags(dmat, format = 'csc').dot(csc_matrix((b_data, b_indices, b_indptr), shape = (b_shape[0], b_shape[1])))
@@ -100,6 +123,18 @@ def construct_leakage_mat(rsvr_size, n, leakage, squarenodes):
     else:
         leakage_mat = np.concatenate((np.zeros((rsvr_size,1)), (1-leakage) *
                              np.identity(rsvr_size), np.zeros((rsvr_size, n))),   axis=1)
+    with objmode(data = 'double[:]', indices = 'int32[:]', indptr = 'int32[:]', shape = 'int32[:]'):
+        mat = csc_matrix(leakage_mat)
+        data   = mat.data
+        indices = mat.indices
+        indptr = mat.indptr
+        shape = np.array(list(mat.shape), dtype = np.int32)
+
+    return data, indices, indptr, shape
+
+@jit(nopython = True, fastmath = True)
+def construct_leakage_mat_mlonly(rsvr_size, n, leakage, squarenodes):
+    leakage_mat = (1-leakage) * np.identity(rsvr_size)
     with objmode(data = 'double[:]', indices = 'int32[:]', indptr = 'int32[:]', shape = 'int32[:]'):
         mat = csc_matrix(leakage_mat)
         data   = mat.data
@@ -218,6 +253,15 @@ def get_D_n(D, X, Win_nobias_data, Win_nobias_indices, Win_nobias_indptr, Win_no
     return D_n_data, D_n_indices, D_n_indptr
 
 @jit(fastmath = True, nopython = True)
+def get_D_n_mlonly(D, X, Win_nobias_data, Win_nobias_indices, Win_nobias_indptr, Win_nobias_shape, \
+        D_n_shape, rsvr_size, res_feature_size, n, squarenodes):
+    D_n_data, D_n_indices, D_n_indptr, tmp = matrix_diag_sparse_mult(D, Win_nobias_data, Win_nobias_indices,\
+        Win_nobias_indptr, Win_nobias_shape)
+    if squarenodes:
+        D_n_data, D_n_indices, D_n_indptr, tmp = matrix_diag_sparse_mult(X, D_n_data, D_n_indices, D_n_indptr, tmp)
+    return D_n_data,D_n_indices,D_n_indptr
+
+@jit(fastmath = True, nopython = True)
 def get_E_n(D, X, E_n_shape, rsvr_size, W_mat_data, W_mat_indices, W_mat_indptr, W_mat_shape, \
             leakage_mat_data, leakage_mat_indices, leakage_mat_indptr, leakage_mat_shape, squarenodes):
     E_n_base_data, E_n_base_indices, E_n_base_indptr, E_n_base_shape = matrix_diag_sparse_mult_sparse_add(
@@ -236,4 +280,13 @@ def get_E_n(D, X, E_n_shape, rsvr_size, W_mat_data, W_mat_indices, W_mat_indptr,
     else:
         E_n_data_coo, E_n_rows, E_n_cols = E_n_base_coo, E_n_base_rows, E_n_base_cols
     E_n_data, E_n_indices, E_n_indptr = coo_to_csc(E_n_data_coo, E_n_rows, E_n_cols, E_n_shape)
+    return E_n_data, E_n_indices, E_n_indptr
+
+@jit(fastmath = True, nopython = True)
+def get_E_n_mlonly(D, X, X_inv, E_n_shape, rsvr_size, W_mat_data, W_mat_indices, W_mat_indptr, W_mat_shape, \
+            leakage_mat_data, leakage_mat_indices, leakage_mat_indptr, leakage_mat_shape, squarenodes):
+    E_n_data, E_n_indices, E_n_indptr, tmp = matrix_diag_sparse_mult_add_sparse(D, W_mat_data, W_mat_indices, W_mat_indptr, W_mat_shape, leakage_mat_data, leakage_mat_indices, leakage_mat_indptr, leakage_mat_shape)
+    if squarenodes:
+        E_n_data, E_n_indices, E_n_indptr, tmp = matrix_diag_sparse_diag_mult(X, E_n_data, E_n_indices, E_n_indptr,\
+            tmp, X_inv)
     return E_n_data, E_n_indices, E_n_indptr

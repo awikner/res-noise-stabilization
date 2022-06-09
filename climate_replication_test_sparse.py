@@ -145,7 +145,7 @@ def wasserstein_distance_empirical(measured_samples, true_samples):
 
     return wass_dist
 
-@jit(fastmath = True, nopython = True)
+#@jit(fastmath = True, nopython = True)
 def numba_eigsh(A):
     np.random.seed(0)
     v0 = np.random.rand(A.shape[0])
@@ -307,7 +307,7 @@ class RungeKutta:
         self.u_arr_test = u_arr[:, ttsplit:]
 
 
-@jit(nopython=True, fastmath=True)
+#@jit(nopython=True, fastmath=True)
 def RungeKuttawrapped(x0=2, y0=2, z0=23, h=0.01, tau=0.1, T=300, ttsplit=5000, u0=0, system='lorenz', params=np.array([[], []], dtype=np.complex128)):
     # Numba function for obtaining training and testing dynamical system time series data
     if system == 'lorenz':
@@ -334,7 +334,7 @@ def RungeKuttawrapped(x0=2, y0=2, z0=23, h=0.01, tau=0.1, T=300, ttsplit=5000, u
     return u_arr_train, u_arr_test, ttsplit, new_params
 
 
-@jit(nopython=True, fastmath=True)
+#@jit(nopython=True, fastmath=True)
 def RungeKuttawrapped_pred(h=0.01, tau=0.1, T=300, ttsplit=5000, u0_array=np.array([[], []], dtype=np.complex128), system='lorenz', params=np.array([[], []], dtype=np.complex128)):
     # Numba function for obtaining training and testing dynamical system time series data for a set of initial conditions.
     # This is used during test to compute the map error instead of a for loop over the entire prediction period.
@@ -370,7 +370,7 @@ def getX(res, rk, x0=1, y0=1, z0=1):
 
     return res.X
 
-@jit(nopython=True, fastmath=True)
+#@jit(nopython=True, fastmath=True)
 def getXwrapped(u_training, res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_indices, W_indptr, W_shape, leakage, noise, noisetype='none', noise_scaling=0, noise_realization=0, traintype='normal'):
     # Numba compatible function for obtaining reservoir states using various types of noise.
     # Generally returns an array of reservoir states and the noiseless training data used as input.
@@ -513,7 +513,7 @@ def getXwrapped(u_training, res_X, Win_data, Win_indices, Win_indptr, Win_shape,
 
 
 """
-@jit(nopython = True, fastmath = True)
+#@jit(nopython = True, fastmath = True)
 def getjacobian(Win, W, Wout, Dn):
     jacsize  = Wout.shape[1]-1
     res_size = Win.shape[0]
@@ -623,7 +623,7 @@ def get_states(res, squarenodes, rk, reg_train_times, noise, noisetype='none', n
         #np.savetxt('/lustre/awikner1/res-noise-stabilization/lorenz_X_train_res%d_noise%e.csv' % (res.rsvr_size, noise_scaling), res.X_train, delimiter = ',')
         #np.savetxt('/lustre/awikner1/res-noise-stabilization/lorenz_Y_train_res%d_noise%e.csv' % (res.rsvr_size, noise_scaling), res.Y_train, delimiter = ',')
 
-@jit(nopython=True, fastmath = True)
+#@jit(nopython=True, fastmath = True)
 def get_squared(X, rsvr_size, squarenodes, dim = 0):
     X_aug = np.copy(X)
     if not squarenodes:
@@ -632,7 +632,7 @@ def get_squared(X, rsvr_size, squarenodes, dim = 0):
         X_out = np.vstack((X_aug[0].reshape(1,-1), X_aug[1:rsvr_size+1], X_aug[1:rsvr_size+1]**2.0, X_aug[rsvr_size+1:]))
         return X_out
 
-@jit(nopython=True, fastmath = True)
+#@jit(nopython=True, fastmath = True)
 def get_squared_vec(X, rsvr_size, squarenodes):
     X_aug = np.copy(X)
     if not squarenodes:
@@ -642,7 +642,7 @@ def get_squared_vec(X, rsvr_size, squarenodes):
         return X_out
 
 
-@jit(nopython=True, fastmath=True)
+#@jit(nopython=True, fastmath=True)
 def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_indices, W_indptr, W_shape, leakage, skip, noise, noisetype='none',
         noise_scaling=0, noise_realizations=1, traintype='normal', squarenodes = False, q=0):
     # Numba compatible function to obtain the matrices used to train the reservoir using either linear regression or a sylvester equation.
@@ -1179,7 +1179,7 @@ def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indice
                             reg_comp_datas[j+1], reg_comp_indices[j+1], reg_comp_indptrs[j+1], reg_comp_shape)
                     else:
                         reg_comp_data, reg_comp_idx, reg_comp_indptr, tmp = matrix_sparse_sparse_mult(\
-                            E_n_datas[j], E_n_indices[j], E_n_indptrs[j], E_n_shape,\
+                            E_n_datas[k-2], E_n_indices[k-2], E_n_indptrs[k-2], E_n_shape,\
                             reg_comp_datas[j+1], reg_comp_indices[j+1], reg_comp_indptrs[j+1], reg_comp_shape)
                     reg_comp_datas[j], reg_comp_indices[j], reg_comp_indptrs[j] = \
                         np.ascontiguousarray(reg_comp_data), np.ascontiguousarray(reg_comp_idx),\
@@ -1750,7 +1750,7 @@ def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indice
                         reg_comp_datas[j+1], reg_comp_indices[j+1], reg_comp_indptrs[j+1], reg_comp_shape)
                 else:
                     reg_comp_data, reg_comp_idx, reg_comp_indptr, tmp = matrix_sparse_sparse_mult(\
-                        E_n_datas[j], E_n_indices[j], E_n_indptrs[j], E_n_shape,\
+                        E_n_datas[k-2], E_n_indices[k-2], E_n_indptrs[k-2], E_n_shape,\
                         reg_comp_datas[j+1], reg_comp_indices[j+1], reg_comp_indptrs[j+1], reg_comp_shape)
                 reg_comp_datas[j], reg_comp_indices[j], reg_comp_indptrs[j] = \
                     np.ascontiguousarray(reg_comp_data), np.ascontiguousarray(reg_comp_idx),\
@@ -1851,7 +1851,7 @@ def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indice
         return data_trstates, states_trstates, Y_train, X_train, gradient_reg
 
 
-@jit(nopython=True, fastmath=True)
+#@jit(nopython=True, fastmath=True)
 def getD(u_arr_train, res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_indices, W_indptr, W_shape, leakage, noise, skip, noisetype='none',
          noise_scaling=0, noise_realizations=1, traintype='normal', squarenodes = False):
     n, d = u_arr_train.shape
@@ -1871,7 +1871,7 @@ def predict(res, u0,  steps=1000, squarenodes = False):
     return Y
 
 
-@jit(nopython=True, fastmath=True)
+#@jit(nopython=True, fastmath=True)
 def predictwrapped(res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_indices, W_indptr, W_shape, Wout, leakage, u0, steps, squarenodes = False):
     # Numba compatible prediction function
     Y = np.empty((Win_shape[1]-1, steps + 1))
@@ -1945,7 +1945,7 @@ def test(res, Wout_itr, squarenodes, noise_in, rktest_u_arr_train_nonoise, rktes
     return stable_count/num_tests, mean_rms, max_rms, variances, valid_time, rms, preds, wass_dist, pmap_max, pmap_max_wass_dist
 
 
-@jit(nopython=True, fastmath=True)
+#@jit(nopython=True, fastmath=True)
 def testwrapped(res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_indices, W_indptr, W_shape, Wout, leakage, rktest_u_arr_train_nonoise, rktest_u_arr_test,   true_pmap_max, num_tests, rkTime, split, noise_in, showMapError=True,   showTrajectories=True, showHist=True, system='lorenz', tau=0.1, params=np.array([[], []], dtype=np.complex128), pmap=False, max_valid_time = 500, squarenodes = False, savepred = False, save_time_rms = False):
     # Numba compatable function for testing trained reservoir performance against true system time series
     stable_count = 0
@@ -2032,7 +2032,7 @@ def testwrapped(res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_i
 
         vt_cutoff = 0.2*np.sqrt(2)
         check_vt = True
-        array_compute = True
+        array_compute = False
         pred = pred_full[:,:max_valid_time]
         for k in range(num_vt_tests):
             for j in range(1, pred.shape[1]):
@@ -2095,6 +2095,13 @@ def testwrapped(res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_i
                     u0 = pred_full[:, j-1]*(1.2146066380280796)
                     rkmap_u_arr_train = RungeKuttawrapped(
                         0, 0, 0, h=tau, T=1, u0=u0, system=system, params=params)[0]
+                if j < 3:
+                    print('Step:')
+                    print(j)
+                    print('Pred:')
+                    print(pred_full[:5,j])
+                    print('Map pred:')
+                    print(rkmap_u_arr_train[:5,1])
                 # if j <= 10:
                 # print(rkmap_u_arr_train[0,1])
 
@@ -2139,6 +2146,8 @@ def testwrapped(res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_i
             rms[i] = rms_test
         max_rms[i] = np.max(rms_test)
         mean_rms[i] = np.mean(rms_test)
+        print('Mean rms:')
+        print(mean_rms[i])
         if system == 'lorenz':
             means[i] = np.mean(pred_full[0])
             variances[i]     = np.var(pred_full[0])
