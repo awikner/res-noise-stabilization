@@ -79,6 +79,7 @@ def dense_to_sparse(W):
 
 @jit(nopython = True, fastmath = True)
 def mult_vec(data, indices, indptr, shape, mat):
+    assert(shape[1] == mat.size)
     out = np.zeros(shape[0])
     for i in range(mat.size):
         for k in range(indptr[i], indptr[i+1]):
@@ -253,12 +254,10 @@ def get_D_n(D, X, Win_nobias_data, Win_nobias_indices, Win_nobias_indptr, Win_no
     return D_n_data, D_n_indices, D_n_indptr
 
 @jit(fastmath = True, nopython = True)
-def get_D_n_mlonly(D, X, Win_nobias_data, Win_nobias_indices, Win_nobias_indptr, Win_nobias_shape, \
+def get_D_n_mlonly(D, Win_nobias_data, Win_nobias_indices, Win_nobias_indptr, Win_nobias_shape, \
         D_n_shape, rsvr_size, res_feature_size, n, squarenodes):
     D_n_data, D_n_indices, D_n_indptr, tmp = matrix_diag_sparse_mult(D, Win_nobias_data, Win_nobias_indices,\
         Win_nobias_indptr, Win_nobias_shape)
-    if squarenodes:
-        D_n_data, D_n_indices, D_n_indptr, tmp = matrix_diag_sparse_mult(X, D_n_data, D_n_indices, D_n_indptr, tmp)
     return D_n_data,D_n_indices,D_n_indptr
 
 @jit(fastmath = True, nopython = True)
@@ -283,10 +282,7 @@ def get_E_n(D, X, E_n_shape, rsvr_size, W_mat_data, W_mat_indices, W_mat_indptr,
     return E_n_data, E_n_indices, E_n_indptr
 
 @jit(fastmath = True, nopython = True)
-def get_E_n_mlonly(D, X, X_inv, E_n_shape, rsvr_size, W_mat_data, W_mat_indices, W_mat_indptr, W_mat_shape, \
+def get_E_n_mlonly(D, E_n_shape, rsvr_size, W_mat_data, W_mat_indices, W_mat_indptr, W_mat_shape, \
             leakage_mat_data, leakage_mat_indices, leakage_mat_indptr, leakage_mat_shape, squarenodes):
     E_n_data, E_n_indices, E_n_indptr, tmp = matrix_diag_sparse_mult_add_sparse(D, W_mat_data, W_mat_indices, W_mat_indptr, W_mat_shape, leakage_mat_data, leakage_mat_indices, leakage_mat_indptr, leakage_mat_shape)
-    if squarenodes:
-        E_n_data, E_n_indices, E_n_indptr, tmp = matrix_diag_sparse_diag_mult(X, E_n_data, E_n_indices, E_n_indptr,\
-            tmp, X_inv)
     return E_n_data, E_n_indices, E_n_indptr
