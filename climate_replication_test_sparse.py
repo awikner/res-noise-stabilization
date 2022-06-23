@@ -185,8 +185,8 @@ class Reservoir:
             spectral_radius/np.abs(max_eig[0])*unnormalized_W))
         self.W_data, self.W_indices, self.W_indptr, self.W_shape = \
                 (W_sp.data, W_sp.indices, W_sp.indptr, np.array(list(W_sp.shape)))
-        print('Avg. degree of W:')
-        print(self.W_data.size/rsvr_size)
+        #print('Avg. degree of W:')
+        #print(self.W_data.size/rsvr_size)
         """
         unnormalized_W_sp = random(rsvr_size, rsvr_size, density = density, format = 'csc', data_rvs = res_gen.random)
         max_eig = eigs(unnormalized_W_sp, k=1, return_eigenvectors = False, maxiter = 10**5, v0 = res_gen.random(rsvr_size))
@@ -197,8 +197,8 @@ class Reservoir:
             np.ascontiguousarray(W_sp.indptr), np.array(list(W_sp.shape)))
         """
 
-        print('Adjacency matrix section:')
-        print(self.W_data[:4])
+        #print('Adjacency matrix section:')
+        #print(self.W_data[:4])
 
         if win_type == 'dense':
             if bias_type != 'new_random':
@@ -588,15 +588,15 @@ def gen_noise(noise_size, noise_length, noisetype, noise_scaling, noise_stream, 
     if 'gaussian' in noisetype:
         for i in range(noise_realizations):
             noise[i] = noise_stream[i].standard_normal(
-                (noise_size, noise_length))*noise_scaling
+                (noise_size, noise_length))*np.sqrt(noise_scaling)
     if noisetype in ['perturbation', 'perturbation_onestep']:
         for noise_realization in noise_realizations:
             if noise_realization < noise_size:
                 noise[noise_realization, noise_realization] = np.ones(
-                    noise_length)*noise_scaling
+                    noise_length)*np.sqrt(noise_scaling)
             elif noise_realization < 2*noise_length:
                 noise[noise_realization, noise_realization -
-                    noise_size] = -np.ones(noise_length)*noise_scaling
+                    noise_size] = -np.ones(noise_length)*np.sqrt(noise_scaling)
             else:
                 raise ValueError
 
@@ -662,7 +662,7 @@ def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indice
     #print('Y_train:')
     #print(Y_train[-5,-5])
     print(reg_train_times)
-    reg_train_fracs = Y_train.shape[1]/reg_train_times
+    reg_train_fracs = 1.0/reg_train_times
     print('Reg train fracs:')
     print(reg_train_fracs)
     if traintype in ['normal', 'normalres1', 'normalres2']:
@@ -1012,7 +1012,7 @@ def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indice
     elif 'gradientk' in traintype and 'only' not in traintype:
         # Linearized k-step noise
         k = str_to_int(traintype.replace('gradientk', ''))
-        reg_train_fracs = Y_train.shape[1]/(reg_train_times-(k-1))
+        reg_train_fracs = 1.0/(reg_train_times-(k-1))
         sparse_cutoff = 0.89
         break_flag = False
         #print(k)
@@ -1267,7 +1267,7 @@ def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indice
         states_trstates[0] = X_train @ X_train.T
         for i in range(1, reg_train_times.size):
             states_trstates[i] = np.ascontiguousarray(states_trstates[0])
-        print('Target matrix:')
+        #print('Target matrix:')
         #print(data_trstates[:5,:5])
         #print('Information matrix:')
         #print(states_trstates[0,:5,:5])
@@ -1279,7 +1279,7 @@ def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indice
     elif 'gradientk' in traintype and 'only' in traintype:
         # Linearized k-step noise
         k = str_to_int(traintype.replace('gradientk', '').replace('only',''))
-        reg_train_fracs = Y_train.shape[1]/(reg_train_times-(k-1))
+        reg_train_fracs = 1.0/(reg_train_times-(k-1))
         sparse_cutoff = 0.89
         break_flag = False
         #print(k)
@@ -1580,7 +1580,7 @@ def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indice
     elif 'regzero' in traintype:
         # Linearized k-step noise
         k = str_to_int(traintype.replace('regzerok', ''))
-        reg_train_fracs = Y_train.shape[1]/(reg_train_times-(k-1))
+        reg_train_fracs = 1.0/(reg_train_times-(k-1))
         sparse_cutoff = 0.89
         break_flag = False
         #print(k)
@@ -2030,7 +2030,7 @@ def testwrapped(res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_i
         plt.show()
         """
 
-        vt_cutoff = 0.2*np.sqrt(2)
+        vt_cutoff = 0.2*1.3697994268693887
         check_vt = True
         array_compute = False
         pred = pred_full[:,:max_valid_time]
@@ -2146,8 +2146,8 @@ def testwrapped(res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_i
             rms[i] = rms_test
         max_rms[i] = np.max(rms_test)
         mean_rms[i] = np.mean(rms_test)
-        print('Mean rms:')
-        print(mean_rms[i])
+        #print('Mean rms:')
+        #print(mean_rms[i])
         if system == 'lorenz':
             means[i] = np.mean(pred_full[0])
             variances[i]     = np.var(pred_full[0])
@@ -2239,6 +2239,7 @@ def optim_func(res, squarenodes, noise_in, noise, rktest_u_arr_train_nonoise, rk
     pmap_max           = np.zeros(num_reg_train_times, dtype = object)
     pmap_max_wass_dist = np.zeros(num_reg_train_times, dtype = object)
     grad_eigenvals     = np.zeros(num_reg_train_times, dtype = object)
+    trainlen_mult      = 1.0/res.Y_train.shape[1]
     for i in range(num_reg_train_times):
         if traintype not in ['sylvester', 'sylvester_wD']:
             # print('Noise mag: %e' % noise)
@@ -2248,7 +2249,7 @@ def optim_func(res, squarenodes, noise_in, noise, rktest_u_arr_train_nonoise, rk
             #print(res.gradient_reg.shape)
             #print(idenmat.shape)
             res.Wout[i] = np.transpose(solve(np.transpose(
-                res.states_trstates[i] + noise**2.0*res.gradient_reg[i]+idenmat), np.transpose(res.data_trstates+prior)))
+                res.states_trstates[i]*trainlen_mult + noise*res.gradient_reg[i]+idenmat), np.transpose(res.data_trstates*trainlen_mult+prior)))
             #np.savetxt('/lustre/awikner1/res-noise-stabilization/lorenz_Wout_res%d_noise%e_reg%e.csv' % (res.rsvr_size, noise, alpha),\
             #        res.Wout[i], delimiter = ',')
             #res.Wout =  matlab_mrdivide(res.states_trstates + noise**2.0*res.gradient_reg + idenmat, res.data_trstates)
@@ -2314,8 +2315,8 @@ def get_res_results(itr, res_gen, squarenodes, rk, reg_train_times, res_size, rh
     train_mean_rms_out     = np.zeros((noise_array.size, alpha_values.size, reg_train_times.size), dtype = object)
     train_max_rms_out      = np.zeros((noise_array.size, alpha_values.size, reg_train_times.size), dtype = object)
     grad_eigenvals_out     = np.zeros((noise_array.size, reg_train_times.size), dtype = object)
-    print('Mean RMS out shape:')
-    print(mean_rms_out.shape)
+    #print('Mean RMS out shape:')
+    #print(mean_rms_out.shape)
     for i, noise in enumerate(noise_array):
         """
         stable_frac = np.zeros((alpha_values.size))
@@ -2734,7 +2735,7 @@ def main(argv):
     ss_train = np.random.SeedSequence(34)
     ss_test  = np.random.SeedSequence(56)
     ss_noise = np.random.SeedSequence(78)
-    if traintype in ['gradient1','gradient2','gradient12'] or 'gradientk' in traintype:
+    if traintype in ['gradient1','gradient2','gradient12'] or 'gradientk' in traintype or 'regzerok' in traintype:
         res_seeds       = ss_res.spawn(res_per_test)
         train_seeds     = ss_train.spawn(num_trains)
         test_seeds      = ss_test.spawn(num_tests)
