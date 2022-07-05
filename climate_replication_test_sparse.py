@@ -2516,7 +2516,7 @@ def get_res_results(itr, res_gen, squarenodes, rk, reg_train_times, res_size, rh
             pmap_max_out, pmap_max_wass_dist_out, train_mean_rms_out, train_max_rms_out, grad_eigenvals_out, train_seed, noise_array, itr
 
 
-def find_stability(noisetype, noise, traintype, train_seed, train_gen, res_itr, res_gen, squarenodes, test_stream, noise_stream, rho, sigma, leakage, win_type, bias_type, train_time, reg_train_times, res_size, res_per_test, noise_realizations, num_tests, alpha_values, system, tau, savepred, save_time_rms, save_eigenvals, debug_mode, root_folder, pmap, max_valid_time, prior, raw_data_folder):
+def find_stability(noisetype, noise, traintype, train_seed, train_gen, res_itr, res_gen, squarenodes, test_stream, test_idxs, noise_stream, rho, sigma, leakage, win_type, bias_type, train_time, reg_train_times, test_time, res_size, res_per_test, noise_realizations, num_tests, alpha_values, system, tau, savepred, save_time_rms, save_eigenvals, debug_mode, root_folder, pmap, max_valid_time, prior, raw_data_folder):
 
     # Main function for training and testing reservoir performance. This function first generates the training and testing data,
     # the passes to get_res_results to obtain th reservoir performance.
@@ -2534,11 +2534,17 @@ def find_stability(noisetype, noise, traintype, train_seed, train_gen, res_itr, 
     print('Training seed: %d' % train_seed)
     warnings.filterwarnings("ignore", category=NumbaPerformanceWarning)
     if system == 'lorenz':
-        rkTime_test = 4000
+        if test_time == 0:
+            rkTime_test = 4000
+        else:
+            rkTime_test = test_time
         split_test = 2000
     elif system in ['KS', 'KS_d2175']:
         time_mult = 0.25/tau
-        rkTime_test = int(18000*time_mult)
+        if test_time == 0:
+            rkTime_test = int(18000*time_mult)
+        else:
+            rkTime_test = int(test_time*time_mult)
         split_test = int(2000*time_mult)
 
         # rkTime_test = 3000
@@ -2675,7 +2681,7 @@ def find_stability(noisetype, noise, traintype, train_seed, train_gen, res_itr, 
                 pred[k] = array_elem
             for l, (k, reg) in product(range(num_tests), enumerate(alpha_values)):
                 np.savetxt(os.path.join(raw_data_folder, 'pred_res%d_train%d_test%d_noise%e_regtrain%d_reg%e.csv' %\
-                        (res_itr, train_seed, l, noise_val, reg_train_time, reg)), pred[k,l], delimiter = ',')
+                        (res_itr, train_seed, test_idxs[l], noise_val, reg_train_time, reg)), pred[k,l], delimiter = ',')
 
     # toc_global = time.perf_counter()
     # print('Total Runtime: %s sec.' % (toc_global - tic_global))
@@ -2699,9 +2705,9 @@ def main(argv):
     # It then calls find_stability in a loop, processes the output from find_stability, and saves the output to a folder.
 
     root_folder, top_folder, run_name, system, noisetype, traintype, savepred, save_time_rms, save_eigenvals, squarenodes, rho,\
-        sigma, leakage, win_type, bias_type, tau, res_size, train_time, noise_realizations, \
+        sigma, leakage, win_type, bias_type, tau, res_size, train_time, test_time, noise_realizations, \
         noise_streams_per_test, noise_values_array,alpha_values, res_per_test, num_trains, num_tests,\
-        debug_mode, pmap, metric, return_all, ifray, machine,max_valid_time,prior, tmp, tmp1, tmp2, tmp3,\
+        debug_mode, pmap, metric, return_all, ifray, machine,max_valid_time,prior, res_start, train_start, test_start, tmp, tmp1, tmp2, tmp3,\
         reg_train_times, discard_time = get_run_opts(argv)
 
     raw_data_folder = os.path.join(os.path.join(root_folder, top_folder), run_name + '_folder')
@@ -2736,18 +2742,20 @@ def main(argv):
     ss_test  = np.random.SeedSequence(56)
     ss_noise = np.random.SeedSequence(78)
     if traintype in ['gradient1','gradient2','gradient12'] or 'gradientk' in traintype or 'regzerok' in traintype:
-        res_seeds       = ss_res.spawn(res_per_test)
-        train_seeds     = ss_train.spawn(num_trains)
-        test_seeds      = ss_test.spawn(num_tests)
+        res_seeds       = ss_res.spawn(res_per_test+res_start)
+        train_seeds     = ss_train.spawn(num_trains+train_start)
+        test_seeds      = ss_test.spawn(num_tests+test_start)
+        test_idxs = np.arange(test_start, test_start+num_tests)
         res_streams     = np.zeros(res_per_test*num_trains, dtype = object)
         train_streams   = np.zeros(res_per_test*num_trains, dtype = object)
         test_streams    = np.zeros((res_per_test*num_trains, num_tests), dtype = object)
         for i in range(res_per_test*num_trains):
-            test_streams[i] = np.array([np.random.default_rng(s) for s in test_seeds], dtype = object)
+            test_streams[i] = np.array([np.random.default_rng(test_seeds[s]) for \
+                s in test_idxs], dtype = object)
         noise_streams   = np.empty(noise_realizations, dtype = object)
         tr, rt = np.meshgrid(np.arange(num_trains), np.arange(res_per_test))
-        tr     = tr.flatten()
-        rt     = rt.flatten()
+        tr     = tr.flatten()+train_start
+        rt     = rt.flatten()+res_start
         for i in range(res_per_test*num_trains):
             res_streams[i]   = np.random.default_rng(res_seeds[rt[i]])
             train_streams[i] = np.random.default_rng(train_seeds[tr[i]])
@@ -2762,15 +2770,15 @@ def main(argv):
         tic = time.perf_counter()
         if ifray:
             out_base  = ray.get([find_stability_remote.remote(noisetype, noise_values_array, traintype, \
-                tr[i], train_streams[i], rt[i], res_streams[i], squarenodes, test_streams[i], noise_streams, rho, sigma, \
-                leakage, win_type, bias_type, train_time, reg_train_times,\
+                tr[i], train_streams[i], rt[i], res_streams[i], squarenodes, test_streams[i], test_idxs, noise_streams, rho, sigma, \
+                leakage, win_type, bias_type, train_time, reg_train_times, test_time,\
                 res_size, res_per_test, noise_realizations, num_tests, alpha_values,\
                 system, tau, savepred, save_time_rms, save_eigenvals, debug_mode, \
                 root_folder, pmap, max_valid_time,prior, raw_data_folder) for i in incomplete_idxs])
         else:
             out_base  = [find_stability_serial(noisetype, noise_values_array, traintype, \
-                tr[i], train_streams[i], rt[i], res_streams[i], squarenodes, test_streams[i], noise_streams, rho, sigma, \
-                leakage, win_type, bias_type, train_time, reg_train_times, \
+                tr[i], train_streams[i], rt[i], res_streams[i], squarenodes, test_streams[i], test_idxs, noise_streams, rho, sigma, \
+                leakage, win_type, bias_type, train_time, reg_train_times, test_time, \
                 res_size, res_per_test, noise_realizations, num_tests, alpha_values,\
                 system, tau, savepred, save_time_rms, save_eigenvals, debug_mode,\
                 root_folder, pmap, max_valid_time,prior, raw_data_folder) for i in incomplete_idxs]
@@ -2804,9 +2812,10 @@ def main(argv):
         out = np.array(final_out, dtype = object)
         """
     else:
-        res_seeds       = ss_res.spawn(res_per_test)
-        train_seeds     = ss_train.spawn(num_trains)
-        test_seeds      = ss_test.spawn(num_tests)
+        res_seeds       = ss_res.spawn(res_per_test+res_start)
+        train_seeds     = ss_train.spawn(num_trains+train_start)
+        test_seeds      = ss_test.spawn(num_tests+test_start)
+        test_idxs = np.arange(test_start, test_start+num_tests)
         noise_seeds     = ss_noise.spawn(noise_realizations)
         res_streams     = np.zeros(num_trains*res_per_test*noise_values_array.size, dtype = object)
         train_streams   = np.zeros(num_trains*res_per_test*noise_values_array.size, dtype = object)
@@ -2814,15 +2823,16 @@ def main(argv):
         noise_streams   = np.zeros((num_trains*res_per_test*noise_values_array.size, noise_realizations), dtype = object)
 
         tnr, ntr, rtn = np.meshgrid(np.arange(num_trains), noise_values_array, np.arange(res_per_test))
-        tnr = tnr.flatten()
+        tnr = tnr.flatten() + res_start
         ntr = ntr.flatten()
-        rtn = rtn.flatten()
+        rtn = rtn.flatten() + train_start
 
         for i in range(num_trains*res_per_test*noise_values_array.size):
             #print(res_seeds[rtn[i]])
             res_streams[i]   = np.random.default_rng(res_seeds[rtn[i]])
             train_streams[i] = np.random.default_rng(train_seeds[tnr[i]])
-            test_streams[i]  = np.array([np.random.default_rng(j) for j in test_seeds])
+            test_streams[i]  = np.array([np.random.default_rng(test_seeds[j]) for\
+                j in test_idxs])
             noise_streams[i] = np.array([np.random.default_rng(j) for j in noise_seeds])
         incomplete_idxs = []
         for i in range(tnr.size):
@@ -2834,14 +2844,14 @@ def main(argv):
         tic = time.perf_counter()
         if ifray:
             out_base  = ray.get([find_stability_remote.remote(noisetype, ntr[i], traintype,\
-                tnr[i], train_streams[i], rtn[i], res_streams[i], squarenodes, test_streams[i], noise_streams[i], \
-                rho, sigma, leakage, win_type, bias_type, train_time, reg_train_times,\
+                tnr[i], train_streams[i], rtn[i], res_streams[i], squarenodes, test_streams[i], test_idxs, noise_streams[i], \
+                rho, sigma, leakage, win_type, bias_type, train_time, reg_train_times, test_time, \
                 res_size, res_per_test, noise_realizations, num_tests, alpha_values,\
                 system, tau, savepred, save_time_rms, save_eigenvals, debug_mode, root_folder, pmap, max_valid_time,prior, raw_data_folder) for i in incomplete_idxs])
         else:
             out_base  = [find_stability_serial(noisetype, ntr[i], traintype,\
-                tnr[i], train_streams[i], rtn[i], res_streams[i], squarenodes, test_streams[i], noise_streams[i], \
-                rho, sigma, leakage, win_type, bias_type, train_time, reg_train_times,\
+                tnr[i], train_streams[i], rtn[i], res_streams[i], squarenodes, test_streams[i], test_idxs, noise_streams[i], \
+                rho, sigma, leakage, win_type, bias_type, train_time, reg_train_times, test_time,\
                 res_size, res_per_test, noise_realizations, num_tests, alpha_values,\
                 system, tau, savepred, save_time_rms, save_eigenvals, debug_mode, root_folder, pmap, max_valid_time,prior, raw_data_folder) for i in incomplete_idxs]
         """
