@@ -6,7 +6,7 @@ import time
 import sys
 
 def start_deepthought2_run(system = 'KS', traintype = 'normal', noisetype = 'gaussian', \
-        noise_realizations = 1, res_size = 500, trainlen = 3000, rho = 0.5, sigma = 1.0,\
+        noise_realizations = 1, res_size = 500, trainlen = 3000, testlen = 0, rho = 0.5, sigma = 1.0,\
         leakage = 1.0, tau = 0.25, win_type = 'full', bias_type = 'old',\
         noise_values_array = np.logspace(-3, 0, num = 19, base = 10)[5:11], \
         alpha_values = np.append(0., np.logspace(-7, -3, 9)), num_res = 3,\
@@ -14,7 +14,8 @@ def start_deepthought2_run(system = 'KS', traintype = 'normal', noisetype = 'gau
         returnall = False, savepred = False, squarenodes = False, savetime = False, max_valid_time = 500, \
         debug = False, num_nodes = 4, cpus_per_node = None, runtime = '2:00:00', \
         account = 'physics-hi',debug_part = False, just_process = False, parallel = True,\
-        resonly_flag = False, import_res = False, import_train = False, import_test = False,\
+        resonly_flag = False, res_start = 0, train_start = 0, test_start = 0, \
+        import_res = False, import_train = False, import_test = False,\
         import_noise = False, reg_train_times = None, discard_time = 500, prior = 'zero',\
         save_eigenvals = False, pmap = False):
 
@@ -115,9 +116,9 @@ def start_deepthought2_run(system = 'KS', traintype = 'normal', noisetype = 'gau
 
     testname = '%s_%s%s_%s_%d_%dnodes_%dtrain_rho%0.1f_sigma%0.1e_leakage%0.1f_tau%0.3f' % \
             (system, program_ext, traintype, noisetype, noise_realizations, res_size, trainlen, rho, sigma, leakage,  tau)
-    options_str = '--resonly=%s --savepred=%s --system=%s --noisetype=%s --traintype=%s -r %d --rho=%f --sigma=%f --leakage=%f --win_type=%s --bias_type=%s --tau=%f -N %d -T %d --res=%d --tests=%d --trains=%d --debug=%s --squarenodes=%s --metric=%s --returnall=%s --savetime=%s --noisevals=%s --regvals=%s --maxvt=%d --machine=%s --parallel=%s --importres=%s --importtrain=%s --importtest=%s --importnoise=%s --regtraintimes=%s --discardlen=%d --prior=%s --saveeigenvals=%s --pmap=%s' % (resonly_str, savepred_str, system, noisetype, traintype, noise_realizations,  rho,sigma, leakage, win_type, bias_type, tau, res_size, trainlen, num_res, num_tests, num_trains,
+    options_str = '--resonly=%s --savepred=%s --system=%s --noisetype=%s --traintype=%s -r %d --rho=%f --sigma=%f --leakage=%f --win_type=%s --bias_type=%s --tau=%f -N %d -T %d --testtime=%d --res=%d --tests=%d --trains=%d --debug=%s --squarenodes=%s --metric=%s --returnall=%s --savetime=%s --noisevals=%s --regvals=%s --maxvt=%d --machine=%s --parallel=%s --resstart=%d --trainstart=%d --teststart=%d --importres=%s --importtrain=%s --importtest=%s --importnoise=%s --regtraintimes=%s --discardlen=%d --prior=%s --saveeigenvals=%s --pmap=%s' % (resonly_str, savepred_str, system, noisetype, traintype, noise_realizations,  rho,sigma, leakage, win_type, bias_type, tau, res_size, trainlen, testlen, num_res, num_tests, num_trains,
             debug_str, squarenodes_str, metric, returnall_str,
-            savetime_str, noise_values_str, reg_values_str, max_valid_time, machine, parallel_str, import_res_str, import_train_str, import_test_str, import_noise_str, reg_train_times_str, discard_time, prior,save_eigenvals_str, pmap_str)
+            savetime_str, noise_values_str, reg_values_str, max_valid_time, machine, parallel_str, res_start, train_start, test_start, import_res_str, import_train_str, import_test_str, import_noise_str, reg_train_times_str, discard_time, prior,save_eigenvals_str, pmap_str)
     input_str = 'python slurm-launch.py --exp-name %s --command "python -u %s %s" --num-nodes %d %s --load-env "conda activate res39" -t %s -A %s %s' % (testname, program_str, options_str, num_nodes, cpus_str, runtime, account, debug_part_str)
     print(input_str)
     run_out = subprocess.check_output(input_str, shell=True)

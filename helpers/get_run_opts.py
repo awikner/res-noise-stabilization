@@ -12,6 +12,7 @@ def get_run_opts(argv, runflag = True):
 
     if runflag:
         train_time = 3000
+        test_time = 0
         discard_time = 500
         res_size = 1000
         res_per_test = 20
@@ -42,6 +43,9 @@ def get_run_opts(argv, runflag = True):
         noise_streams_per_test = 5
         noise_values_array = np.logspace(-3, 0, num = 19, base = 10)[5:11]
         alpha_values = np.append(0., np.logspace(-7, -3, 9))
+        res_start = 0
+        train_start = 0
+        test_start = 0
         import_res = False
         import_train = False
         import_test = False
@@ -51,11 +55,12 @@ def get_run_opts(argv, runflag = True):
 
         try:
             opts, args = getopt.getopt(argv, "T:N:r:",
-                    ['noisetype=', 'traintype=', 'system=', 'res=',
+                    ['testtime=', 'noisetype=', 'traintype=', 'system=', 'res=',
                     'tests=', 'trains=', 'savepred=', 'tau=', 'rho=',
                     'sigma=', 'leakage=', 'bias_type=', 'debug=', 'win_type=',
                     'machine=', 'num_cpus=', 'pmap=', 'parallel=', 'metric=','returnall=',
                     'savetime=', 'saveeigenvals=','noisevals=', 'regvals=', 'maxvt=', 'noisestreams=',
+                    'resstart=','trainstart=','teststart=',
                     'squarenodes=', 'resonly=', 'importres=','importtrain=',
                     'importtest=','importnoise=','regtraintimes=','discardlen=',
                     'prior='])
@@ -72,6 +77,21 @@ def get_run_opts(argv, runflag = True):
             elif opt == '-r':
                 noise_realizations = int(arg)
                 print('Noise Realizations: %d' % noise_realizations)
+            elif opt == '--testtime':
+                test_time = int(arg)
+                if test_time == 0:
+                    print('Testing duration: default')
+                else:
+                    print('Testing duration: %d' % test_time)
+            elif opt == '--resstart':
+                res_start = int(arg)
+                print('Reservoir ensemble start: %d' % res_start)
+            elif opt == '--trainstart':
+                train_start = int(arg)
+                print('Train ensemble start: %d' % train_start)
+            elif opt == '--teststart':
+                test_start = int(arg)
+                print('Test ensemble start: %d' % test_start)
             elif opt == '--saveeigenvals':
                 if arg == 'True':
                     save_eigenvals = True
@@ -263,7 +283,8 @@ def get_run_opts(argv, runflag = True):
         train_time, res_size, noise_realizations, save_time_rms, save_eigenvals, pmap, metric,\
                 return_all, machine, rho, sigma, leakage, tau, win_type, \
                 bias_type, res_per_test, num_tests, num_trains, savepred, \
-                noisetype, traintype, system, squarenodes, resonly, prior, import_res,\
+                noisetype, traintype, system, squarenodes, resonly, prior, res_start,\
+                train_start, test_start, import_res,\
                 import_train, import_test, import_noise, reg_train_times,\
                 discard_time = argv
     #if return_all and savepred:
@@ -347,10 +368,10 @@ def get_run_opts(argv, runflag = True):
             os.mkdir(os.path.join(os.path.join(root_folder, data_folder), run_name + '_folder'))
 
         return root_folder, data_folder, run_name, system, noisetype, traintype, savepred, save_time_rms, save_eigenvals, squarenodes, rho,\
-            sigma, leakage, win_type, bias_type, tau, res_size, train_time, noise_realizations, noise_streams_per_test,\
+            sigma, leakage, win_type, bias_type, tau, res_size, train_time, test_time, noise_realizations, noise_streams_per_test,\
             noise_values_array,alpha_values, res_per_test, num_trains, num_tests, debug_mode, pmap, metric, \
-            return_all, ifray, machine, max_valid_time, prior, import_res, import_train, import_test, import_noise, \
-            reg_train_times, discard_time
+            return_all, ifray, machine, max_valid_time, prior, res_start, train_start, test_start, import_res,\
+             import_train, import_test, import_noise, reg_train_times, discard_time
     else:
         if not savepred and not pmap:
             return os.path.join(os.path.join(root_folder, data_folder), run_name + '.bz2'), ''
