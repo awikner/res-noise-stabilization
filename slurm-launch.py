@@ -24,9 +24,16 @@ MEMORY  = "${MEMORY}"
 CPUS    = "${CPUS}"
 PARTITION = "${PARTITION}"
 SCRATCH = "${SCRATCH}"
+IFRAY   = "${IFRAY}"
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--ifray",
+        "-r",
+        type=str,
+        default="true",
+        help="Flag whether or not to use ray for parallelization.")
     parser.add_argument(
         "--runtime",
         "-t",
@@ -97,6 +104,10 @@ if __name__ == "__main__":
 
     job_name = "{}_{}".format(args.exp_name,
                               time.strftime("%m%d-%H%M%S", time.localtime()))
+    if str(args.ifray) == "false":
+        args.num_nodes = 1
+        args.cpus_per_node = 1
+        print('Number of nodes and cpus set to 1 due to ifray=false')
 
     partition_option = "#SBATCH --partition={}".format(
         args.partition) if args.partition else ""
@@ -117,6 +128,7 @@ if __name__ == "__main__":
     text = text.replace(MEMORY, memory)
     text = text.replace(CPUS, str(args.cpus_per_node))
     text = text.replace(SCRATCH, str(args.tmp))
+    text = text.replace(IFRAY, str(args.ifray))
     text = text.replace(
         "# THIS FILE IS A TEMPLATE AND IT SHOULD NOT BE DEPLOYED TO "
         "PRODUCTION!",

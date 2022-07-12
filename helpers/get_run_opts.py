@@ -6,55 +6,158 @@ import os
 
 import numpy as np
 
+class RunOpts:
+    def __init__(self, argv=None, runflag=True, train_time = 3000,\
+        test_time = 0,\
+        discard_time = 500,\
+        res_size = 1000,\
+        res_per_test = 20,\
+        noise_realizations = 1,\
+        num_tests = 10,\
+        num_trains = 25,\
+        traintype = 'normal',\
+        noisetype = 'gaussian',\
+        system = 'KS',\
+        savepred = False,\
+        save_time_rms = False,\
+        squarenodes = False,\
+        rho = 0.5,\
+        sigma = 1.0,\
+        leakage = 1.0,\
+        bias_type = 'old',\
+        win_type = 'full',\
+        debug_mode = False,\
+        pmap = False,\
+        machine = 'deepthought2',\
+        ifray = True,\
+        tau_flag = True,\
+        num_cpus = 20,\
+        metric = 'mss_var',\
+        return_all = False,\
+        save_eigenvals = False,\
+        max_valid_time = 500,\
+        noise_streams_per_test = 5,\
+        noise_values_array = np.logspace(-3, 0, num = 19, base = 10)[5:11],\
+        alpha_values = np.append(0., np.logspace(-7, -3, 9)),\
+        res_start = 0,\
+        train_start = 0,\
+        test_start = 0,\
+        import_res = False,\
+        import_train = False,\
+        import_test = False,\
+        import_noise = False,\
+        reg_train_times = None,\
+        prior = 'zero',\
+        nojit = False):
+        self.train_time = train_time
+        self.test_time = test_time
+        self.discard_time = discard_time
+        self.res_size = res_size
+        self.res_per_test = res_per_test
+        self.noise_realizations = noise_realizations
+        self.num_tests = num_tests
+        self.num_trains = num_trains
+        self.traintype = traintype
+        self.noisetype = noisetype
+        self.system = system
+        self.savepred = savepred
+        self.save_time_rms = save_time_rms
+        self.squarenodes = squarenodes
+        self.rho = rho
+        self.sigma = sigma
+        self.leakage = leakage
+        self.bias_type = bias_type
+        self.win_type = win_type
+        self.debug_mode = debug_mode
+        self.pmap = pmap
+        self.machine = machine
+        self.ifray = ifray
+        self.tau_flag = tau_flag
+        self.num_cpus = num_cpus
+        self.metric = metric
+        self.return_all = return_all
+        self.save_eigenvals = save_eigenvals
+        self.max_valid_time = max_valid_time
+        self.noise_streams_per_test = noise_streams_per_test
+        self.noise_values_array = noise_values_array
+        self.alpha_values = alpha_values
+        self.res_start = res_start
+        self.train_start = train_start
+        self.test_start = test_start
+        self.import_res = import_res
+        self.import_train = import_train
+        self.import_test = import_test
+        self.import_noise = import_noise
+        self.prior = prior
+        self.nojit = nojit
+        self.reg_train_times = reg_train_times
+        if not isinstance(argv, type(None)):
+            self.get_run_opts(argv, runflag)
 
-def get_run_opts(argv, runflag = True):
-    #print(argv)
+    def get_file_name(self):
+        if self.import_res:
+            iresflag = '_ires'
+        else:
+            iresflag = ''
+        if self.import_train:
+            itrainflag = '_itrain'
+        else:
+            itrainflag = ''
+        if self.import_test:
+            itestflag = '_itest'
+        else:
+            itestflag = ''
+        if self.import_noise:
+            inoiseflag = '_inoise'
+        else:
+            inoiseflag = ''
+        if self.prior == 'zero':
+            prior_str = ''
+        else:
+            prior_str = '_prior_%s' % self.prior
+        if self.savepred:
+            predflag = '_wpred'
+        else:
+            predflag = ''
+        if self.save_time_rms:
+            timeflag = '_savetime'
+        else:
+            timeflag = ''
+        if self.squarenodes:
+            squarenodes_flag = '_squarenodes'
+        else:
+            squarenodes_flag = ''
+        if self.resonly:
+            resonly_flag = '_resonly'
+        else:
+            resonly_flag = ''
+        if self.save_eigenvals:
+            eigenval_flag = '_wmoregradeigs'
+        else:
+            eigenval_flag = ''
+        if self.pmap:
+            pmap_flag = '_wpmap0'
+        else:
+            pmap_flag = ''
+        if self.machine == 'deepthought2':
+            self.root_folder = '/lustre/awikner1/res-noise-stabilization/'
+        elif self.machine == 'personal':
+            self.root_folder = 'D:/'    
 
-    if runflag:
-        train_time = 3000
-        test_time = 0
-        discard_time = 500
-        res_size = 1000
-        res_per_test = 20
-        noise_realizations = 1
-        num_tests = 10
-        num_trains = 25
-        traintype = 'normal'
-        noisetype = 'gaussian'
-        system = 'KS'
-        savepred = False
-        save_time_rms = False
-        squarenodes = False
-        rho = 0.5
-        sigma = 1.0
-        leakage = 1.0
-        bias_type = 'old'
-        win_type = 'full'
-        debug_mode = False
-        pmap = False
-        machine = 'deepthought2'
-        ifray = True
-        tau_flag = True
-        num_cpus = 20
-        metric = 'mss_var'
-        return_all = False
-        save_eigenvals = False
-        max_valid_time = 500
-        noise_streams_per_test = 5
-        noise_values_array = np.logspace(-3, 0, num = 19, base = 10)[5:11]
-        alpha_values = np.append(0., np.logspace(-7, -3, 9))
-        res_start = 0
-        train_start = 0
-        test_start = 0
-        import_res = False
-        import_train = False
-        import_test = False
-        import_noise = False
-        reg_train_times = None
-        prior = 'zero'
+        if not self.return_all:
+            self.data_folder = 'Data/%s_noisetest_noisetype_%s_traintype_%s/' % (self.system, self.noisetype, self.traintype)
+            self.run_name = '%s%s%s%s%s%s%s%s%s%s%s_rho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s%s_metric_%s' \
+             % (self.system,resonly_flag,predflag, timeflag, eigenval_flag, pmap_flag, squarenodes_flag, iresflag, itrainflag, itestflag, inoiseflag, self.rho, self.sigma, self.leakage, self.win_type, self.bias_type, self.tau, self.res_size, \
+             self.train_time, self.noise_realizations, self.noisetype, self.traintype, prior_str, self.metric)
+        elif self.return_all:
+            self.data_folder = 'Data/%s_noisetest_noisetype_%s_traintype_%s/' % (self.system, self.noisetype, self.traintype)
+            self.run_name = '%s%s%s%s%s%s%s%s%s%s%s_rho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s%s' % (self.system,resonly_flag,predflag, timeflag, eigenval_flag, pmap_flag, squarenodes_flag, iresflag, itrainflag, itestflag, inoiseflag, self.rho, self.sigma, self.leakage, self.win_type, self.bias_type, self.tau,self.res_size, self.train_time, self.noise_realizations, self.noisetype, self.traintype, prior_str)
+        
+    def get_run_opts(self, argv, runflag = True):
 
-        try:
-            opts, args = getopt.getopt(argv, "T:N:r:",
+        if runflag:
+            try:
+                opts, args = getopt.getopt(argv, "T:N:r:",
                     ['testtime=', 'noisetype=', 'traintype=', 'system=', 'res=',
                     'tests=', 'trains=', 'savepred=', 'tau=', 'rho=',
                     'sigma=', 'leakage=', 'bias_type=', 'debug=', 'win_type=',
@@ -63,319 +166,254 @@ def get_run_opts(argv, runflag = True):
                     'resstart=','trainstart=','teststart=',
                     'squarenodes=', 'resonly=', 'importres=','importtrain=',
                     'importtest=','importnoise=','regtraintimes=','discardlen=',
-                    'prior='])
-        except getopt.GetoptError:
-            print('Error: Some options not recognized')
-            sys.exit(2)
-        for opt, arg in opts:
-            if opt == '-T':
-                train_time = int(arg)
-                print('Training iterations: %d' % train_time)
-            elif opt == '-N':
-                res_size = int(arg)
-                print('Reservoir nodes: %d' % res_size)
-            elif opt == '-r':
-                noise_realizations = int(arg)
-                print('Noise Realizations: %d' % noise_realizations)
-            elif opt == '--testtime':
-                test_time = int(arg)
-                if test_time == 0:
-                    print('Testing duration: default')
-                else:
-                    print('Testing duration: %d' % test_time)
-            elif opt == '--resstart':
-                res_start = int(arg)
-                print('Reservoir ensemble start: %d' % res_start)
-            elif opt == '--trainstart':
-                train_start = int(arg)
-                print('Train ensemble start: %d' % train_start)
-            elif opt == '--teststart':
-                test_start = int(arg)
-                print('Test ensemble start: %d' % test_start)
-            elif opt == '--saveeigenvals':
-                if arg == 'True':
-                    save_eigenvals = True
-                elif arg == 'False':
-                    save_eigenvals = False
-                else:
-                    raise ValueError
-                print('Save grad reg eigenvalues: %s' % arg)
-            elif opt == '--prior':
-                prior = str(arg)
-                print('Prior type: %s' % prior)
-            elif opt == '--discardlen':
-                discard_time = int(arg)
-                print('Discard iterations: %d' % discard_time)
-            elif opt == '--importres':
-                if arg == 'True':
-                    import_res = True
-                elif arg == 'False':
-                    import_res = False
-                else:
-                    raise ValueError
-                print('Importing reservoir from file: %s' % arg)
-            elif opt == '--importtrain':
-                if arg == 'True':
-                    import_train = True
-                elif arg == 'False':
-                    import_train = False
-                else:
-                    raise ValueError
-                print('Importing training data from file: %s' % arg)
-            elif opt == '--importtest':
-                if arg == 'True':
-                    import_test = True
-                elif arg == 'False':
-                    import_test = False
-                else:
-                    raise ValueError
-                print('Importing test data from file: %s' % arg)
-            elif opt == '--importnoise':
-                if arg == 'True':
-                    import_noise = True
-                elif arg == 'False':
-                    import_noise = False
-                else:
-                    raise ValueError
-                print('Importing noise from file: %s' % arg)
-            elif opt == '--resonly':
-                if arg == 'True':
-                    resonly = True
-                elif arg == 'False':
-                    resonly = False
-                else:
-                    raise ValueError
-                print('Only reservoir nodes in feature: %s' % arg)
-            elif opt == '--squarenodes':
-                if arg == 'True':
-                    squarenodes = True
-                elif arg == 'False':
-                    squarenodes = False
-                else:
-                    raise ValueError
-                print('Square reservoir nodes: %s' % arg)
-            elif opt == '--noisestreams':
-                noise_streams_per_test = int(arg)
-                print('Noise Streams per test: %d' % noise_streams_per_test)
-            elif opt == '--maxvt':
-                max_valid_time = int(arg)
-                print('Maximum valid time: %d' % max_valid_time)
-            elif opt == '--noisevals':
-                noise_values_array = np.array([float(noise) for noise in arg.split(',')])
-                noise_str = '[ '
-                for noise in noise_values_array:
-                    noise_str += '%0.3e, ' % noise
-                noise_str = noise_str[:-2] + ' ]'
-                print('Noise values: %s' % noise_str)
-            elif opt == '--regvals':
-                alpha_values = np.array([float(reg) for reg in arg.split(',')])
-                reg_str = '[ '
-                for reg in alpha_values:
-                    reg_str += '%0.3e, ' % reg
-                reg_str = reg_str[:-2] + ' ]'
-                print('Regularization values: %s' % reg_str)
-            elif opt == '--regtraintimes':
-                if arg != 'None':
-                    reg_train_times = np.array([int(reg_train) for reg_train in arg.split(',')])
-                    reg_train_str = '[ '
-                    for reg_train in reg_train_times:
-                        reg_train_str += '%0.3e, ' % reg_train
-                    reg_train_str = reg_train_str[:-2] + ' ]'
-                    print('Regularization training times: %s' % reg_train_str)
-            elif opt == '--savetime':
-                if str(arg) == 'True':
-                    save_time_rms = True
-                elif str(arg) == 'False':
-                    save_time_rms = False
-                else:
-                    raise ValueError
-            elif opt == '--metric':
-                metric = str(arg)
-                if metric not in ['pmap_max_wass_dist', 'mean_rms', 'max_rms', 'mss_var']:
-                    raise ValueError
-                print('Stability metric: %s' % metric)
-            elif opt == '--returnall':
-                if arg == 'True':
-                    return_all = True
-                elif arg == 'False':
-                    return_all = False
-                else:
-                    raise ValueError
-            elif opt == '--parallel':
-                parallel_in = str(arg)
-                if parallel_in == 'True':
-                    ifray = True
-                elif parallel_in == 'False':
-                    ifray = False
-                else:
-                    raise ValueError
-            elif opt == '--pmap':
-                pmap_in = str(arg)
-                if pmap_in == 'True':
-                    pmap = True
-                elif pmap_in == 'False':
-                    pmap = False
-                else:
-                    raise ValueError
-            elif opt == '--machine':
-                machine = str(arg)
-                if machine not in ['skynet', 'deepthought2', 'personal']:
-                    raise ValueError
-                print('Machine: %s' % machine)
-            elif opt == '--num_cpus':
-                num_cpus = int(arg)
-                print('Number of CPUS: %d' % num_cpus)
-            elif opt == '--rho':
-                rho = float(arg)
-                print('Rho: %f' % rho)
-            elif opt == '--sigma':
-                sigma = float(arg)
-                print('Sigma: %f' % sigma)
-            elif opt == '--leakage':
-                leakage = float(arg)
-                print('Leakage: %f' % leakage)
-            elif opt == '--tau':
-                tau  = float(arg)
-                tau_flag = False
-                print('Reservoir timestep: %f' % tau)
-            elif opt == '--win_type':
-                win_type = str(arg)
-                print('Win Type: %s' % win_type)
-            elif opt == '--bias_type':
-                bias_type = str(arg)
-                print('Bias Type: %s' % bias_type)
-            elif opt == '--res':
-                res_per_test = int(arg)
-                print('Number of reservoirs: %d' % res_per_test)
-            elif opt == '--tests':
-                num_tests = int(arg)
-                print('Number of tests: %d' % num_tests)
-            elif opt == '--trains':
-                num_trains = int(arg)
-                print('Number of training data sequences: %d' % num_trains)
-            elif opt == '--savepred':
-                if arg == 'True':
-                    savepred = True
-                elif arg == 'False':
-                    savepred = False
-                print('Saving predictions: %s' % arg)
-            elif opt == '--noisetype':
-                noisetype = str(arg)
-                print('Noise type: %s' % noisetype)
-            elif opt == '--traintype':
-                traintype = str(arg)
-                print('Training type: %s' % traintype)
-            elif opt == '--system':
-                system = str(arg)
-                print('System: %s' % system)
-            elif opt == '--debug':
-                if arg == 'True':
-                    debug_mode = True
-                elif arg == 'False':
-                    debug_mode = False
-                print('Debug Mode: %s' % arg)
-        if tau_flag:
-            if system == 'lorenz':
-                tau = 0.1
-            elif system in ['KS', 'KS_d2175']:
-                tau = 0.25
-    else:
-        train_time, res_size, noise_realizations, save_time_rms, save_eigenvals, pmap, metric,\
-                return_all, machine, rho, sigma, leakage, tau, win_type, \
-                bias_type, res_per_test, num_tests, num_trains, savepred, \
-                noisetype, traintype, system, squarenodes, resonly, prior, res_start,\
-                train_start, test_start, import_res,\
-                import_train, import_test, import_noise, reg_train_times,\
-                discard_time = argv
-    #if return_all and savepred:
-    #    print('Cannot return results for all parameters and full predictions due to memory constraints.')
-    #    raise ValueError
-    if isinstance(reg_train_times, np.ndarray) or isinstance(reg_train_times, list):
-        if (reg_train_times[0] != train_time - discard_time or len(reg_train_times) != 1) and (traintype in ['normal','normalres1','normalres2','rmean','rmeanres1',\
-                'rmeanres2','rplusq','rplusqres1','rplusqres2'] or 'confined' in traintype):
-            print('Traintypes "normal", "rmean", and "rplusq" are not compatible with fractional regularization training.')
-            raise ValueError
-    if traintype in ['gradient','gradient12','gradient2']:
-        print('Use of gradient, gradient12, and gradient2 is depracated. Please use gradientk instead.')
-        raise ValueError
-    if prior not in ['zero','input_pass']:
-        print('Prior type not recognized.')
-        raise ValueError
-    if import_res:
-        iresflag = '_ires'
-    else:
-        iresflag = ''
-    if import_train:
-        itrainflag = '_itrain'
-    else:
-        itrainflag = ''
-    if import_test:
-        itestflag = '_itest'
-    else:
-        itestflag = ''
-    if import_noise:
-        inoiseflag = '_inoise'
-    else:
-        inoiseflag = ''
-    if prior == 'zero':
-        prior_str = ''
-    else:
-        prior_str = '_prior_%s' % prior
-    if savepred:
-        predflag = '_wpred'
-    else:
-        predflag = ''
-    if save_time_rms:
-        timeflag = '_savetime'
-    else:
-        timeflag = ''
-    if squarenodes:
-        squarenodes_flag = '_squarenodes'
-    else:
-        squarenodes_flag = ''
-    if resonly:
-        resonly_flag = '_resonly'
-    else:
-        resonly_flag = ''
-    if save_eigenvals:
-        eigenval_flag = '_wmoregradeigs'
-    else:
-        eigenval_flag = ''
-    if pmap:
-        pmap_flag = '_wpmap0'
-    else:
-        pmap_flag = ''
-    if machine == 'skynet':
-        root_folder = '/h/awikner/res-noise-stabilization/'
-    elif machine == 'deepthought2':
-        root_folder = '/lustre/awikner1/res-noise-stabilization/'
-    elif machine == 'personal':
-        root_folder = 'D:/'
-    # print(root_folder)
-
-    if not return_all:
-        data_folder = 'Data/%s_noisetest_noisetype_%s_traintype_%s/' % (system, noisetype, traintype)
-        run_name = '%s%s%s%s%s%s%s%s%s%s%s_rho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s%s_metric_%s' \
-             % (system,resonly_flag,predflag, timeflag, eigenval_flag, pmap_flag, squarenodes_flag, iresflag, itrainflag, itestflag, inoiseflag, rho, sigma, leakage, win_type, bias_type, tau, res_size, \
-             train_time, noise_realizations, noisetype, traintype, prior_str, metric)
-    elif return_all:
-        data_folder = 'Data/%s_noisetest_noisetype_%s_traintype_%s/' % (system, noisetype, traintype)
-        run_name = '%s%s%s%s%s%s%s%s%s%s%s_rho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s%s' % (system,resonly_flag,predflag, timeflag, eigenval_flag, pmap_flag, squarenodes_flag, iresflag, itrainflag, itestflag, inoiseflag, rho, sigma, leakage, win_type, bias_type, tau,res_size, train_time, noise_realizations, noisetype, traintype, prior_str)
-    if runflag:
-        if not os.path.isdir(os.path.join(root_folder, data_folder)):
-            os.mkdir(os.path.join(root_folder, data_folder))
-        if not os.path.isdir(os.path.join(os.path.join(root_folder, data_folder), run_name + '_folder')):
-            os.mkdir(os.path.join(os.path.join(root_folder, data_folder), run_name + '_folder'))
-
-        return root_folder, data_folder, run_name, system, noisetype, traintype, savepred, save_time_rms, save_eigenvals, squarenodes, rho,\
-            sigma, leakage, win_type, bias_type, tau, res_size, train_time, test_time, noise_realizations, noise_streams_per_test,\
-            noise_values_array,alpha_values, res_per_test, num_trains, num_tests, debug_mode, pmap, metric, \
-            return_all, ifray, machine, max_valid_time, prior, res_start, train_start, test_start, import_res,\
-             import_train, import_test, import_noise, reg_train_times, discard_time
-    else:
-        if not savepred and not pmap:
-            return os.path.join(os.path.join(root_folder, data_folder), run_name + '.bz2'), ''
+                    'prior=','nojit='])
+            except getopt.GetoptError:
+                print('Error: Some options not recognized')
+                sys.exit(2)
+            for opt, arg in opts:
+                if opt == '-T':
+                    self.train_time = int(arg)
+                    print('Training iterations: %d' % self.train_time)
+                elif opt == '-N':
+                    self.res_size = int(arg)
+                    print('Reservoir nodes: %d' % self.res_size)
+                elif opt == '-r':
+                    self.noise_realizations = int(arg)
+                    print('Noise Realizations: %d' % self.noise_realizations)
+                elif opt == '--nojit':
+                    if arg == 'True':
+                        self.nojit = True
+                    elif arg == 'False':
+                        self.nojit = False
+                    else:
+                        raise ValueError
+                elif opt == '--testtime':
+                    self.test_time = int(arg)
+                    if self.test_time == 0:
+                        print('Testing duration: default')
+                    else:
+                        print('Testing duration: %d' % self.test_time)
+                elif opt == '--resstart':
+                    self.res_start = int(arg)
+                    print('Reservoir ensemble start: %d' % self.res_start)
+                elif opt == '--trainstart':
+                    self.train_start = int(arg)
+                    print('Train ensemble start: %d' % self.train_start)
+                elif opt == '--teststart':
+                    self.test_start = int(arg)
+                    print('Test ensemble start: %d' % self.test_start)
+                elif opt == '--saveeigenvals':
+                    if arg == 'True':
+                        self.save_eigenvals = True
+                    elif arg == 'False':
+                        self.save_eigenvals = False
+                    else:
+                        raise ValueError
+                    print('Save grad reg eigenvalues: %s' % arg)
+                elif opt == '--prior':
+                    self.prior = str(arg)
+                    print('Prior type: %s' % self.prior)
+                elif opt == '--discardlen':
+                    self.discard_time = int(arg)
+                    print('Discard iterations: %d' % self.discard_time)
+                elif opt == '--importres':
+                    if arg == 'True':
+                        self.import_res = True
+                    elif arg == 'False':
+                        self.import_res = False
+                    else:
+                        raise ValueError
+                    print('Importing reservoir from file: %s' % arg)
+                elif opt == '--importtrain':
+                    if arg == 'True':
+                        self.import_train = True
+                    elif arg == 'False':
+                        self.import_train = False
+                    else:
+                        raise ValueError
+                    print('Importing training data from file: %s' % arg)
+                elif opt == '--importtest':
+                    if arg == 'True':
+                        self.import_test = True
+                    elif arg == 'False':
+                        self.import_test = False
+                    else:
+                        raise ValueError
+                    print('Importing test data from file: %s' % arg)
+                elif opt == '--importnoise':
+                    if arg == 'True':
+                        self.import_noise = True
+                    elif arg == 'False':
+                        self.import_noise = False
+                    else:
+                        raise ValueError
+                    print('Importing noise from file: %s' % arg)
+                elif opt == '--resonly':
+                    if arg == 'True':
+                        self.resonly = True
+                    elif arg == 'False':
+                        self.resonly = False
+                    else:
+                        raise ValueError
+                    print('Only reservoir nodes in feature: %s' % arg)
+                elif opt == '--squarenodes':
+                    if arg == 'True':
+                        self.squarenodes = True
+                    elif arg == 'False':
+                        self.squarenodes = False
+                    else:
+                        raise ValueError
+                    print('Square reservoir nodes: %s' % arg)
+                elif opt == '--noisestreams':
+                    self.noise_streams_per_test = int(arg)
+                    print('Noise Streams per test: %d' % self.noise_streams_per_test)
+                elif opt == '--maxvt':
+                    self.max_valid_time = int(arg)
+                    print('Maximum valid time: %d' % self.max_valid_time)
+                elif opt == '--noisevals':
+                    self.noise_values_array = np.array([float(noise) for noise in arg.split(',')])
+                    noise_str = '[ '
+                    for noise in self.noise_values_array:
+                        noise_str += '%0.3e, ' % noise
+                    noise_str = noise_str[:-2] + ' ]'
+                    print('Noise values: %s' % noise_str)
+                elif opt == '--regvals':
+                    self.alpha_values = np.array([float(reg) for reg in arg.split(',')])
+                    reg_str = '[ '
+                    for reg in self.alpha_values:
+                        reg_str += '%0.3e, ' % reg
+                    reg_str = reg_str[:-2] + ' ]'
+                    print('Regularization values: %s' % reg_str)
+                elif opt == '--regtraintimes':
+                    if arg != 'None':
+                        self.reg_train_times = np.array([int(reg_train) for reg_train in arg.split(',')])
+                        reg_train_str = '[ '
+                        for reg_train in self.reg_train_times:
+                            reg_train_str += '%0.3e, ' % reg_train
+                        reg_train_str = reg_train_str[:-2] + ' ]'
+                        print('Regularization training times: %s' % reg_train_str)
+                elif opt == '--savetime':
+                    if str(arg) == 'True':
+                        self.save_time_rms = True
+                    elif str(arg) == 'False':
+                        self.save_time_rms = False
+                    else:
+                        raise ValueError
+                elif opt == '--metric':
+                    self.metric = str(arg)
+                    if self.metric not in ['pmap_max_wass_dist', 'mean_rms', 'max_rms', 'mss_var']:
+                        raise ValueError
+                    print('Stability metric: %s' % self.metric)
+                elif opt == '--returnall':
+                    if arg == 'True':
+                        self.return_all = True
+                    elif arg == 'False':
+                        self.return_all = False
+                    else:
+                        raise ValueError
+                elif opt == '--parallel':
+                    parallel_in = str(arg)
+                    if parallel_in == 'True':
+                        self.ifray = True
+                    elif parallel_in == 'False':
+                        self.ifray = False
+                    else:
+                        raise ValueError
+                elif opt == '--pmap':
+                    pmap_in = str(arg)
+                    if pmap_in == 'True':
+                        self.pmap = True
+                    elif pmap_in == 'False':
+                        self.pmap = False
+                    else:
+                        raise ValueError
+                elif opt == '--machine':
+                    self.machine = str(arg)
+                    if self.machine not in ['deepthought2', 'personal']:
+                        raise ValueError
+                    print('Machine: %s' % self.machine)
+                elif opt == '--num_cpus':
+                    self.num_cpus = int(arg)
+                    print('Number of CPUS: %d' % self.num_cpus)
+                elif opt == '--rho':
+                    self.rho = float(arg)
+                    print('Rho: %f' % self.rho)
+                elif opt == '--sigma':
+                    self.sigma = float(arg)
+                    print('Sigma: %f' % self.sigma)
+                elif opt == '--leakage':
+                    self.leakage = float(arg)
+                    print('Leakage: %f' % self.leakage)
+                elif opt == '--tau':
+                    self.tau  = float(arg)
+                    self.tau_flag = False
+                    print('Reservoir timestep: %f' % self.tau)
+                elif opt == '--win_type':
+                    self.win_type = str(arg)
+                    print('Win Type: %s' % self.win_type)
+                elif opt == '--bias_type':
+                    self.bias_type = str(arg)
+                    print('Bias Type: %s' % self.bias_type)
+                elif opt == '--res':
+                    self.res_per_test = int(arg)
+                    print('Number of reservoirs: %d' % self.res_per_test)
+                elif opt == '--tests':
+                    self.num_tests = int(arg)
+                    print('Number of tests: %d' % self.num_tests)
+                elif opt == '--trains':
+                    self.num_trains = int(arg)
+                    print('Number of training data sequences: %d' % self.num_trains)
+                elif opt == '--savepred':
+                    if arg == 'True':
+                        self.savepred = True
+                    elif arg == 'False':
+                        self.savepred = False
+                    print('Saving predictions: %s' % arg)
+                elif opt == '--noisetype':
+                    self.noisetype = str(arg)
+                    print('Noise type: %s' % self.noisetype)
+                elif opt == '--traintype':
+                    self.traintype = str(arg)
+                    print('Training type: %s' % self.traintype)
+                elif opt == '--system':
+                    self.system = str(arg)
+                    print('System: %s' % self.system)
+                elif opt == '--debug':
+                    if arg == 'True':
+                        self.debug_mode = True
+                    elif arg == 'False':
+                        self.debug_mode = False
+                    print('Debug Mode: %s' % arg)
+            if self.tau_flag:
+                if self.system == 'lorenz':
+                    self.tau = 0.1
+                elif self.system in ['KS', 'KS_d2175']:
+                    self.tau = 0.25
         else:
-            return os.path.join(os.path.join(root_folder, data_folder), run_name + '.bz2'), \
-                        os.path.join(os.path.join(root_folder, data_folder), run_name + '_folder')
+            self.train_time, self.res_size, self.noise_realizations, self.save_time_rms,\
+                self.save_eigenvals, self.pmap, self.metric,\
+                self.return_all, self.machine, self.rho, self.sigma, self.leakage,\
+                self.tau, self.win_type, self.bias_type, self.res_per_test, \
+                self.num_tests, self.num_trains, self.savepred, self.noisetype, \
+                self.traintype, self.system, self.squarenodes, self.resonly, self.prior, \
+                self.res_start, self.train_start, self.test_start, self.import_res,\
+                self.import_train, self.import_test, self.import_noise, self.reg_train_times,\
+                self.discard_time = argv
+        if isinstance(self.reg_train_times, np.ndarray) or isinstance(self.reg_train_times, list):
+            if (self.reg_train_times[0] != self.train_time - self.discard_time or len(self.reg_train_times) != 1) and (self.traintype in ['normal','normalres1','normalres2','rmean','rmeanres1',\
+                'rmeanres2','rplusq','rplusqres1','rplusqres2'] or 'confined' in self.traintype):
+                print('Traintypes "normal", "rmean", and "rplusq" are not compatible with fractional regularization training.')
+                raise ValueError
+        if self.prior not in ['zero','input_pass']:
+            print('Prior type not recognized.')
+            raise ValueError
+        
+        self.get_file_name()
+        if runflag:
+            if not os.path.isdir(os.path.join(self.root_folder, self.data_folder)):
+                os.mkdir(os.path.join(self.root_folder, self.data_folder))
+            if not os.path.isdir(os.path.join(os.path.join(self.root_folder, self.data_folder), self.run_name + '_folder')):
+                os.mkdir(os.path.join(os.path.join(self.root_folder, self.data_folder), self.run_name + '_folder'))
+        self.run_file_name = os.path.join(os.path.join(self.root_folder, self.data_folder), self.run_name + '.bz2')
+        self.run_folder_name = os.path.join(os.path.join(self.root_folder, self.data_folder), self.run_name + '_folder')
 
