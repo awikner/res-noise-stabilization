@@ -33,6 +33,7 @@ class RunOpts:
         pmap = False,\
         machine = 'deepthought2',\
         ifray = False,\
+        tau      = 0.25,\
         tau_flag = True,\
         num_cpus = 1,\
         metric = 'mean_rms',\
@@ -76,6 +77,7 @@ class RunOpts:
         self.pmap = pmap
         self.machine = machine
         self.ifray = ifray
+        self.tau = tau
         self.tau_flag = tau_flag
         self.num_cpus = num_cpus
         self.metric = metric
@@ -97,6 +99,11 @@ class RunOpts:
         self.root_folder = root_folder
         if not isinstance(argv, type(None)):
             self.get_run_opts(argv, runflag)
+        if self.tau_flag:
+            if self.system == 'lorenz':
+                self.tau = 0.1
+            elif self.system in ['KS', 'KS_d2175']:
+                self.tau = 0.25
         if isinstance(self.test_time, type(None)):
             if self.system == 'lorenz':
                 self.test_time = 4000
@@ -405,11 +412,6 @@ class RunOpts:
                     elif arg == 'False':
                         self.debug_mode = False
                     print('Debug Mode: %s' % arg)
-            if self.tau_flag:
-                if self.system == 'lorenz':
-                    self.tau = 0.1
-                elif self.system in ['KS', 'KS_d2175']:
-                    self.tau = 0.25
         else:
             self.train_time, self.res_size, self.noise_realizations, self.save_time_rms,\
                 self.save_eigenvals, self.pmap, self.metric,\

@@ -30,12 +30,13 @@ from get_run_opts import *
 
 sys.path.append('/h/awikner/res-noise-stabilization/')
 
-def main(argv):
+def process_data(argv=None, run_opts=None):
 
     saved_flag = False
 
     tic = time.perf_counter()
-    run_opts = RunOpts(argv)
+    if not isinstance(argv, type(None)) and isinstance(run_opts, type(None)):
+        run_opts = RunOpts(argv)
 
     raw_data_size = 0
     for ele in os.scandir(run_opts.run_folder_name):
@@ -370,6 +371,8 @@ def main(argv):
     toc = time.perf_counter()
     print('Compressed Results Saved in %f sec.' % (toc - tic))
 
+def main(argv):
+    process_data(argv)
 
 if __name__ == "__main__":
     main(sys.argv[1:])
