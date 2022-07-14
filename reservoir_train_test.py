@@ -1686,13 +1686,14 @@ def find_stability_remote(*args):
 def find_stability_serial(*args):
     return find_stability(*args)
 
-def main(argv):
+def start_reservoir_test(argv=None, run_opts=None):
 
     # Main driver function for obtaining reservoir performance. This function processes input arguments and
     # creates random number generators for the different reservoirs, trainings, noise arrays, and tests.
     # It then calls find_stability in a loop, processes the output from find_stability, and saves the output to a folder.
-
-    run_opts = RunOpts(argv)
+    
+    if not isinstance(argv, type(None)) and isinstance(run_opts, type(None)):
+        run_opts = RunOpts(argv)
     print(run_opts.run_folder_name)
     if run_opts.machine == 'personal':
         if run_opts.ifray:
@@ -1794,6 +1795,8 @@ def main(argv):
 
     ray.shutdown()
 
+def main(argv):
+    start_reservoir_test(argv)
 
 if __name__ == "__main__":
     main(sys.argv[1:])
