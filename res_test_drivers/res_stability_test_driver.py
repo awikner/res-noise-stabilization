@@ -59,7 +59,7 @@ prior = 'zero'
 save_eigenvals = False
 pmap = False
 reg_train_times_in = None
-set_numba('/lustre/awikner1/res-noise-stabilization',nojit)
+set_numba(os.getcwd(),nojit)
 for i, (noisetype, res_size, win_type, traintype, noise_realizations, train_time, tau, squarenode) in enumerate(zip(noisetypes, res_sizes, win_types, traintypes, nos, train_times, taus, squarenodes)):
 
     for rho, leakage, sigma in zip(rhos, leakages, sigmas):
