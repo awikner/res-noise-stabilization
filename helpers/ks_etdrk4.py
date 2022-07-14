@@ -13,7 +13,7 @@ class ModelParams():
         self.tau = tau
         self.M = M
         self.const = const
-        self.k = np.concatenate((np.arange(int(N/2)), np.array([0.]), np.arange(-int(N/2)+1, 0)))*2*np.pi/d
+        self.k = np.concatenate((np.arange(int(N/2)), np.arange(-int(N/2), 0)))*2*np.pi/d
         L = (1+const)*k**2.0 - k**4.0
         self.E = np.exp(tau*L)
         self.E2 = np.exp(tau/2*L)
@@ -36,7 +36,7 @@ def mean_numba_axis1(mat):
 
 @jit(nopython = True, fastmath = True)
 def precompute_KS_params(N, d, tau, M = 16, const = 0):
-    k = np.concatenate((np.arange(int(N/2)), np.array([0.]), np.arange(-int(N/2)+1, 0)))*2*np.pi/d
+    k = np.concatenate((np.arange(int(N/2)), np.arange(-int(N/2), 0)))*2*np.pi/d
     L = (1+const)*k**2.0 - k**4.0
     E = np.exp(tau*L)
     E2 = np.exp(tau/2*L)
