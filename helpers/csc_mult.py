@@ -1,9 +1,5 @@
 import numpy as np
-<<<<<<< HEAD
-from scipy.sparse import csc_matrix, diags, csr_matrix
-=======
 from scipy.sparse import csc_matrix, diags, csr_matrix, coo_matrix
->>>>>>> dev
 from numba import jit, objmode
 
 #def create_csc_matrix(data, indices, indptr, shape):
