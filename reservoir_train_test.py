@@ -30,14 +30,12 @@ from numba.typed import List
 from copy import copy, deepcopy
 import time
 
-sys.path.append('/h/awikner/res-noise-stabilization/')
+sys.path.append(os.getcwd())
 from helpers.lorenzrungekutta_numba import *
 from helpers.ks_etdrk4 import *
 from helpers.csc_mult import *
 from helpers.poincare_max import *
 from helpers.get_run_opts import *
-from helpers.set_numba import *
-#from helpers.matlab_funcs import *
 
 warnings.filterwarnings("ignore", category=NumbaPerformanceWarning)
 
@@ -244,85 +242,85 @@ class Reservoir:
 
 class ResOutput:
     def __init__(self,run_opts,noise_array):
-        self.stable_frac_out        = np.zeros((noise_array.size, run_opts.alpha_values.size, run_opts.reg_train_times.size), dtype = object)
-        self.mean_rms_out           = np.zeros((noise_array.size, run_opts.alpha_values.size, run_opts.reg_train_times.size), dtype = object)
-        self.max_rms_out            = np.zeros((noise_array.size, run_opts.alpha_values.size, run_opts.reg_train_times.size), dtype = object)
-        self.variances_out          = np.zeros((noise_array.size, run_opts.alpha_values.size, run_opts.reg_train_times.size), dtype = object)
-        self.valid_time_out         = np.zeros((noise_array.size, run_opts.alpha_values.size, run_opts.reg_train_times.size), dtype = object)
-        self.rms_out                = np.zeros((noise_array.size, run_opts.alpha_values.size, run_opts.reg_train_times.size), dtype = object)
-        self.preds_out              = np.zeros((noise_array.size, run_opts.alpha_values.size, run_opts.reg_train_times.size), dtype = object)
-        self.wass_dist_out          = np.zeros((noise_array.size, run_opts.alpha_values.size, run_opts.reg_train_times.size), dtype = object)
-        self.pmap_max_out           = np.zeros((noise_array.size, run_opts.alpha_values.size, run_opts.reg_train_times.size), dtype = object)
-        self.pmap_max_wass_dist_out = np.zeros((noise_array.size, run_opts.alpha_values.size, run_opts.reg_train_times.size), dtype = object)
-        self.stable_frac_out        = np.zeros((noise_array.size, run_opts.alpha_values.size, run_opts.reg_train_times.size), dtype = object)
-        self.train_mean_rms_out     = np.zeros((noise_array.size, run_opts.alpha_values.size, run_opts.reg_train_times.size), dtype = object)
-        self.train_max_rms_out      = np.zeros((noise_array.size, run_opts.alpha_values.size, run_opts.reg_train_times.size), dtype = object)
+        self.stable_frac_out        = np.zeros((noise_array.size, run_opts.reg_values.size, run_opts.reg_train_times.size), dtype = object)
+        self.mean_rms_out           = np.zeros((noise_array.size, run_opts.reg_values.size, run_opts.reg_train_times.size), dtype = object)
+        self.max_rms_out            = np.zeros((noise_array.size, run_opts.reg_values.size, run_opts.reg_train_times.size), dtype = object)
+        self.variances_out          = np.zeros((noise_array.size, run_opts.reg_values.size, run_opts.reg_train_times.size), dtype = object)
+        self.valid_time_out         = np.zeros((noise_array.size, run_opts.reg_values.size, run_opts.reg_train_times.size), dtype = object)
+        self.rms_out                = np.zeros((noise_array.size, run_opts.reg_values.size, run_opts.reg_train_times.size), dtype = object)
+        self.preds_out              = np.zeros((noise_array.size, run_opts.reg_values.size, run_opts.reg_train_times.size), dtype = object)
+        self.wass_dist_out          = np.zeros((noise_array.size, run_opts.reg_values.size, run_opts.reg_train_times.size), dtype = object)
+        self.pmap_max_out           = np.zeros((noise_array.size, run_opts.reg_values.size, run_opts.reg_train_times.size), dtype = object)
+        self.pmap_max_wass_dist_out = np.zeros((noise_array.size, run_opts.reg_values.size, run_opts.reg_train_times.size), dtype = object)
+        self.stable_frac_out        = np.zeros((noise_array.size, run_opts.reg_values.size, run_opts.reg_train_times.size), dtype = object)
+        self.train_mean_rms_out     = np.zeros((noise_array.size, run_opts.reg_values.size, run_opts.reg_train_times.size), dtype = object)
+        self.train_max_rms_out      = np.zeros((noise_array.size, run_opts.reg_values.size, run_opts.reg_train_times.size), dtype = object)
         self.grad_eigenvals_out     = np.zeros((noise_array.size, run_opts.reg_train_times.size), dtype = object)
     
     def save(self, run_opts, noise_array, res_itr, train_seed):
         for (i, noise_val), (j, reg_train_time) in product(enumerate(noise_array), enumerate(run_opts.reg_train_times)):
             print((i,j))
-            stable_frac = np.zeros(run_opts.alpha_values.size)
+            stable_frac = np.zeros(run_opts.reg_values.size)
             for k, array_elem in enumerate(self.stable_frac_out[i,:,j]):
                 stable_frac[k] = array_elem
             np.savetxt(os.path.join(run_opts.run_folder_name, 'stable_frac_res%d_train%d_noise%e_regtrain%d.csv' % (res_itr, train_seed, noise_val, reg_train_time)),\
                 stable_frac, delimiter = ',')
 
-            mean_rms = np.zeros((run_opts.alpha_values.size, *self.mean_rms_out[i,0,j].shape))
+            mean_rms = np.zeros((run_opts.reg_values.size, *self.mean_rms_out[i,0,j].shape))
             for k, array_elem in enumerate(self.mean_rms_out[i,:,j]):
                 mean_rms[k] = array_elem
             np.savetxt(os.path.join(run_opts.run_folder_name, 'mean_rms_res%d_train%d_noise%e_regtrain%d.csv' % (res_itr, train_seed, noise_val, reg_train_time)),\
                 mean_rms, delimiter = ',')
 
-            max_rms = np.zeros((run_opts.alpha_values.size, *self.max_rms_out[i,0,j].shape))
+            max_rms = np.zeros((run_opts.reg_values.size, *self.max_rms_out[i,0,j].shape))
             for k, array_elem in enumerate(self.max_rms_out[i,:,j]):
                 max_rms[k] = array_elem
             np.savetxt(os.path.join(run_opts.run_folder_name, 'max_rms_res%d_train%d_noise%e_regtrain%d.csv' % (res_itr, train_seed, noise_val, reg_train_time)),\
                 max_rms, delimiter = ',')
 
-            variances = np.zeros((run_opts.alpha_values.size, *self.variances_out[i,0,j].shape))
+            variances = np.zeros((run_opts.reg_values.size, *self.variances_out[i,0,j].shape))
             for k, array_elem in enumerate(self.variances_out[i,:,j]):
                 variances[k] = array_elem
             np.savetxt(os.path.join(run_opts.run_folder_name, 'variance_res%d_train%d_noise%e_regtrain%d.csv' % (res_itr, train_seed, noise_val, reg_train_time)),\
                 variances, delimiter = ',')
 
-            valid_time = np.zeros((run_opts.alpha_values.size, *self.valid_time_out[i,0,j].shape))
+            valid_time = np.zeros((run_opts.reg_values.size, *self.valid_time_out[i,0,j].shape))
             for k, array_elem in enumerate(self.valid_time_out[i,:,j]):
                 valid_time[k] = array_elem
             for k in range(run_opts.num_tests):
                 np.savetxt(os.path.join(run_opts.run_folder_name, 'valid_time_res%d_train%d_test%d_noise%e_regtrain%d.csv' % (res_itr, train_seed, k, noise_val, reg_train_time)),\
                     valid_time[:,k], delimiter = ',')
 
-            train_mean_rms = np.zeros((run_opts.alpha_values.size, *self.train_mean_rms_out[i,0,j].shape))
+            train_mean_rms = np.zeros((run_opts.reg_values.size, *self.train_mean_rms_out[i,0,j].shape))
             for k, array_elem in enumerate(self.train_mean_rms_out[i,:,j]):
                 train_mean_rms[k] = array_elem
             np.savetxt(os.path.join(run_opts.run_folder_name, 'train_mean_rms_res%d_train%d_noise%e_regtrain%d.csv' % (res_itr, train_seed, noise_val, reg_train_time)),\
                 train_mean_rms, delimiter = ',')
 
-            train_max_rms = np.zeros((run_opts.alpha_values.size, *self.train_max_rms_out[i,0,j].shape))
+            train_max_rms = np.zeros((run_opts.reg_values.size, *self.train_max_rms_out[i,0,j].shape))
             for k, array_elem in enumerate(self.train_max_rms_out[i,:,j]):
                 train_max_rms[k] = array_elem
             np.savetxt(os.path.join(run_opts.run_folder_name, 'train_max_rms_res%d_train%d_noise%e_regtrain%d.csv' % (res_itr, train_seed, noise_val, reg_train_time)),\
                 train_max_rms, delimiter = ',')
 
             if run_opts.pmap:
-                pmap_max_wass_dist = np.zeros((run_opts.alpha_values.size, *self.pmap_max_wass_dist_out[i,0,j].shape))
+                pmap_max_wass_dist = np.zeros((run_opts.reg_values.size, *self.pmap_max_wass_dist_out[i,0,j].shape))
                 for k, array_elem in enumerate(self.pmap_max_wass_dist_out[i,:,j]):
                     pmap_max_wass_dist[k] = array_elem
                 np.savetxt(os.path.join(run_opts.run_folder_name, 'pmap_max_wass_dist_res%d_train%d_noise%e_regtrain%d.csv' % (res_itr, train_seed, noise_val, reg_train_time)),\
                     pmap_max_wass_dist, delimiter = ',')
 
-                pmap_max = np.zeros((run_opts.alpha_values.size, run_opts.num_tests), dtype = object)
-                for k, l in product(np.arange(run_opts.alpha_values.size), np.arange(run_opts.num_tests)):
+                pmap_max = np.zeros((run_opts.reg_values.size, run_opts.num_tests), dtype = object)
+                for k, l in product(np.arange(run_opts.reg_values.size), np.arange(run_opts.num_tests)):
                     pmap_max[k,l] = pmap_max_out[i,k,j][l]
                     pmap_len = [len(arr) for arr in pmap_max[k,l]]
                     max_pmap_len = max(pmap_len)
                     pmap_max_save = np.zeros((len(pmap_max[k,l]), max_pmap_len))
                     for m in range(len(pmap_max[k,l])):
                         pmap_max_save[m,:pmap_len[m]] = pmap_max[k,l][m]
-                    np.savetxt(os.path.join(run_opts.run_folder_name, 'pmap_max_res%d_train%d_test%d_noise%e_reg%e_regtrain%d.csv' % (res_itr, train_seed, l, noise_val, run_opts.alpha_values[k], reg_train_time)),pmap_max_save, delimiter = ',')
+                    np.savetxt(os.path.join(run_opts.run_folder_name, 'pmap_max_res%d_train%d_test%d_noise%e_reg%e_regtrain%d.csv' % (res_itr, train_seed, l, noise_val, run_opts.reg_values[k], reg_train_time)),pmap_max_save, delimiter = ',')
             if run_opts.save_time_rms:
-                rms = np.zeros((run_opts.alpha_values.size, *self.rms_out[i,0,j].shape))
+                rms = np.zeros((run_opts.reg_values.size, *self.rms_out[i,0,j].shape))
                 for k, array_elem in enumerate(self.rms_out[i,:,j]):
                     rms[k] = array_elem
                 for k in range(run_opts.num_tests):
@@ -333,10 +331,10 @@ class ResOutput:
                 np.savetxt(os.path.join(run_opts.run_folder_name, 'gradreg_eigenvals_res%d_train%d_noise%e_regtrain%d.csv' % (res_itr, train_seed, noise_val, reg_train_time)),\
                     eigenvals, delimiter = ',')
             if run_opts.savepred:
-                pred = np.zeros((run_opts.alpha_values.size, *self.pred_out[i,0,j].shape))
+                pred = np.zeros((run_opts.reg_values.size, *self.pred_out[i,0,j].shape))
                 for k, array_elem in enumerate(self.pred_out[i,:,j]):
                     pred[k] = array_elem
-                for l, (k, reg) in product(range(run_opts.num_tests), enumerate(run_opts.alpha_values)):
+                for l, (k, reg) in product(range(run_opts.num_tests), enumerate(run_opts.reg_values)):
                     np.savetxt(os.path.join(run_opts.run_folder_name, 'pred_res%d_train%d_test%d_noise%e_regtrain%d_reg%e.csv' %\
                         (res_itr, train_seed, test_idxs[l], noise_val, reg_train_time, reg)), pred[k,l], delimiter = ',')
             
@@ -581,38 +579,38 @@ def get_X_wrapped(u_training, res_X, Win_data, Win_indices, Win_indptr, Win_shap
 def gen_noise_driver(run_opts, data_shape, res_shape, noise_scaling, noise_stream):
     # Generates an array of noise states for a given noise type, number of noise realizations, and array of random number generators
     if run_opts.noisetype in ['gaussian', 'perturbation']:
-        if traintype in ['normal', 'rmean', 'rplusq','rmeanq','rqmean','rq'] or 'confined' in traintype:
+        if run_opts.traintype in ['normal', 'rmean', 'rplusq','rmeanq','rqmean','rq'] or 'confined' in run_opts.traintype:
             noise = gen_noise(data_shape[0], data_shape[1], run_opts.noisetype,
                               noise_scaling, noise_stream, run_opts.noise_realizations)
-        elif traintype in ['normalres1', 'rmeanres1', 'rplusqres1','rmeanqres1','rqmeanres1','rqres1']:
+        elif run_opts.traintype in ['normalres1', 'rmeanres1', 'rplusqres1','rmeanqres1','rqmeanres1','rqres1']:
             noise = gen_noise(res_shape[0], data_shape[1], run_opts.noisetype,
                               noise_scaling, noise_stream, run_opts.noise_realizations)
-        elif traintype in ['normalres2', 'rmeanres2', 'rplusqres2','rmeanqres2','rqmeanres2','rqres2']:
+        elif run_opts.traintype in ['normalres2', 'rmeanres2', 'rplusqres2','rmeanqres2','rqmeanres2','rqres2']:
             noise = gen_noise(res_shape[0], data_shape[1], run_opts.noisetype,
                               noise_scaling, noise_stream, run_opts.noise_realizations)
         else:
             raise ValueError
     elif run_opts.noisetype not in ['gaussian_onestep', 'perturbation_onestep'] and \
             ('gaussian' in run_opts.noisetype and 'step' in run_opts.noisetype):
-        if traintype in ['normal', 'rmean', 'rplusq','rmeanq','rqmean','rq']:
+        if run_opts.traintype in ['normal', 'rmean', 'rplusq','rmeanq','rqmean','rq']:
             noise = gen_noise(data_shape[0], data_shape[1], str(
                 run_opts.noisetype), noise_scaling, noise_stream, run_opts.noise_realizations)
-        elif traintype in ['normalres1', 'rmeanres1', 'rplusqres1','rmeanqres1','rqmeanres1','rqres1']:
+        elif run_opts.traintype in ['normalres1', 'rmeanres1', 'rplusqres1','rmeanqres1','rqmeanres1','rqres1']:
             noise = gen_noise(res_shape[0], data_shape[1], run_opts.noisetype,
                               noise_scaling, noise_stream, run_opts.noise_realizations)
-        elif traintype in ['normalres2', 'rmeanres2', 'rplusqres2','rmeanqres2','rqmeanres2','rqres2']:
+        elif run_opts.traintype in ['normalres2', 'rmeanres2', 'rplusqres2','rmeanqres2','rqmeanres2','rqres2']:
             noise = gen_noise(res_shape[0], data_shape[1], run_opts.noisetype,
                               noise_scaling, noise_stream, run_opts.noise_realizations)
         else:
             raise ValueError
     elif run_opts.noisetype in ['gaussian_onestep', 'perturbation_onestep']:
-        if traintype in ['normal', 'rmean', 'rplusq','rmeanq','rqmean','rq']:
+        if run_opts.traintype in ['normal', 'rmean', 'rplusq','rmeanq','rqmean','rq']:
             noise = gen_noise(data_shape[0], data_shape[1], run_opts.noisetype,
                               noise_scaling, noise_stream, run_opts.noise_realizations)
-        elif traintype in ['normalres1', 'rmeanres1', 'rplusqres1','rmeanqres1','rqmeanres1','rqres1']:
+        elif run_opts.traintype in ['normalres1', 'rmeanres1', 'rplusqres1','rmeanqres1','rqmeanres1','rqres1']:
             noise = gen_noise(res_shape[0], data_shape[1], run_opts.noisetype,
                               noise_scaling, noise_stream, run_opts.noise_realizations)
-        elif traintype in ['normalres2', 'rmeanres2', 'rplusqres2','rmeanqres2','rqmeanres2','rqres2']:
+        elif run_opts.traintype in ['normalres2', 'rmeanres2', 'rplusqres2','rmeanqres2','rqmeanres2','rqres2']:
             noise = gen_noise(res_shape[0], data_shape[1], run_opts.noisetype,
                               noise_scaling, noise_stream, run_opts.noise_realizations)
         else:
@@ -1447,8 +1445,8 @@ def test_wrapped(res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_
                 else:
                     #if check_vt:
                     check_vt = False
-            #print('Valid Time')
-            #print(valid_time[i,k])
+            print('Valid Time')
+            print(valid_time[i,k])
             res_X = np.zeros((res_X.shape[0], max_valid_time+2))
             res_X, p = get_X_wrapped(np.ascontiguousarray(
                 rktest_u_arr_test[:, k*max_valid_time:(k+1)*max_valid_time+1, i]), res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_indices, W_indptr, W_shape, leakage, noise_in)
@@ -1582,12 +1580,12 @@ def get_res_results(run_opts, res_itr, res_gen, rk, noise, noise_stream, \
     res_out = ResOutput(run_opts, noise)
     for noise_idx, noise in enumerate(noise_array):
         noise_tic = time.perf_counter()
-        min_optim_func = lambda alpha, alpha_idx: optim_func(run_opts, res_out, reservoir, noise_in[0], noise, noise_idx,\
+        min_optim_func = lambda alpha, alpha_idx: optim_func(run_opts, res_out, reservoir, noise_in[noise_idx], noise, noise_idx,\
                 rktest_u_arr_train_nonoise, rktest_u_arr_test, alpha, alpha_idx,\
                 true_pmap_max, rkTime_test, split_test, params)
-        func_vals = np.zeros(run_opts.alpha_values.size)
-        for j, alpha_value in enumerate(run_opts.alpha_values):
-            print('Regularization: ', run_opts.alpha_values[j])
+        func_vals = np.zeros(run_opts.reg_values.size)
+        for j, alpha_value in enumerate(run_opts.reg_values):
+            print('Regularization: ', run_opts.reg_values[j])
             if run_opts.debug_mode:
                 min_optim_func(alpha_value, j)
             else:
@@ -1626,14 +1624,14 @@ def find_stability(run_opts, noise, train_seed, train_gen, res_itr, res_gen, tes
             rkTime_test = 4000
         else:
             rkTime_test = run_opts.test_time
-        split_test = 2000
+        split_test = run_opts.sync_time
     elif run_opts.system in ['KS', 'KS_d2175']:
         time_mult = 0.25/run_opts.tau
         if run_opts.test_time == 0:
             rkTime_test = int(18000*time_mult)
         else:
             rkTime_test = int(run_opts.test_time*time_mult)
-        split_test = int(2000*time_mult)
+        split_test = int(run_opts.sync_time*time_mult)
 
         # rkTime_test = 3000
     # split_test  = 2000
@@ -1643,12 +1641,12 @@ def find_stability(run_opts, noise, train_seed, train_gen, res_itr, res_gen, tes
     if run_opts.system == 'lorenz':
         ic = train_gen.random(3)*2-1
         rk = RungeKutta(x0=ic[0], y0=ic[1], z0=30*ic[2], tau=run_opts.tau,
-                        T=run_opts.train_time, ttsplit=run_opts.train_time, system=run_opts.system, params=params)
+                        T=run_opts.train_time+run_opts.discard_time, ttsplit=run_opts.train_time+run_opts.discard_time, system=run_opts.system, params=params)
     elif run_opts.system in ['KS', 'KS_d2175']:
         u0 = 0.6*(train_gen.random(64)*2-1)
         u0 = u0 - np.mean(u0)
-        rk = RungeKutta(0, 0, 0, tau=run_opts.tau, T=run_opts.train_time,
-                        ttsplit=run_opts.train_time, u0=u0, system=run_opts.system, params=params)
+        rk = RungeKutta(0, 0, 0, tau=run_opts.tau, T=run_opts.train_time+run_opts.discard_time,
+                        ttsplit=run_opts.train_time+run_opts.discard_time, u0=u0, system=run_opts.system, params=params)
     #print('Training data %d:' % train_seed)
     #print(rk.u_arr_train[-3:,-3:])
     #true_filename = root_folder + \
@@ -1695,6 +1693,7 @@ def main(argv):
     # It then calls find_stability in a loop, processes the output from find_stability, and saves the output to a folder.
 
     run_opts = RunOpts(argv)
+    print(run_opts.run_folder_name)
     if run_opts.machine == 'personal':
         if run_opts.ifray:
             ray.init(num_cpus = run_opts.num_cpus)
@@ -1705,12 +1704,9 @@ def main(argv):
 
     if run_opts.traintype in ['normal','normalres1','normalres2','rmean','rmeanres1','rmeanres2',
             'rplusq','rplusqres1','rplusqres2']:
-        run_opts.alpha_values = run_opts.alpha_values*run_opts.noise_realizations
+        run_opts.reg_values = run_opts.reg_values*run_opts.noise_realizations
     if run_opts.reg_train_times is None:
         run_opts.reg_train_times = np.array([run_opts.train_time - run_opts.discard_time])
-    np.savetxt(os.path.join(run_opts.run_folder_name, 'reg_train_times.csv'),   run_opts.reg_train_times,    delimiter = ',')
-    np.savetxt(os.path.join(run_opts.run_folder_name, 'test_noise_values.csv'), run_opts.noise_values_array, delimiter = ',')
-    np.savetxt(os.path.join(run_opts.run_folder_name, 'test_alpha_values.csv'), run_opts.alpha_values      , delimiter = ',')
 
     ss_res   = np.random.SeedSequence(12)
     ss_train = np.random.SeedSequence(34)
@@ -1756,17 +1752,17 @@ def main(argv):
         test_seeds      = ss_test.spawn(run_opts.num_tests+run_opts.test_start)
         test_idxs       = np.arange(run_opts.test_start, run_opts.test_start+run_opts.num_tests)
         noise_seeds     = ss_noise.spawn(run_opts.noise_realizations)
-        res_streams     = np.zeros(run_opts.num_trains*run_opts.res_per_test*noise_values_array.size, dtype = object)
-        train_streams   = np.zeros(run_opts.num_trains*run_opts.res_per_test*noise_values_array.size, dtype = object)
-        test_streams    = np.zeros((run_opts.num_trains*run_opts.res_per_test*noise_values_array.size, run_opts.num_tests), dtype = object)
-        noise_streams   = np.zeros((run_opts.num_trains*run_opts.res_per_test*noise_values_array.size, run_opts.noise_realizations), dtype = object)
+        res_streams     = np.zeros(run_opts.num_trains*run_opts.res_per_test*run_opts.noise_values_array.size, dtype = object)
+        train_streams   = np.zeros(run_opts.num_trains*run_opts.res_per_test*run_opts.noise_values_array.size, dtype = object)
+        test_streams    = np.zeros((run_opts.num_trains*run_opts.res_per_test*run_opts.noise_values_array.size, run_opts.num_tests), dtype = object)
+        noise_streams   = np.zeros((run_opts.num_trains*run_opts.res_per_test*run_opts.noise_values_array.size, run_opts.noise_realizations), dtype = object)
 
-        tnr, ntr, rtn = np.meshgrid(np.arange(run_opts.num_trains), noise_values_array, np.arange(run_opts.res_per_test))
+        tnr, ntr, rtn = np.meshgrid(np.arange(run_opts.num_trains), run_opts.noise_values_array, np.arange(run_opts.res_per_test))
         tnr = tnr.flatten() + run_opts.res_start
         ntr = ntr.flatten()
         rtn = rtn.flatten() + run_opts.train_start
 
-        for i in range(run_opts.num_trains*run_opts.res_per_test*noise_values_array.size):
+        for i in range(run_opts.num_trains*run_opts.res_per_test*run_opts.noise_values_array.size):
             #print(res_seeds[rtn[i]])
             res_streams[i]   = np.random.default_rng(res_seeds[rtn[i]])
             train_streams[i] = np.random.default_rng(train_seeds[tnr[i]])
@@ -1788,8 +1784,6 @@ def main(argv):
             out_base  = [find_stability_serial(run_opts, ntr[i], tnr[i], train_streams[i], rtn[i], \
                 res_streams[i], test_streams[i], test_idxs, noise_streams[i]) for i in incomplete_idxs]
     if len(incomplete_idxs) != 0:
-        rkTime, split = out_base[0]
-        np.savetxt(os.path.join(run_opts.run_folder_name, 'test_time_split.csv'), np.array([rkTime, split]), delimiter = ',')
         toc = time.perf_counter()
         runtime = toc - tic
         print('Runtime over all cores: %f sec.' %(runtime))
