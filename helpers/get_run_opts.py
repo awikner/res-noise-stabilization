@@ -7,38 +7,41 @@ import os
 import numpy as np
 
 class RunOpts:
-    def __init__(self, argv=None, runflag=True, train_time = 3000,\
-        test_time = 0,\
+    def __init__(self, argv=None,\
+        runflag=True,\
+        train_time = 20000,\
+        test_time = None,\
+        sync_time = 2000,\
         discard_time = 500,\
-        res_size = 1000,\
-        res_per_test = 20,\
+        res_size = 500,\
+        res_per_test = 1,\
         noise_realizations = 1,\
-        num_tests = 10,\
-        num_trains = 25,\
+        num_tests = 1,\
+        num_trains = 1,\
         traintype = 'normal',\
         noisetype = 'gaussian',\
         system = 'KS',\
         savepred = False,\
         save_time_rms = False,\
-        squarenodes = False,\
-        rho = 0.5,\
-        sigma = 1.0,\
+        squarenodes = True,\
+        rho = 0.6,\
+        sigma = 0.1,\
         leakage = 1.0,\
-        bias_type = 'old',\
-        win_type = 'full',\
+        bias_type = 'new_random',\
+        win_type = 'full_0centered',\
         debug_mode = False,\
         pmap = False,\
         machine = 'deepthought2',\
-        ifray = True,\
+        ifray = False,\
         tau_flag = True,\
-        num_cpus = 20,\
-        metric = 'mss_var',\
-        return_all = False,\
+        num_cpus = 1,\
+        metric = 'mean_rms',\
+        return_all = True,\
         save_eigenvals = False,\
-        max_valid_time = 500,\
-        noise_streams_per_test = 5,\
-        noise_values_array = np.logspace(-3, 0, num = 19, base = 10)[5:11],\
-        alpha_values = np.append(0., np.logspace(-7, -3, 9)),\
+        max_valid_time = 2000,\
+        noise_streams_per_test = 1,\
+        noise_values_array = np.logspace(-4, 3, num = 3, base = 10),\
+        reg_values = np.append(0., np.logspace(-11, -9, 5)),\
         res_start = 0,\
         train_start = 0,\
         test_start = 0,\
@@ -47,10 +50,11 @@ class RunOpts:
         import_test = False,\
         import_noise = False,\
         reg_train_times = None,\
-        prior = 'zero',\
-        nojit = False):
+        root_folder = None,\
+        prior = 'zero'):
         self.train_time = train_time
         self.test_time = test_time
+        self.sync_time = sync_time
         self.discard_time = discard_time
         self.res_size = res_size
         self.res_per_test = res_per_test
@@ -80,7 +84,7 @@ class RunOpts:
         self.max_valid_time = max_valid_time
         self.noise_streams_per_test = noise_streams_per_test
         self.noise_values_array = noise_values_array
-        self.alpha_values = alpha_values
+        self.reg_values = reg_values
         self.res_start = res_start
         self.train_start = train_start
         self.test_start = test_start
@@ -89,12 +93,35 @@ class RunOpts:
         self.import_test = import_test
         self.import_noise = import_noise
         self.prior = prior
-        self.nojit = nojit
         self.reg_train_times = reg_train_times
+        self.root_folder = root_folder
         if not isinstance(argv, type(None)):
             self.get_run_opts(argv, runflag)
+        if isinstance(self.test_time, type(None)):
+            if self.system == 'lorenz':
+                self.test_time = 4000
+            elif 'KS' in self.system:
+                self.test_time = 16000
+        if not isinstance(self.reg_train_times, np.ndarray):
+            if isinstance(self.reg_train_times, type(None)):
+                self.reg_train_times = np.array([self.train_time])
+            elif isinstance(self.reg_train_times, int):
+                self.reg_train_times =np.array([self.reg_train_times])
+            else:
+                raise TypeError()
+        if isinstance(self.root_folder, type(None)):
+            self.root_folder = os.getcwd()
+        if isinstance(self.reg_train_times, np.ndarray) or isinstance(self.reg_train_times, list):
+            if (self.reg_train_times[0] != self.train_time or len(self.reg_train_times) != 1) and (self.traintype in ['normal','normalres1','normalres2','rmean','rmeanres1',\
+                'rmeanres2','rplusq','rplusqres1','rplusqres2'] or 'confined' in self.traintype):
+                print('Traintypes "normal", "rmean", and "rplusq" are not compatible with fractional regularization training.')
+                raise ValueError
+        if self.prior not in ['zero','input_pass']:
+            print('Prior type not recognized.')
+            raise ValueError
+        self.get_file_name(runflag)
 
-    def get_file_name(self):
+    def get_file_name(self,runflag):
         if self.import_res:
             iresflag = '_ires'
         else:
@@ -127,10 +154,6 @@ class RunOpts:
             squarenodes_flag = '_squarenodes'
         else:
             squarenodes_flag = ''
-        if self.resonly:
-            resonly_flag = '_resonly'
-        else:
-            resonly_flag = ''
         if self.save_eigenvals:
             eigenval_flag = '_wmoregradeigs'
         else:
@@ -139,19 +162,26 @@ class RunOpts:
             pmap_flag = '_wpmap0'
         else:
             pmap_flag = ''
-        if self.machine == 'deepthought2':
-            self.root_folder = '/lustre/awikner1/res-noise-stabilization/'
-        elif self.machine == 'personal':
-            self.root_folder = 'D:/'    
+        data_folder_base = os.path.join(self.root_folder, 'Data')
+        if not os.path.isdir(data_folder_base):
+            os.mkdir(data_folder_base)
 
         if not self.return_all:
-            self.data_folder = 'Data/%s_noisetest_noisetype_%s_traintype_%s/' % (self.system, self.noisetype, self.traintype)
-            self.run_name = '%s%s%s%s%s%s%s%s%s%s%s_rho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s%s_metric_%s' \
-             % (self.system,resonly_flag,predflag, timeflag, eigenval_flag, pmap_flag, squarenodes_flag, iresflag, itrainflag, itestflag, inoiseflag, self.rho, self.sigma, self.leakage, self.win_type, self.bias_type, self.tau, self.res_size, \
+            self.data_folder = os.path.join(data_folder_base,'%s_noisetest_noisetype_%s_traintype_%s' % (self.system, self.noisetype, self.traintype))
+            self.run_name = '%s%s%s%s%s%s%s%s%s%s_rho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s%s_metric_%s' \
+             % (self.system,predflag, timeflag, eigenval_flag, pmap_flag, squarenodes_flag, iresflag, itrainflag, itestflag, inoiseflag, self.rho, self.sigma, self.leakage, self.win_type, self.bias_type, self.tau, self.res_size, \
              self.train_time, self.noise_realizations, self.noisetype, self.traintype, prior_str, self.metric)
         elif self.return_all:
-            self.data_folder = 'Data/%s_noisetest_noisetype_%s_traintype_%s/' % (self.system, self.noisetype, self.traintype)
-            self.run_name = '%s%s%s%s%s%s%s%s%s%s%s_rho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s%s' % (self.system,resonly_flag,predflag, timeflag, eigenval_flag, pmap_flag, squarenodes_flag, iresflag, itrainflag, itestflag, inoiseflag, self.rho, self.sigma, self.leakage, self.win_type, self.bias_type, self.tau,self.res_size, self.train_time, self.noise_realizations, self.noisetype, self.traintype, prior_str)
+            self.data_folder = os.path.join(data_folder_base, '%s_noisetest_noisetype_%s_traintype_%s' % (self.system, self.noisetype, self.traintype))
+            self.run_name = '%s%s%s%s%s%s%s%s%s%s_rho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s%s' % (self.system,predflag, timeflag, eigenval_flag, pmap_flag, squarenodes_flag, iresflag, itrainflag, itestflag, inoiseflag, self.rho, self.sigma, self.leakage, self.win_type, self.bias_type, self.tau,self.res_size, self.train_time, self.noise_realizations, self.noisetype, self.traintype, prior_str)
+
+        if runflag:
+            if not os.path.isdir(self.data_folder):
+                os.mkdir(self.data_folder)
+            if not os.path.isdir(os.path.join(self.data_folder, self.run_name + '_folder')):
+                os.mkdir(os.path.join(self.data_folder, self.run_name + '_folder'))
+        self.run_file_name = os.path.join(self.data_folder, self.run_name + '.bz2')
+        self.run_folder_name = os.path.join(self.data_folder, self.run_name + '_folder')
         
     def get_run_opts(self, argv, runflag = True):
 
@@ -164,9 +194,9 @@ class RunOpts:
                     'machine=', 'num_cpus=', 'pmap=', 'parallel=', 'metric=','returnall=',
                     'savetime=', 'saveeigenvals=','noisevals=', 'regvals=', 'maxvt=', 'noisestreams=',
                     'resstart=','trainstart=','teststart=',
-                    'squarenodes=', 'resonly=', 'importres=','importtrain=',
+                    'squarenodes=', 'importres=','importtrain=',
                     'importtest=','importnoise=','regtraintimes=','discardlen=',
-                    'prior=','nojit='])
+                    'prior=','synctime=','datarootdir='])
             except getopt.GetoptError:
                 print('Error: Some options not recognized')
                 sys.exit(2)
@@ -180,13 +210,12 @@ class RunOpts:
                 elif opt == '-r':
                     self.noise_realizations = int(arg)
                     print('Noise Realizations: %d' % self.noise_realizations)
-                elif opt == '--nojit':
-                    if arg == 'True':
-                        self.nojit = True
-                    elif arg == 'False':
-                        self.nojit = False
-                    else:
-                        raise ValueError
+                elif opt == '--datarootdir':
+                    self.root_folder = str(arg)
+                    print('Root directory for data: %s' % self.root_folder)
+                elif opt == '--synctime':
+                    self.sync_time = int(arg)
+                    print('Sync time: %d' %  self.sync_time)
                 elif opt == '--testtime':
                     self.test_time = int(arg)
                     if self.test_time == 0:
@@ -248,14 +277,6 @@ class RunOpts:
                     else:
                         raise ValueError
                     print('Importing noise from file: %s' % arg)
-                elif opt == '--resonly':
-                    if arg == 'True':
-                        self.resonly = True
-                    elif arg == 'False':
-                        self.resonly = False
-                    else:
-                        raise ValueError
-                    print('Only reservoir nodes in feature: %s' % arg)
                 elif opt == '--squarenodes':
                     if arg == 'True':
                         self.squarenodes = True
@@ -278,9 +299,9 @@ class RunOpts:
                     noise_str = noise_str[:-2] + ' ]'
                     print('Noise values: %s' % noise_str)
                 elif opt == '--regvals':
-                    self.alpha_values = np.array([float(reg) for reg in arg.split(',')])
+                    self.reg_values = np.array([float(reg) for reg in arg.split(',')])
                     reg_str = '[ '
-                    for reg in self.alpha_values:
+                    for reg in self.reg_values:
                         reg_str += '%0.3e, ' % reg
                     reg_str = reg_str[:-2] + ' ]'
                     print('Regularization values: %s' % reg_str)
@@ -395,25 +416,7 @@ class RunOpts:
                 self.return_all, self.machine, self.rho, self.sigma, self.leakage,\
                 self.tau, self.win_type, self.bias_type, self.res_per_test, \
                 self.num_tests, self.num_trains, self.savepred, self.noisetype, \
-                self.traintype, self.system, self.squarenodes, self.resonly, self.prior, \
+                self.traintype, self.system, self.squarenodes, self.prior, \
                 self.res_start, self.train_start, self.test_start, self.import_res,\
                 self.import_train, self.import_test, self.import_noise, self.reg_train_times,\
                 self.discard_time = argv
-        if isinstance(self.reg_train_times, np.ndarray) or isinstance(self.reg_train_times, list):
-            if (self.reg_train_times[0] != self.train_time - self.discard_time or len(self.reg_train_times) != 1) and (self.traintype in ['normal','normalres1','normalres2','rmean','rmeanres1',\
-                'rmeanres2','rplusq','rplusqres1','rplusqres2'] or 'confined' in self.traintype):
-                print('Traintypes "normal", "rmean", and "rplusq" are not compatible with fractional regularization training.')
-                raise ValueError
-        if self.prior not in ['zero','input_pass']:
-            print('Prior type not recognized.')
-            raise ValueError
-        
-        self.get_file_name()
-        if runflag:
-            if not os.path.isdir(os.path.join(self.root_folder, self.data_folder)):
-                os.mkdir(os.path.join(self.root_folder, self.data_folder))
-            if not os.path.isdir(os.path.join(os.path.join(self.root_folder, self.data_folder), self.run_name + '_folder')):
-                os.mkdir(os.path.join(os.path.join(self.root_folder, self.data_folder), self.run_name + '_folder'))
-        self.run_file_name = os.path.join(os.path.join(self.root_folder, self.data_folder), self.run_name + '.bz2')
-        self.run_folder_name = os.path.join(os.path.join(self.root_folder, self.data_folder), self.run_name + '_folder')
-
