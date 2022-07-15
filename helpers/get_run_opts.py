@@ -46,10 +46,6 @@ class RunOpts:
         res_start = 0,\
         train_start = 0,\
         test_start = 0,\
-        import_res = False,\
-        import_train = False,\
-        import_test = False,\
-        import_noise = False,\
         reg_train_times = None,\
         root_folder = None,\
         prior = 'zero'):
@@ -90,10 +86,6 @@ class RunOpts:
         self.res_start = res_start
         self.train_start = train_start
         self.test_start = test_start
-        self.import_res = import_res
-        self.import_train = import_train
-        self.import_test = import_test
-        self.import_noise = import_noise
         self.prior = prior
         self.reg_train_times = reg_train_times
         self.root_folder = root_folder
@@ -129,22 +121,6 @@ class RunOpts:
         self.get_file_name(runflag)
 
     def get_file_name(self,runflag):
-        if self.import_res:
-            iresflag = '_ires'
-        else:
-            iresflag = ''
-        if self.import_train:
-            itrainflag = '_itrain'
-        else:
-            itrainflag = ''
-        if self.import_test:
-            itestflag = '_itest'
-        else:
-            itestflag = ''
-        if self.import_noise:
-            inoiseflag = '_inoise'
-        else:
-            inoiseflag = ''
         if self.prior == 'zero':
             prior_str = ''
         else:
@@ -175,12 +151,12 @@ class RunOpts:
 
         if not self.return_all:
             self.data_folder = os.path.join(data_folder_base,'%s_noisetest_noisetype_%s_traintype_%s' % (self.system, self.noisetype, self.traintype))
-            self.run_name = '%s%s%s%s%s%s%s%s%s%s_rho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s%s_metric_%s' \
-             % (self.system,predflag, timeflag, eigenval_flag, pmap_flag, squarenodes_flag, iresflag, itrainflag, itestflag, inoiseflag, self.rho, self.sigma, self.leakage, self.win_type, self.bias_type, self.tau, self.res_size, \
+            self.run_name = '%s%s%s%s%s%s_rho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s%s_metric_%s' \
+             % (self.system,predflag, timeflag, eigenval_flag, pmap_flag, squarenodes_flag, self.rho, self.sigma, self.leakage, self.win_type, self.bias_type, self.tau, self.res_size, \
              self.train_time, self.noise_realizations, self.noisetype, self.traintype, prior_str, self.metric)
         elif self.return_all:
             self.data_folder = os.path.join(data_folder_base, '%s_noisetest_noisetype_%s_traintype_%s' % (self.system, self.noisetype, self.traintype))
-            self.run_name = '%s%s%s%s%s%s%s%s%s%s_rho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s%s' % (self.system,predflag, timeflag, eigenval_flag, pmap_flag, squarenodes_flag, iresflag, itrainflag, itestflag, inoiseflag, self.rho, self.sigma, self.leakage, self.win_type, self.bias_type, self.tau,self.res_size, self.train_time, self.noise_realizations, self.noisetype, self.traintype, prior_str)
+            self.run_name = '%s%s%s%s%s%s_rho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s%s' % (self.system,predflag, timeflag, eigenval_flag, pmap_flag, squarenodes_flag, self.rho, self.sigma, self.leakage, self.win_type, self.bias_type, self.tau,self.res_size, self.train_time, self.noise_realizations, self.noisetype, self.traintype, prior_str)
 
         if runflag:
             if not os.path.isdir(self.data_folder):
@@ -201,8 +177,7 @@ class RunOpts:
                     'machine=', 'num_cpus=', 'pmap=', 'parallel=', 'metric=','returnall=',
                     'savetime=', 'saveeigenvals=','noisevals=', 'regvals=', 'maxvt=', 'noisestreams=',
                     'resstart=','trainstart=','teststart=',
-                    'squarenodes=', 'importres=','importtrain=',
-                    'importtest=','importnoise=','regtraintimes=','discardlen=',
+                    'squarenodes=', 'regtraintimes=','discardlen=',
                     'prior=','synctime=','datarootdir='])
             except getopt.GetoptError:
                 print('Error: Some options not recognized')
@@ -252,38 +227,6 @@ class RunOpts:
                 elif opt == '--discardlen':
                     self.discard_time = int(arg)
                     print('Discard iterations: %d' % self.discard_time)
-                elif opt == '--importres':
-                    if arg == 'True':
-                        self.import_res = True
-                    elif arg == 'False':
-                        self.import_res = False
-                    else:
-                        raise ValueError
-                    print('Importing reservoir from file: %s' % arg)
-                elif opt == '--importtrain':
-                    if arg == 'True':
-                        self.import_train = True
-                    elif arg == 'False':
-                        self.import_train = False
-                    else:
-                        raise ValueError
-                    print('Importing training data from file: %s' % arg)
-                elif opt == '--importtest':
-                    if arg == 'True':
-                        self.import_test = True
-                    elif arg == 'False':
-                        self.import_test = False
-                    else:
-                        raise ValueError
-                    print('Importing test data from file: %s' % arg)
-                elif opt == '--importnoise':
-                    if arg == 'True':
-                        self.import_noise = True
-                    elif arg == 'False':
-                        self.import_noise = False
-                    else:
-                        raise ValueError
-                    print('Importing noise from file: %s' % arg)
                 elif opt == '--squarenodes':
                     if arg == 'True':
                         self.squarenodes = True

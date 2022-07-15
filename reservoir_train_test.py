@@ -36,6 +36,7 @@ from helpers.ks_etdrk4 import *
 from helpers.csc_mult import *
 from helpers.poincare_max import *
 from helpers.get_run_opts import *
+from helpers.get_windows_path import *
 
 warnings.filterwarnings("ignore", category=NumbaPerformanceWarning)
 
@@ -1647,14 +1648,11 @@ def find_stability(run_opts, noise, train_seed, train_gen, res_itr, res_gen, tes
         u0 = u0 - np.mean(u0)
         rk = RungeKutta(0, 0, 0, tau=run_opts.tau, T=run_opts.train_time+run_opts.discard_time,
                         ttsplit=run_opts.train_time+run_opts.discard_time, u0=u0, system=run_opts.system, params=params)
-    #print('Training data %d:' % train_seed)
-    #print(rk.u_arr_train[-3:,-3:])
-    #true_filename = root_folder + \
-    #    '%s_tau%0.2f_true_trajectory.csv' % (system, tau)
-    #true_trajectory = np.loadtxt(true_filename, delimiter=',')
     if run_opts.pmap:
         true_pmap_max_filename = run_opts.root_folder + \
             '%s_tau%0.2f_true_pmap_max.csv' % (run_opts.system, run_opts.tau)
+        if os.name == 'nt' and len(true_pmap_max_filename) >= 260:
+            true_pmap_max_filename = get_windows_path(true_pmap_max_filename)
         true_pmap_max = np.loadtxt(true_pmap_max_filename, delimiter=',')
         print('Snippet of true poincare map:')
         print(true_pmap_max[:5])
