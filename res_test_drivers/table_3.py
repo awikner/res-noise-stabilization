@@ -1,7 +1,4 @@
 import sys,os
-#sys.path.append(os.path.join(os.getcwd(),'helpers'))
-#sys.path.append(os.path.join(os.getcwd(),'data_scripts'))
-#sys.path.append(os.path.join(os.getcwd(),'reservoir_train_test.py'))
 from res_reg_lmnt_awikner.set_numba import set_numba
 from res_reg_lmnt_awikner.reservoir_train_test import start_reservoir_test
 from res_reg_lmnt_awikner.process_test_data import process_data
@@ -13,16 +10,13 @@ import numpy as np
 import time
 from itertools import product
 import re
-#from set_numba import *
-#from reservoir_train_test import *
-#from process_test_data import *
 rho = 0.6
 sigma = 0.1
 leakage = 1.0
 
 discard_time = 500
-#traintypes   = ['normal','gradientk1','normal','gradientk1','normal','gradientk4','regzerok4']
-traintypes = ['normal','gradientk1','normal']
+traintypes   = ['normal','gradientk1','normal','gradientk1','normal','gradientk4','regzerok4']
+#traintypes = ['normal','gradientk1','normal']
 train_time   = 20000
 res_size     = 500
 noise_realizations = 1
@@ -56,12 +50,12 @@ ifray           = True
 just_process    = False
 just_display    = False
 nojit           = False
-#res_per_test    = 20
-res_per_test    = 4
-#num_trains      = 10
-num_trains      = 3
+res_per_test    = 20
+#res_per_test    = 4
+num_trains      = 10
+#num_trains      = 3
 num_tests       = 5
-cpus_per_node   = 6
+cpus_per_node   = 4
 metric          = 'mss_var'
 machine         = 'personal'
 max_valid_time  = 2000
@@ -103,8 +97,16 @@ for data, run_opts in zip(all_data, all_run_opts):
     data_slice = data.data_slice(reg = run_opts.reg_values[0], reg_train = run_opts.reg_train_times[0],\
                                  noise = run_opts.noise_values_array[0], median_flag = True, metric = 'gross_frac',\
                                  gross_err_bnd = gross_err_bnd, reduce_axes = ['res','train','test'])
-    print('Noisetype: %s, Traintype: %s, Tikhonov: 10^(%0.1f), Other Reg.: 10^(%0.1f)' %\
-            (run_opts.noisetype, run_opts.traintype, np.log10(run_opts.reg_values[0]), np.log10(run_opts.noise_values_array[0])))
+    if run_opts.reg_values[0] == 0.:
+        reg_str = '0.0'
+    else:
+        reg_str = '10^(%0.1f)' % np.log10(run_opts.reg_values[0])
+    if run_opts.noise_values_array[0] == 0.:
+        noise_str = '0.0'
+    else:
+        noise_str = '10^(%0.1f)' % np.log10(run_opts.noise_values_array[0])
+    print('Noisetype: %s, Traintype: %s, Tikhonov: %s, Other Reg.: %s' %\
+            (run_opts.noisetype, run_opts.traintype, reg_str, noise_str))
     print('Fraction Stable: %0.3f, Median VT: %0.2f, Median Mean Map error: %0.2e, Median Max Map Error: %0.2e' %\
             (1.0-data_slice['gross_frac'].iloc[0], data_slice['valid_time'].iloc[0]/lyapunov_time, \
             data_slice['mean_rms'].iloc[0], data_slice['max_rms'].iloc[0]))

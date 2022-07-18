@@ -156,7 +156,6 @@ class ResData:
                         row_dict['gross_count'] = 0.
                         row_dict['gross_frac'] = 1.0
                         row_dict['data_present'] = False
-                        median_slice_data = median_slice_data.append(row_dict, ignore_index = True)
                     else:           
                         nans      = pd.isna(reduced_sliced_data['mean_rms'])
                         near_nans = reduced_sliced_data['mean_rms'] > gross_err_bnd
@@ -175,7 +174,10 @@ class ResData:
                         row_dict['valid_time'] = reduce_fun(pd.DataFrame(valid_times)).to_numpy()[0]
                         row_dict['gross_count'] = nan_count; row_dict['gross_frac'] = nan_frac
                         row_dict['data_present'] = True
-                        median_slice_data = median_slice_data.append(row_dict, ignore_index = True)
+                    for key in row_dict.keys():
+                        if not isinstance(row_dict[key], list) and not isinstance(row_dict[key], np.ndarray):
+                            row_dict[key] = [row_dict[key]]
+                    median_slice_data = pd.concat([median_slice_data, pd.DataFrame(row_dict)], ignore_index = True, verify_integrity = True)
             if len(metric) == 0:
                 return median_slice_data
             else:
@@ -212,5 +214,8 @@ class ResData:
                     if len(best_reduced_slice_data.shape) != 1:
                         best_reduced_slice_data = best_reduced_slice_data[best_reduced_slice_data['reg'] == \
                             best_reduced_slice_data['reg'].min()]
-                    best_median_slice_data = best_median_slice_data.append(best_reduced_slice_data, ignore_index = True)
+                    for key in best_reduced_slice_data.keys():
+                        if not isinstance(best_reduced_slice_data[key], list) and not isinstance(best_reduced_slice_data[key], np.ndarray):
+                            best_reduced_slice_data[key] = [best_reduced_slice_data[key]]
+                    best_median_slice_data = pd.concat([best_median_slice_data, best_reduced_slice_data], ignore_index = True, verify_integrity = True)
                 return best_median_slice_data
