@@ -1,0 +1,26 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+[project]
+name = "res_reg_lmnt_awikner"
+version = "0.0.10"
+authors = [
+	{name="Alexander Wikner", email="apwikner@gmail.com"},]
+description = "Package for testing regularization performance on reservoir computer predictions"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.9"
+dependencies= ["matplotlib==3.5.2",
+		"numba==0.55.2",
+		"numpy==1.22.4",
+		"pandas==1.4.3",
+		"ray==1.13.0",
+		"scipy==1.8.1",
+		"tqdm==4.64.0" ]
+classifiers = [
+	"Programming Language :: Python :: 3",
+	"License :: OSI Approved :: MIT License",
+	"Operating System :: OS Independent",]
+
+[project.urls]
+"Homepage" = "https://github.com/awikner/res-noise-stabilization"
