@@ -1318,7 +1318,7 @@ def predictwrapped(res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, 
 
     return Y
 
-def get_test_data(run_opts, test_stream, rkTime, split):
+def get_test_data(run_opts, test_stream, overall_idx, rkTime, split):
     # Function for obtaining test data sets used to validate reservoir performance
     # Uses an array of random number generators
     if run_opts.system == 'lorenz':
@@ -1358,6 +1358,10 @@ def get_test_data(run_opts, test_stream, rkTime, split):
         print('Test data %d' % i)
         print(rktest_u_arr_test[-3:,-3:,i])
         """
+
+    if run_opts.save_truth and overall_idx == 0:
+        for i in range(run_opts.num_tests):
+            np.savetxt(os.path.join(run_opts.run_folder_name, '%s_tau%0.2f_true_test_%d.csv' % (run_opts.system, run_opts.tau, i)), rktest_u_arr_test[:,:,i], delimiter = ',')
 
     return rktest_u_arr_train_nonoise, rktest_u_arr_test, params
 
@@ -1603,7 +1607,7 @@ def get_res_results(run_opts, res_itr, res_gen, rk, noise, noise_stream, \
     return res_out, train_seed, noise_array, res_itr
 
 
-def find_stability(run_opts, noise, train_seed, train_gen, res_itr, res_gen, test_stream, test_idxs, noise_stream):
+def find_stability(run_opts, noise, train_seed, train_gen, res_itr, res_gen, test_stream, test_idxs, noise_stream, overall_idx):
 
     # Main function for training and testing reservoir performance. This function first generates the training and testing data,
     # the passes to get_res_results to obtain th reservoir performance.
@@ -1636,7 +1640,7 @@ def find_stability(run_opts, noise, train_seed, train_gen, res_itr, res_gen, tes
         # rkTime_test = 3000
     # split_test  = 2000
     rktest_u_arr_train_nonoise, rktest_u_arr_test, params = get_test_data(
-        run_opts, test_stream, rkTime=rkTime_test, split=split_test)
+        run_opts, test_stream, overall_idx, rkTime=rkTime_test, split=split_test)
     # np.random.seed(train_seed)
     if run_opts.system == 'lorenz':
         ic = train_gen.random(3)*2-1
@@ -1739,10 +1743,10 @@ def start_reservoir_test(argv=None, run_opts=None):
         tic = time.perf_counter()
         if run_opts.ifray:
             out_base  = ray.get([find_stability_remote.remote(run_opts, run_opts.noise_values_array, tr[i], train_streams[i],\
-                rt[i], res_streams[i], test_streams[i], test_idxs, noise_streams) for i in incomplete_idxs])
+                rt[i], res_streams[i], test_streams[i], test_idxs, noise_streams, i) for i in incomplete_idxs])
         else:
             out_base  = [find_stability_serial(run_opts, run_opts.noise_values_array,tr[i], train_streams[i],\
-                rt[i], res_streams[i], test_streams[i], test_idxs, noise_streams) for i in incomplete_idxs]
+                rt[i], res_streams[i], test_streams[i], test_idxs, noise_streams, i) for i in incomplete_idxs]
 
     else:
         res_seeds       = ss_res.spawn(run_opts.res_per_test+run_opts.res_start)
@@ -1777,10 +1781,10 @@ def start_reservoir_test(argv=None, run_opts=None):
         tic = time.perf_counter()
         if run_opts.ifray:
             out_base  = ray.get([find_stability_remote.remote(run_opts, ntr[i], tnr[i], train_streams[i],\
-                rtn[i], res_streams[i], test_streams[i], test_idxs, noise_streams[i]) for i in incomplete_idxs])
+                rtn[i], res_streams[i], test_streams[i], test_idxs, noise_streams[i], i) for i in incomplete_idxs])
         else:
             out_base  = [find_stability_serial(run_opts, ntr[i], tnr[i], train_streams[i], rtn[i], \
-                res_streams[i], test_streams[i], test_idxs, noise_streams[i]) for i in incomplete_idxs]
+                res_streams[i], test_streams[i], test_idxs, noise_streams[i], i) for i in incomplete_idxs]
     if len(incomplete_idxs) != 0:
         toc = time.perf_counter()
         runtime = toc - tic

@@ -48,7 +48,8 @@ class RunOpts:
         test_start = 0,\
         reg_train_times = None,\
         root_folder = None,\
-        prior = 'zero'):
+        prior = 'zero',\
+        save_truth = False):
         self.train_time = train_time
         self.test_time = test_time
         self.sync_time = sync_time
@@ -89,6 +90,7 @@ class RunOpts:
         self.prior = prior
         self.reg_train_times = reg_train_times
         self.root_folder = root_folder
+        self.save_truth = save_truth
         if not isinstance(argv, type(None)):
             self.get_run_opts(argv, runflag)
         if self.tau_flag:
@@ -178,7 +180,7 @@ class RunOpts:
                     'savetime=', 'saveeigenvals=','noisevals=', 'regvals=', 'maxvt=', 'noisestreams=',
                     'resstart=','trainstart=','teststart=',
                     'squarenodes=', 'regtraintimes=','discardlen=',
-                    'prior=','synctime=','datarootdir='])
+                    'prior=','synctime=','datarootdir=', 'savetruth='])
             except getopt.GetoptError:
                 print('Error: Some options not recognized')
                 sys.exit(2)
@@ -192,6 +194,13 @@ class RunOpts:
                 elif opt == '-r':
                     self.noise_realizations = int(arg)
                     print('Noise Realizations: %d' % self.noise_realizations)
+                elif opt == '--savetruth':
+                    if arg == 'True':
+                        self.save_truth = True
+                    elif arg == 'False':
+                        self.save_truth = False
+                    else:
+                        raise ValueError
                 elif opt == '--datarootdir':
                     self.root_folder = str(arg)
                     print('Root directory for data: %s' % self.root_folder)

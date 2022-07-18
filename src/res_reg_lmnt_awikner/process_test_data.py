@@ -348,20 +348,22 @@ def process_data(argv=None, run_opts=None):
                          reg_values[best_j[noise_vals_set_idx, reg_train_times_set_idx]]))]
         all_files = os.listdir(run_opts.run_folder_name)
         for file in all_files:
-            if file not in pred_files:
+            if file not in pred_files and 'true_test' not in file:
                 os.remove(file)
         pred_data_size = 0
         for ele in os.scandir(run_opts.run_folder_name):
             pred_data_size+=os.stat(ele).st_size 
         comp_data_size += pred_data_size
     else:
-        if run_opts.pmap:
-            all_files = os.listdir(run_opts.run_folder_name)
+        all_files = os.listdir(run_opts.run_folder_name)
+        if run_opts.pmap: 
             for file in all_files:
-                if os.path.isfile(os.path.join(run_opts.run_folder_name, file)) and 'pmap_max_res' in file:
+                if os.path.isfile(os.path.join(run_opts.run_folder_name, file)) and 'pmap_max_res' not in file and 'true_test' not in file:
                     os.remove(os.path.join(run_opts.run_folder_name, file))
         else:
-            shutil.rmtree(run_opts.run_folder_name)
+            for file in all files:
+                if os.path.isfile(os.path.join(run_opts.run_folder_name, file)) and 'true_test' not in file:
+                    os.remove(os.path.join(run_opts.run_folder_name, file))
     print('Compressed data size: %0.3f kB' % (comp_data_size/1000))
     print('Data compressed by %0.3f percent' % ((1.-comp_data_size/float(raw_data_size))*100))
     toc = time.perf_counter()
