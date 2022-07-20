@@ -17,12 +17,12 @@ leakage = 1.0
 
 discard_time = 500
 #traintypes   = ['normal','gradientk1','normal','gradientk1','normal','gradientk4','regzerok4']
-traintypes = ['normal','gradientk1','normal']
+traintypes = ['normal','gradientk1','normal','gradientk4','regzerok4']
 train_time   = 20000
 res_size     = 500
 noise_realizations = 1
 #noisetypes   = ['none','none','none','none','gaussian','none','none']
-noisetypes   = ['none','none','none']
+noisetypes   = ['none','none','gaussian','none','none']
 tau          = 0.25
 win_type     = 'full_0centered'
 squarenodes  = True
@@ -52,16 +52,22 @@ reg_train_times_all = [np.array([20000]),\
                         np.array([4])]
 """
 noise_values_array_all = [np.array([0.0]),\
-                            np.array([10.**(-6.8)]),\
-                            np.array([0.0])]
-reg_values_all         = [np.array([0.0]),\
-                            np.array([0.0]),\
-                            np.array([10.**(-6.0)])]
+                        np.array([10.**(-5.4)]),\
+                        np.array([10.**(-7.4)]),\
+                        np.array([10.**(-7.4)]),\
+                        np.array([10.**(-7.4)])]
+reg_values_all         = [np.array([10.**(-6.0)]),\
+                        np.array([10.**(-8.5)]),\
+                        np.array([10.**(-16)]),\
+                        np.array([10.**(-16)]),\
+                        np.array([10.**(-16.5)])]
 reg_train_times_all = [np.array([20000]),\
                         np.array([20000]),\
-                        np.array([20000])]
+                        np.array([20000]),\
+                        np.array([20000]),\
+                        np.array([4])]
 
-res_start = 1; train_start = 1; test_start = 2;
+res_start = 2; train_start = 9; test_start = 2;
 
 test_time       = 18000
 return_all      = True
@@ -126,7 +132,7 @@ new_cmp_vals = np.concatenate((np.ones((64,1)) @ black, new_cmp_vals, np.ones((6
 print(new_cmp_vals.shape)
 new_cmp = ListedColormap(new_cmp_vals)
 
-plotlen_us = (round(7*lyapunov_time)+2)/lyapunov_time
+plotlen_s = (round(7*lyapunov_time)+2)/lyapunov_time
 plotlen = round(7*lyapunov_time)+2
 line_width = 2
 if os.name == 'nt':
@@ -141,8 +147,8 @@ X,Y = np.meshgrid(22/64*np.arange(num_vars), (1/lyapunov_time)*np.arange(plotlen
 plt.rcParams.update({'font.size': 30})
 raw_data_map   = [0,1,2]
 plot_idxs = [0,1,2]
-plot_type = 'unstable'
-xmax = plotlen_us
+plot_type = 'stable'
+xmax = plotlen_s
 for j,i in enumerate(plot_idxs):
     fig = plt.figure(figsize = (17,5))
     pred_plot = np.copy(all_preds[i].preds[0,0,0,0,0,0][:, :plotlen])
@@ -249,5 +255,5 @@ ax.tick_params(width=line_width)
 cbar.ax.tick_params(width=line_width)
 plt.yticks([0,22/64*np.arange(num_vars)[-1]/2,22/64*np.arange(num_vars)[-1]],['0','L/2','L'])
 
-plt.savefig(os.path.join(os.getcwd(),'KS_truth_unstable.pdf'), bbox_inches = "tight", dpi = 400)
+plt.savefig(os.path.join(os.getcwd(),'KS_truth_stable.pdf'), bbox_inches = "tight", dpi = 400)
 plt.show()
