@@ -257,8 +257,9 @@ class ResOutput:
         self.train_mean_rms_out     = np.zeros((noise_array.size, run_opts.reg_values.size, run_opts.reg_train_times.size), dtype = object)
         self.train_max_rms_out      = np.zeros((noise_array.size, run_opts.reg_values.size, run_opts.reg_train_times.size), dtype = object)
         self.grad_eigenvals_out     = np.zeros((noise_array.size, run_opts.reg_train_times.size), dtype = object)
+        self.pred_out               = np.zeros((noise_array.size, run_opts.reg_values.size, run_opts.reg_train_times.size), dtype = object)
     
-    def save(self, run_opts, noise_array, res_itr, train_seed):
+    def save(self, run_opts, noise_array, res_itr, train_seed, test_idxs):
         for (i, noise_val), (j, reg_train_time) in product(enumerate(noise_array), enumerate(run_opts.reg_train_times)):
             print((i,j))
             stable_frac = np.zeros(run_opts.reg_values.size)
@@ -289,7 +290,7 @@ class ResOutput:
             for k, array_elem in enumerate(self.valid_time_out[i,:,j]):
                 valid_time[k] = array_elem
             for k in range(run_opts.num_tests):
-                np.savetxt(os.path.join(run_opts.run_folder_name, 'valid_time_res%d_train%d_test%d_noise%e_regtrain%d.csv' % (res_itr, train_seed, k, noise_val, reg_train_time)),\
+                np.savetxt(os.path.join(run_opts.run_folder_name, 'valid_time_res%d_train%d_test%d_noise%e_regtrain%d.csv' % (res_itr, train_seed, test_idxs[k], noise_val, reg_train_time)),\
                     valid_time[:,k], delimiter = ',')
 
             train_mean_rms = np.zeros((run_opts.reg_values.size, *self.train_mean_rms_out[i,0,j].shape))
@@ -319,13 +320,13 @@ class ResOutput:
                     pmap_max_save = np.zeros((len(pmap_max[k,l]), max_pmap_len))
                     for m in range(len(pmap_max[k,l])):
                         pmap_max_save[m,:pmap_len[m]] = pmap_max[k,l][m]
-                    np.savetxt(os.path.join(run_opts.run_folder_name, 'pmap_max_res%d_train%d_test%d_noise%e_reg%e_regtrain%d.csv' % (res_itr, train_seed, l, noise_val, run_opts.reg_values[k], reg_train_time)),pmap_max_save, delimiter = ',')
+                    np.savetxt(os.path.join(run_opts.run_folder_name, 'pmap_max_res%d_train%d_test%d_noise%e_reg%e_regtrain%d.csv' % (res_itr, train_seed, test_idxs[l], noise_val, run_opts.reg_values[k], reg_train_time)),pmap_max_save, delimiter = ',')
             if run_opts.save_time_rms:
                 rms = np.zeros((run_opts.reg_values.size, *self.rms_out[i,0,j].shape))
                 for k, array_elem in enumerate(self.rms_out[i,:,j]):
                     rms[k] = array_elem
                 for k in range(run_opts.num_tests):
-                    np.savetxt(os.path.join(run_opts.run_folder_name, 'rms_res%d_train%d_test%d_noise%e_regtrain%d.csv' % (res_itr, train_seed, k, noise_val, reg_train_time)),\
+                    np.savetxt(os.path.join(run_opts.run_folder_name, 'rms_res%d_train%d_test%d_noise%e_regtrain%d.csv' % (res_itr, train_seed, test_idxs[k], noise_val, reg_train_time)),\
                         rms[:,k], delimiter = ',')
             if run_opts.save_eigenvals:
                 eigenvals = self.grad_eigenvals_out[i,j]
@@ -1360,8 +1361,8 @@ def get_test_data(run_opts, test_stream, overall_idx, rkTime, split):
         """
 
     if run_opts.save_truth and overall_idx == 0:
-        for i in range(run_opts.num_tests):
-            np.savetxt(os.path.join(run_opts.run_folder_name, '%s_tau%0.2f_true_test_%d.csv' % (run_opts.system, run_opts.tau, i)), rktest_u_arr_test[:,:,i], delimiter = ',')
+        for (i, test) in enumerate(np.arange(run_opts.test_start, run_opts.test_start + run_opts.num_tests)):
+            np.savetxt(os.path.join(run_opts.run_folder_name, '%s_tau%0.2f_true_test_%d.csv' % (run_opts.system, run_opts.tau, test)), rktest_u_arr_test[:,:,i], delimiter = ',')
 
     return rktest_u_arr_train_nonoise, rktest_u_arr_test, params
 
@@ -1558,7 +1559,7 @@ def optim_func(run_opts, res_out, res, noise_in, noise, noise_idx, rktest_u_arr_
         res_out.stable_frac_out[noise_idx,alpha_idx,i], res_out.mean_rms_out[noise_idx,alpha_idx,i],\
             res_out.max_rms_out[noise_idx,alpha_idx,i],res_out.variances_out[noise_idx,alpha_idx,i],\
             res_out.valid_time_out[noise_idx,alpha_idx,i],  res_out.rms_out[noise_idx,alpha_idx,i],\
-            res_out.preds_out[noise_idx,alpha_idx,i], res_out.wass_dist_out[noise_idx,alpha_idx,i],\
+            res_out.pred_out[noise_idx,alpha_idx,i], res_out.wass_dist_out[noise_idx,alpha_idx,i],\
             res_out.pmap_max_out[noise_idx,alpha_idx,i], res_out.pmap_max_wass_dist_out[noise_idx,alpha_idx,i]\
             = test(run_opts, res, i, noise_in, rktest_u_arr_train_nonoise, rktest_u_arr_test,\
             true_pmap_max, rkTime=rkTime,split=split, params=params)
@@ -1671,7 +1672,7 @@ def find_stability(run_opts, noise, train_seed, train_gen, res_itr, res_gen, tes
     else:
         noise_array = noise
 
-    res_out.save(run_opts, noise_array, res_itr, train_seed)
+    res_out.save(run_opts, noise_array, res_itr, train_seed, test_idxs)
     # toc_global = time.perf_counter()
     # print('Total Runtime: %s sec.' % (toc_global - tic_global))
 

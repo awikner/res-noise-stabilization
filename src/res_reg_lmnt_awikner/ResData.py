@@ -10,7 +10,7 @@ from res_reg_lmnt_awikner.get_windows_path import *
 class ResPreds:
     def __init__(self, run_opts):
         self.data_filename, self.pred_folder = run_opts.run_file_name, run_opts.run_folder_name
-        self.noise_vals = run_opts.noise_values_array; self.reg_train_vals = run_opts.reg_train_vals; self.reg_vals = run_opts.reg_values
+        self.noise_vals = run_opts.noise_values_array; self.reg_train_vals = run_opts.reg_train_times; self.reg_vals = run_opts.reg_values
         print('Starding data read...')
         #print(self.pred_folder)
         self.preds = np.zeros((run_opts.res_per_test, run_opts.num_trains, run_opts.num_tests, self.noise_vals.size, self.reg_train_vals.size, self.reg_vals.size), dtype = object)
@@ -31,7 +31,7 @@ class ResPreds:
 class ResPmap:
     def __init__(self, run_opts):
         self.data_filename, self.pred_folder = run_opts.run_file_name, run_opts.run_folder_name
-        self.noise_vals = run_opts.noise_values_array; self.reg_train_vals = run_opts.reg_train_vals; self.reg_vals = run_opts.reg_values
+        self.noise_vals = run_opts.noise_values_array; self.reg_train_vals = run_opts.reg_train_times; self.reg_vals = run_opts.reg_values
         print('Starding data read...')
         #print(self.pred_folder)
         self.preds = np.zeros((run_opts.res_per_test, run_opts.num_trains, run_opts.num_tests, self.noise_vals.size, self.reg_train_vals.size, self.reg_vals.size), dtype = object)

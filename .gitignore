@@ -134,6 +134,7 @@ dmypy.json
 *.txt
 *.bz2
 *.svg
+*.pdf
 
 # Non-template data processing files
 data_scripts/process_test_data_*.py
