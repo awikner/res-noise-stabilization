@@ -119,7 +119,7 @@ from matplotlib import cm
 from matplotlib.colors import ListedColormap, LinearSegmentedColormap
 import matplotlib.pyplot as plt
 
-plasma = cm.get_cmap('plasma', 256)
+plasma = cm.get_cmap('bwr', 256)
 new_cmp_vals = plasma(np.linspace(0,1,256))
 black = np.array([0,0,0,1]).reshape(1,-1)
 new_cmp_vals = np.concatenate((np.ones((64,1)) @ black, new_cmp_vals, np.ones((64,1)) @ black), axis = 0)
@@ -127,15 +127,17 @@ print(new_cmp_vals.shape)
 new_cmp = ListedColormap(new_cmp_vals)
 
 plotlen_us = (round(7*lyapunov_time)+2)/lyapunov_time
-plotlen_s = (round(7*lyapunov_time)+2)/lyapunov_time
-plotlen = round(25*lyapunov_time)+2
+plotlen = round(7*lyapunov_time)+2
 line_width = 2
-ks_true = np.loadtxt(get_windows_path(os.path.join(all_run_opts[0].run_folder_name, '%s_tau%0.2f_true_test_%d.csv' %\
-    (all_run_opts[0].system, all_run_opts[0].tau, all_run_opts[0].test_start))), delimiter = ',')
+if os.name == 'nt':
+    ks_true = np.loadtxt(get_windows_path(os.path.join(all_run_opts[0].run_folder_name, '%s_tau%0.2f_true_test_%d.csv' %\
+        (all_run_opts[0].system, all_run_opts[0].tau, all_run_opts[0].test_start))), delimiter = ',')
+else:
+    ks_true = np.loadtxt(os.path.join(all_run_opts[0].run_folder_name, '%s_tau%0.2f_true_test_%d.csv' %\
+                    (all_run_opts[0].system, all_run_opts[0].tau, all_run_opts[0].test_start)), delimiter = ',')
 num_vars = 64
 ub, lb = 4.5, -4.5
 X,Y = np.meshgrid(22/64*np.arange(num_vars), (1/lyapunov_time)*np.arange(plotlen))
-#plt.set_cmap(new_cmp)
 plt.rcParams.update({'font.size': 30})
 raw_data_map   = [0,1,2]
 plot_idxs = [0,1,2]
@@ -229,7 +231,7 @@ for j,i in enumerate(plot_idxs):
 
 fig = plt.figure(figsize = (17,5))
 pred_plot = ks_true[:,:plotlen]
-cs=plt.pcolormesh(Y.T, X.T,pred_plot,cmap = 'plasma')
+cs=plt.pcolormesh(Y.T, X.T,pred_plot,cmap = 'bwr')
 cs.cmap.set_under('k')
 cs.cmap.set_over('k')
 plt.clim(-3,3)
@@ -248,6 +250,4 @@ cbar.ax.tick_params(width=line_width)
 plt.yticks([0,22/64*np.arange(num_vars)[-1]/2,22/64*np.arange(num_vars)[-1]],['0','L/2','L'])
 
 plt.savefig(os.path.join(os.getcwd(),'KS_truth_unstable.pdf'), bbox_inches = "tight", dpi = 400)
-plt.xlim(0,plotlen_us)
-#plt.savefig('KS_truth_unstable.pdf', bbox_inches = "tight", dpi = 400)
-#plt.show()
+plt.show()

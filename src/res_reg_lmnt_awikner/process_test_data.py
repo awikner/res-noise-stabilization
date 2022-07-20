@@ -137,7 +137,7 @@ def process_data(argv=None, run_opts=None):
             mean_rms[i,j,:,k,:,l]     = np.transpose(np.loadtxt(os.path.join(run_opts.run_folder_name, 'mean_rms_res%d_train%d_noise%e_regtrain%d.csv'% (res,train,noise,reg_train_time)), delimiter = ',')).reshape((run_opts.num_tests, reg_values.size))
             max_rms[i,j,:,k,:,l]      = np.transpose(np.loadtxt(os.path.join(run_opts.run_folder_name, 'max_rms_res%d_train%d_noise%e_regtrain%d.csv' % (res,train,noise,reg_train_time)), delimiter = ',')).reshape((run_opts.num_tests, reg_values.size))
             variances[i,j,:,k,:,l]    = np.transpose(np.loadtxt(os.path.join(run_opts.run_folder_name, 'variance_res%d_train%d_noise%e_regtrain%d.csv'% (res,train,noise,reg_train_time)), delimiter = ',')).reshape((run_opts.num_tests, reg_values.size))
-            for (m,test) in enuemrate(np.arange(run_opts.test_start, run_opts.test_start + run_opts.num_tests)):
+            for (m,test) in enumerate(np.arange(run_opts.test_start, run_opts.test_start + run_opts.num_tests)):
                 valid_time[i,j,m,k,:,:,l]    = np.transpose(np.loadtxt(os.path.join(run_opts.run_folder_name, 'valid_time_res%d_train%d_test%d_noise%e_regtrain%d.csv' % (res,train,test,noise,reg_train_time)), delimiter = ',')).reshape((num_vt_tests, reg_values.size))
             if run_opts.pmap:
                 run_opts.pmap_max_wass_dist[i,j,:,k,:,l] = np.transpose(np.loadtxt(os.path.join(run_opts.run_folder_name, 'pmap_max_wass_dist_res%d_train%d_noise%e_regtrain%d.csv' % (res,train,noise,reg_train_time)), delimiter = ',')).reshape((run_opts.num_tests, reg_values.size))
