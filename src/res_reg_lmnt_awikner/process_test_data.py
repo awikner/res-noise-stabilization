@@ -24,7 +24,7 @@ import numpy as np
 import pandas as pd
 import time
 
-from res_reg_lmnt_awikner.RunOpts import *
+from res_reg_lmnt_awikner.classes import RunOpts
 from res_reg_lmnt_awikner.get_windows_path import get_windows_path
 
 def process_data(argv=None, run_opts=None):

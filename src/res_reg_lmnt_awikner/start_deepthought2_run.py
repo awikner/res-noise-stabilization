@@ -3,7 +3,6 @@ import os
 import subprocess
 import re
 import time
-import sys
 
 def start_deepthought2_run(system = 'KS', traintype = 'normal', noisetype = 'gaussian', \
         noise_realizations = 1, res_size = 500, trainlen = 3000, testlen = 0, rho = 0.5, sigma = 1.0,\
