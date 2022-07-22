@@ -3,9 +3,9 @@ from tqdm import tqdm
 import numpy as np
 import time
 from itertools import product
-import sys
+import sys, os
 import getopt
-from res_reg_lmnt_awikner.get_windows_path import *
+from res_reg_lmnt_awikner.helpers import get_windows_path
 from res_reg_lmnt_awikner.lorenzrungekutta_numba import rungekutta
 from res_reg_lmnt_awikner.ks_etdrk4 import kursiv_predict
 from scipy.sparse.linalg import eigs
@@ -386,13 +386,13 @@ class RunOpts:
                     print('Debug Mode: %s' % arg)
         else:
             self.train_time, self.res_size, self.noise_realizations, self.save_time_rms, \
-            self.save_eigenvals, self.pmap, self.metric, \
-            self.return_all, self.machine, self.rho, self.sigma, self.leakage, \
-            self.tau, self.win_type, self.bias_type, self.res_per_test, \
-            self.num_tests, self.num_trains, self.savepred, self.noisetype, \
-            self.traintype, self.system, self.squarenodes, self.prior, \
-            self.res_start, self.train_start, self.test_start, self.reg_train_times, \
-            self.discard_time = argv
+                self.save_eigenvals, self.pmap, self.metric, \
+                self.return_all, self.machine, self.rho, self.sigma, self.leakage, \
+                self.tau, self.win_type, self.bias_type, self.res_per_test, \
+                self.num_tests, self.num_trains, self.savepred, self.noisetype, \
+                self.traintype, self.system, self.squarenodes, self.prior, \
+                self.res_start, self.train_start, self.test_start, self.reg_train_times, \
+                self.discard_time = argv
 
 
 class Reservoir:
@@ -451,7 +451,7 @@ class Reservoir:
                 q = int((self.rsvr_size - const_conn) // input_vars.size)
                 for i, var in enumerate(input_vars):
                     Win[const_conn + q * i:const_conn + q *
-                                           (i + 1), var + 1] = (res_gen.random(q) * 2 - 1) * run_opts.sigma
+                        (i + 1), var + 1] = (res_gen.random(q) * 2 - 1) * run_opts.sigma
             elif run_opts.bias_type == 'new_random':
                 Win = np.zeros((self.rsvr_size, input_size + 1))
                 Win[:, 0] = (res_gen.random(self.rsvr_size) * 2 - 1) * run_opts.sigma
@@ -472,7 +472,7 @@ class Reservoir:
                 var = input_vars[res_gen.choice(
                     input_vars.size, size=leftover_nodes, replace=False)]
                 Win[self.rsvr_size - leftover_nodes:, var +
-                                                      1] = (res_gen.random(leftover_nodes) * 2 - 1) * run_opts.sigma
+                    1] = (res_gen.random(leftover_nodes) * 2 - 1) * run_opts.sigma
             elif run_opts.bias_type == 'new_const':
                 Win = np.zeros((self.rsvr_size, input_size + 1))
                 Win[:, 0] = run_opts.sigma
@@ -483,7 +483,7 @@ class Reservoir:
                 var = input_vars[res_gen.integers(
                     input_vars.size, size=leftover_nodes)]
                 Win[self.rsvr_size - leftover_nodes:, var +
-                                                      1] = (res_gen.random(leftover_nodes) * 2 - 1) * run_opts.sigma
+                    1] = (res_gen.random(leftover_nodes) * 2 - 1) * run_opts.sigma
 
         Win_sp = csc_matrix(Win)
         self.Win_data, self.Win_indices, self.Win_indptr, self.Win_shape = \
@@ -619,7 +619,7 @@ class ResOutput:
                     pred[k] = array_elem
                 for l, (k, reg) in product(range(run_opts.num_tests), enumerate(run_opts.reg_values)):
                     np.savetxt(os.path.join(run_opts.run_folder_name,
-                                            'pred_res%d_train%d_test%d_noise%e_regtrain%d_reg%e.csv' % \
+                                            'pred_res%d_train%d_test%d_noise%e_regtrain%d_reg%e.csv' %
                                             (res_itr, train_seed, test_idxs[l], noise_val, reg_train_time, reg)),
                                pred[k, l], delimiter=',')
 
