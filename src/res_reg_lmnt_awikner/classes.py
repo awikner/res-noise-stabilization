@@ -5,7 +5,7 @@ import time
 from itertools import product
 import sys, os
 import getopt
-from res_reg_lmnt_awikner.helpers import get_windows_path
+from res_reg_lmnt_awikner.helpers import get_windows_path, get_filename
 from res_reg_lmnt_awikner.lorenzrungekutta_numba import rungekutta
 from res_reg_lmnt_awikner.ks_etdrk4 import kursiv_predict
 from scipy.sparse.linalg import eigs
@@ -386,13 +386,13 @@ class RunOpts:
                     print('Debug Mode: %s' % arg)
         else:
             self.train_time, self.res_size, self.noise_realizations, self.save_time_rms, \
-                self.save_eigenvals, self.pmap, self.metric, \
-                self.return_all, self.machine, self.rho, self.sigma, self.leakage, \
-                self.tau, self.win_type, self.bias_type, self.res_per_test, \
-                self.num_tests, self.num_trains, self.savepred, self.noisetype, \
-                self.traintype, self.system, self.squarenodes, self.prior, \
-                self.res_start, self.train_start, self.test_start, self.reg_train_times, \
-                self.discard_time = argv
+            self.save_eigenvals, self.pmap, self.metric, \
+            self.return_all, self.machine, self.rho, self.sigma, self.leakage, \
+            self.tau, self.win_type, self.bias_type, self.res_per_test, \
+            self.num_tests, self.num_trains, self.savepred, self.noisetype, \
+            self.traintype, self.system, self.squarenodes, self.prior, \
+            self.res_start, self.train_start, self.test_start, self.reg_train_times, \
+            self.discard_time = argv
 
 
 class Reservoir:
@@ -451,7 +451,7 @@ class Reservoir:
                 q = int((self.rsvr_size - const_conn) // input_vars.size)
                 for i, var in enumerate(input_vars):
                     Win[const_conn + q * i:const_conn + q *
-                        (i + 1), var + 1] = (res_gen.random(q) * 2 - 1) * run_opts.sigma
+                                           (i + 1), var + 1] = (res_gen.random(q) * 2 - 1) * run_opts.sigma
             elif run_opts.bias_type == 'new_random':
                 Win = np.zeros((self.rsvr_size, input_size + 1))
                 Win[:, 0] = (res_gen.random(self.rsvr_size) * 2 - 1) * run_opts.sigma
@@ -472,7 +472,7 @@ class Reservoir:
                 var = input_vars[res_gen.choice(
                     input_vars.size, size=leftover_nodes, replace=False)]
                 Win[self.rsvr_size - leftover_nodes:, var +
-                    1] = (res_gen.random(leftover_nodes) * 2 - 1) * run_opts.sigma
+                                                      1] = (res_gen.random(leftover_nodes) * 2 - 1) * run_opts.sigma
             elif run_opts.bias_type == 'new_const':
                 Win = np.zeros((self.rsvr_size, input_size + 1))
                 Win[:, 0] = run_opts.sigma
@@ -483,7 +483,7 @@ class Reservoir:
                 var = input_vars[res_gen.integers(
                     input_vars.size, size=leftover_nodes)]
                 Win[self.rsvr_size - leftover_nodes:, var +
-                    1] = (res_gen.random(leftover_nodes) * 2 - 1) * run_opts.sigma
+                                                      1] = (res_gen.random(leftover_nodes) * 2 - 1) * run_opts.sigma
 
         Win_sp = csc_matrix(Win)
         self.Win_data, self.Win_indices, self.Win_indptr, self.Win_shape = \
@@ -535,55 +535,59 @@ class ResOutput:
             stable_frac = np.zeros(run_opts.reg_values.size)
             for k, array_elem in enumerate(self.stable_frac_out[i, :, j]):
                 stable_frac[k] = array_elem
-            np.savetxt(os.path.join(run_opts.run_folder_name, 'stable_frac_res%d_train%d_noise%e_regtrain%d.csv' % (
-                res_itr, train_seed, noise_val, reg_train_time)), stable_frac, delimiter=',')
+            np.savetxt(
+                get_filename(run_opts.run_folder_name, 'stable_frac', res_itr, train_seed, noise_val, reg_train_time),
+                stable_frac, delimiter=',')
 
             mean_rms = np.zeros((run_opts.reg_values.size, *self.mean_rms_out[i, 0, j].shape))
             for k, array_elem in enumerate(self.mean_rms_out[i, :, j]):
                 mean_rms[k] = array_elem
-            np.savetxt(os.path.join(run_opts.run_folder_name, 'mean_rms_res%d_train%d_noise%e_regtrain%d.csv' % (
-                res_itr, train_seed, noise_val, reg_train_time)), mean_rms, delimiter=',')
+            np.savetxt(
+                get_filename(run_opts.run_folder_name, 'mean_rms', res_itr, train_seed, noise_val, reg_train_time),
+                mean_rms, delimiter=',')
 
             max_rms = np.zeros((run_opts.reg_values.size, *self.max_rms_out[i, 0, j].shape))
             for k, array_elem in enumerate(self.max_rms_out[i, :, j]):
                 max_rms[k] = array_elem
-            np.savetxt(os.path.join(run_opts.run_folder_name, 'max_rms_res%d_train%d_noise%e_regtrain%d.csv' % (
-                res_itr, train_seed, noise_val, reg_train_time)), max_rms, delimiter=',')
+            np.savetxt(
+                get_filename(run_opts.run_folder_name, 'max_rms', res_itr, train_seed, noise_val, reg_train_time),
+                max_rms, delimiter=',')
 
             variances = np.zeros((run_opts.reg_values.size, *self.variances_out[i, 0, j].shape))
             for k, array_elem in enumerate(self.variances_out[i, :, j]):
                 variances[k] = array_elem
-            np.savetxt(os.path.join(run_opts.run_folder_name, 'variance_res%d_train%d_noise%e_regtrain%d.csv' % (
-                res_itr, train_seed, noise_val, reg_train_time)), variances, delimiter=',')
+            np.savetxt(
+                get_filename(run_opts.run_folder_name, 'variance', res_itr, train_seed, noise_val, reg_train_time),
+                variances, delimiter=',')
 
             valid_time = np.zeros((run_opts.reg_values.size, *self.valid_time_out[i, 0, j].shape))
             for k, array_elem in enumerate(self.valid_time_out[i, :, j]):
                 valid_time[k] = array_elem
             for k in range(run_opts.num_tests):
-                np.savetxt(os.path.join(run_opts.run_folder_name,
-                                        'valid_time_res%d_train%d_test%d_noise%e_regtrain%d.csv' % (
-                                            res_itr, train_seed, test_idxs[k], noise_val, reg_train_time)),
-                           valid_time[:, k], delimiter=',')
+                np.savetxt(
+                    get_filename(run_opts.run_folder_name, 'valid_time', res_itr, train_seed, noise_val, reg_train_time,
+                                 test_idx=test_idxs[k]), valid_time[:, k], delimiter=',')
 
             train_mean_rms = np.zeros((run_opts.reg_values.size, *self.train_mean_rms_out[i, 0, j].shape))
             for k, array_elem in enumerate(self.train_mean_rms_out[i, :, j]):
                 train_mean_rms[k] = array_elem
-            np.savetxt(os.path.join(run_opts.run_folder_name, 'train_mean_rms_res%d_train%d_noise%e_regtrain%d.csv' % (
-                res_itr, train_seed, noise_val, reg_train_time)), train_mean_rms, delimiter=',')
+            np.savetxt(get_filename(run_opts.run_folder_name, 'train_mean_rms', res_itr, train_seed, noise_val,
+                                    reg_train_time),
+                       train_mean_rms, delimiter=',')
 
             train_max_rms = np.zeros((run_opts.reg_values.size, *self.train_max_rms_out[i, 0, j].shape))
             for k, array_elem in enumerate(self.train_max_rms_out[i, :, j]):
                 train_max_rms[k] = array_elem
-            np.savetxt(os.path.join(run_opts.run_folder_name, 'train_max_rms_res%d_train%d_noise%e_regtrain%d.csv' % (
-                res_itr, train_seed, noise_val, reg_train_time)), train_max_rms, delimiter=',')
+            np.savetxt(
+                get_filename(run_opts.run_folder_name, 'train_max_rms', res_itr, train_seed, noise_val, reg_train_time),
+                train_max_rms, delimiter=',')
 
             if run_opts.pmap:
                 pmap_max_wass_dist = np.zeros((run_opts.reg_values.size, *self.pmap_max_wass_dist_out[i, 0, j].shape))
                 for k, array_elem in enumerate(self.pmap_max_wass_dist_out[i, :, j]):
                     pmap_max_wass_dist[k] = array_elem
-                np.savetxt(os.path.join(run_opts.run_folder_name,
-                                        'pmap_max_wass_dist_res%d_train%d_noise%e_regtrain%d.csv' % (
-                                            res_itr, train_seed, noise_val, reg_train_time)),
+                np.savetxt(get_filename(run_opts.run_folder_name, 'pmap_max_wass_dist', res_itr, train_seed, noise_val,
+                                        reg_train_time),
                            pmap_max_wass_dist, delimiter=',')
 
                 pmap_max = np.zeros((run_opts.reg_values.size, run_opts.num_tests), dtype=object)
@@ -594,34 +598,33 @@ class ResOutput:
                     pmap_max_save = np.zeros((len(pmap_max[k, l]), max_pmap_len))
                     for m in range(len(pmap_max[k, l])):
                         pmap_max_save[m, :pmap_len[m]] = pmap_max[k, l][m]
-                    np.savetxt(os.path.join(run_opts.run_folder_name,
-                                            'pmap_max_res%d_train%d_test%d_noise%e_reg%e_regtrain%d.csv' % (
-                                                res_itr, train_seed, test_idxs[l], noise_val, run_opts.reg_values[k],
-                                                reg_train_time)), pmap_max_save, delimiter=',')
+                    np.savetxt(get_filename(run_opts.run_folder_name, 'pmap_max', res_itr, train_seed, noise_val,
+                                            reg_train_time,
+                                            test_idx=test_idxs[l], reg=run_opts.reg_values[k]),
+                               pmap_max_save, delimiter=',')
             if run_opts.save_time_rms:
                 rms = np.zeros((run_opts.reg_values.size, *self.rms_out[i, 0, j].shape))
                 for k, array_elem in enumerate(self.rms_out[i, :, j]):
                     rms[k] = array_elem
                 for k in range(run_opts.num_tests):
-                    np.savetxt(os.path.join(run_opts.run_folder_name,
-                                            'rms_res%d_train%d_test%d_noise%e_regtrain%d.csv' % (
-                                                res_itr, train_seed, test_idxs[k], noise_val, reg_train_time)),
-                               rms[:, k], delimiter=',')
+                    np.savetxt(
+                        get_filename(run_opts.run_folder_name, 'rms', res_itr, train_seed, noise_val, reg_train_time,
+                                     test_idx=test_idxs[k]),
+                        rms[:, k], delimiter=',')
             if run_opts.save_eigenvals:
                 eigenvals = self.grad_eigenvals_out[i, j]
-                np.savetxt(os.path.join(run_opts.run_folder_name,
-                                        'gradreg_eigenvals_res%d_train%d_noise%e_regtrain%d.csv' % (
-                                            res_itr, train_seed, noise_val, reg_train_time)),
+                np.savetxt(get_filename(run_opts.run_folder_name, 'gradreg_eigenvals', res_itr, train_seed, noise_val,
+                                        reg_train_time),
                            eigenvals, delimiter=',')
             if run_opts.savepred:
                 pred = np.zeros((run_opts.reg_values.size, *self.pred_out[i, 0, j].shape))
                 for k, array_elem in enumerate(self.pred_out[i, :, j]):
                     pred[k] = array_elem
                 for l, (k, reg) in product(range(run_opts.num_tests), enumerate(run_opts.reg_values)):
-                    np.savetxt(os.path.join(run_opts.run_folder_name,
-                                            'pred_res%d_train%d_test%d_noise%e_regtrain%d_reg%e.csv' %
-                                            (res_itr, train_seed, test_idxs[l], noise_val, reg_train_time, reg)),
-                               pred[k, l], delimiter=',')
+                    np.savetxt(
+                        get_filename(run_opts.run_folder_name, 'pred', res_itr, train_seed, noise_val, reg_train_time,
+                                     test_idx=test_idxs[l], reg=reg),
+                        pred[k, l], delimiter=',')
 
 
 class RungeKutta:
@@ -675,8 +678,7 @@ class ResPreds:
                     enumerate(np.arange(run_opts.test_start, run_opts.test_start + run_opts.num_tests)),
                     enumerate(self.noise_vals),
                     enumerate(self.reg_train_vals), enumerate(self.reg_vals)):
-                filename = os.path.join(self.pred_folder, 'pred_res%d_train%d_test%d_noise%e_regtrain%d_reg%e.csv' %
-                                        (res, train, test, noise, reg_train, reg))
+                filename = get_filename(self.pred_folder, 'pred', res, train, noise, reg_train, reg = reg, test_idx = test)
                 if os.name == 'nt' and len(filename) >= 260:
                     filename = get_windows_path(filename)
                 self.preds[i, j, k, l, m, n] = np.loadtxt(filename, delimiter=',')
@@ -701,8 +703,7 @@ class ResPmap:
                     enumerate(np.arange(run_opts.test_start, run_opts.test_start + run_opts.num_tests)),
                     enumerate(self.noise_vals),
                     enumerate(self.reg_train_vals), enumerate(self.reg_vals)):
-                filename = os.path.join(self.pred_folder, 'pmap_max_res%d_train%d_test%d_noise%e_reg%e_regtrain%d.csv' %
-                                        (res, train, test, noise, reg, reg_train))
+                filename = get_filename(self.pred_folder, 'pmap_max', res, train, noise, reg_train, reg = reg, test_idx = test)
                 if os.name == 'nt' and len(filename) >= 260:
                     filename = get_windows_path(filename)
                 pmap_in = np.loadtxt(filename, delimiter=',')
