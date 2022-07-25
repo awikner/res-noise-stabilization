@@ -1180,7 +1180,7 @@ def get_test_data(run_opts, test_stream, overall_idx, rkTime, split):
     transient = 2000
     u_arr_train_nonoise, u_arr_test, p, params = runge_kutta_wrapped(x0=ic[0],
                                                                      y0=ic[1], z0=30 * ic[2], tau=run_opts.tau,
-                                                                     T=rkTime + transient, ttsplit=split + transient,
+                                                                     T=rkTime + transient + split, ttsplit=split + transient,
                                                                      u0=u0, system=run_opts.system)
     u_arr_train_nonoise = u_arr_train_nonoise[:, transient:]
     rktest_u_arr_train_nonoise = np.zeros(
@@ -1514,12 +1514,11 @@ def find_stability(run_opts, noise, train_seed, train_gen, res_itr, res_gen, tes
             rkTime_test = run_opts.test_time
         split_test = run_opts.sync_time
     elif run_opts.system in ['KS', 'KS_d2175']:
-        time_mult = 0.25 / run_opts.tau
         if run_opts.test_time == 0:
-            rkTime_test = int(18000 * time_mult)
+            rkTime_test = int(16000)
         else:
-            rkTime_test = int(run_opts.test_time * time_mult)
-        split_test = int(run_opts.sync_time * time_mult)
+            rkTime_test = int(run_opts.test_time)
+        split_test = int(run_opts.sync_time)
 
         # rkTime_test = 3000
     # split_test  = 2000

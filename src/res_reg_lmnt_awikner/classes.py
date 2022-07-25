@@ -3,7 +3,8 @@ from tqdm import tqdm
 import numpy as np
 import time
 from itertools import product
-import sys, os
+import sys
+import os
 import getopt
 from res_reg_lmnt_awikner.helpers import get_windows_path, get_filename
 from res_reg_lmnt_awikner.lorenzrungekutta_numba import rungekutta
@@ -13,6 +14,128 @@ from scipy.sparse import csc_matrix
 
 
 class RunOpts:
+    """This class contains the various parameters and options that will be used during the time series data generation,
+    reservoir generation, training, testing, and output."""
+    argv: None
+    """Command line input for generating a RunOpts object. If left as None, then the object will be generated using
+    the other inputs or defaults. If multiple instances of the same variable are given, the class will default to the
+    command line input. See RunOpts.get_run_opts for more information."""
+    system: str = 'KS'
+    """String denoting which dynamical system we are obtaining time series data from. Options: 'lorenz' for the 
+    Lorenz 63 equations, 'KS' for the Kuramoto-Sivashinsky equation with 64 grid points and a periodicity length of 22,
+    and KS_d2175 for the Kuramoto-Sivashinksy equation with 64 grid points and a periodicity length of 21.75."""
+    tau: None
+    """Time between each data point in the time series data. If system = 'lorenz', this value must be evenly divided
+    by 0.01 (the integration time step). If left as None, then the class will set tau to the default value for the
+    particular dynamical system."""
+    train_time: int = 20000
+    """Number of training data points."""
+    test_time = None
+    """Number of testing data points. If left as None, then the class will default to 4000 if system = 'lorenz', or 
+    16000 if system = 'KS' or 'KS_d2175'."""
+    sync_time: int = 500
+    """Number of data points used to synchronize the reservoir to each test data set."""
+    discard_time: int = 500
+    """Number of data points used to synchronize the reservoir to each training data set."""
+    res_size: int = 500
+    """Number of nodes in the reservoir."""
+    rho: float = 0.6
+    """Reservoir spectral radius."""
+    sigma: float = 0.1
+    """Reservoir input scaling."""
+    theta: float = 0.1
+    """Reservoir input bias."""
+    leakage: float = 1.0
+    """Reservoir leaking rate."""
+    squarenodes: bool = True
+    """Boolean denoting whether or not the squared node states are including in the reservoir feature vector."""
+    bias_type: str = 'new_random'
+    """Type of reservoir input bias to be used. See the Reservoir class for available options."""
+    win_type: str = 'full_0centered'
+    """Type of input coupling matrix to be used. See the Reservoir class for available options."""
+    traintype: str = 'normal'
+    """Type of training to be used to determine the reservoir output coupling matrix. There are a number of options
+    available, but those used in the paper are:
+    
+    'normal' - Standard reservoir training, potentially with input noise added.
+    
+    'gradientk%d' % (Number of noise steps) - Reservoir training with no noise and LMNT regularization for a number of 
+    noise steps > 1, or Jacobian regularization for a number of noise steps = 1.
+    
+    'regzerok%d' % (Number of noise steps) - Reservoir training with no noise and LMNT/Jacobian regularization computed
+    using a zero-input and zero reservoir state.
+    """
+    noisetype: str = 'none'
+    """Type of noise to be added to the reservoir input during training. Options are 'none' and 'gaussian'.
+    """
+    noise_values_array: np.ndarray = np.logspace(-4, 3, num=3, base=10)
+    """Numpy array containing the variance of the added input noise (if noisetype = 'gaussian') or the LMNT/Jacobian
+    regularization parameter value (if traintype = 'gradientk%d' or 'regzerok%d'). Each value contained in the array
+    will be tested separately using each of the reservoirs, training, and testing data sets."""
+    reg_train_times = None
+    """Numpy array containing the number of training data points to be used to train the LMNT or Jacobian 
+    regularization. If left as None, then the class will default to an array containing only
+    the total number of training data points for standard LMNT/Jacobian or the number of noise steps 
+    if using zero-input LMNT."""
+    noise_realizations: int = 1
+    """Number of input noise realizations used to train the reservoir (if training with noise). If not training with
+    noise, set to 1."""
+    reg_values: np.ndarray = np.append(0., np.logspace(-11, -9, 5))
+    """Numpy array containing the Tikhonov regularization parameter values. Each value contained in the array
+    will be tested separately using each of the reservoirs, training, and testing data sets."""
+    prior: str = 'zero'
+    """Prior to be used when computing the output coupling matrix using Tikhonov regularization. Options are:
+    
+    'zero' - Standard Tikhonov regularization with a zero prior.
+    
+    'input_pass' - Tikhonov regularization with a persistence prior (i.e., set the input pass-through weights to 1)."""
+    max_valid_time: int = 2000
+    """Maximum valid time for each valid time test during the testing period. This should be set so that
+    test_time / max_valid_time is a whole number greater than 0."""
+    res_per_test: int = 1
+    """Number of random reservoir realizations to test."""
+    num_trains: int = 1
+    """Number of independently generated training data sets to test with."""
+    num_tests: int = 1
+    """Number of independently generated testing data sets to test with."""
+    res_start: int = 0
+    """Starting iterate for generating the random seeds that are used to generate the reservoir."""
+    train_start: int = 0
+    """Starting iterate for generating the random seeds that are used to generate the training data sets."""
+    test_start: int = 0
+    """Starting iterate for generating the random seeds that are used to generate the testing data sets."""
+    root_folder = None
+    """Location where output data will be stored in the Data folder. If None, then defaults to the current working 
+    directory."""
+    return_all: bool = True
+    """Boolean for determining of all results should be returned, or only the results with the obtained using the
+    "best" Tikhonov regularization parameter value based on the selected metric."""
+    metric: str = 'mean_rms'
+    """Metric for determining the "best" results. Not used if return_all = True. Options include 'mean_rms', 'max_rms',
+    and 'stable_frac'. Caution: Some options may be deprecated."""
+    savepred: bool = False
+    """Boolean for determining if reservoir prediction time series should be saved."""
+    save_time_rms: bool = False
+    """Boolean for determining if reservoir prediction RMS error should be saved."""
+    pmap: bool = False
+    """Boolean for determining if reservoir prediction Poincare maximum map should be saved."""
+    save_eigenvals: bool = False
+    """Boolean for determining if the eigenvalues of the LMNT/Jacobian regularization matrices should be saved."""
+    save_truth: bool = False
+    """Boolean for determining if the true testing data should be saved."""
+    ifray: bool = False
+    """Boolean for determining if ray should be used to compute results for multiple reservoirs and training 
+    data sets."""
+    num_cpus: int = 1
+    """If using ray for paralellization, this sets the number of cpus to be used."""
+    machine = 'personal'
+    """Machine which results are computed on. Leave as personal unless you are connecting to a ray cluster elsewhere."""
+    runflag: bool = True
+    """True indicates that we are about to compute results, and the appropriate directories should be created.
+    Otherwise, we do not create additional directories."""
+    debug_mode: bool = False
+    """Boolean for determining if errors during reservoir training which could arise from non-convergence of the 
+    eigenvalue solver should be suppressed."""
     def __init__(self, argv=None,
                  runflag=True,
                  train_time=20000,
@@ -39,14 +162,12 @@ class RunOpts:
                  pmap=False,
                  machine='deepthought2',
                  ifray=False,
-                 tau=0.25,
-                 tau_flag=True,
+                 tau=None,
                  num_cpus=1,
                  metric='mean_rms',
                  return_all=True,
                  save_eigenvals=False,
                  max_valid_time=2000,
-                 noise_streams_per_test=1,
                  noise_values_array=np.logspace(-4, 3, num=3, base=10),
                  reg_values=np.append(0., np.logspace(-11, -9, 5)),
                  res_start=0,
@@ -81,13 +202,11 @@ class RunOpts:
         self.machine = machine
         self.ifray = ifray
         self.tau = tau
-        self.tau_flag = tau_flag
         self.num_cpus = num_cpus
         self.metric = metric
         self.return_all = return_all
         self.save_eigenvals = save_eigenvals
         self.max_valid_time = max_valid_time
-        self.noise_streams_per_test = noise_streams_per_test
         self.noise_values_array = noise_values_array
         self.reg_values = reg_values
         self.res_start = res_start
@@ -98,8 +217,8 @@ class RunOpts:
         self.root_folder = root_folder
         self.save_truth = save_truth
         if not isinstance(argv, type(None)):
-            self.get_run_opts(argv, runflag)
-        if self.tau_flag:
+            self.get_run_opts(argv)
+        if isinstance(self.tau, type(None)):
             if self.system == 'lorenz':
                 self.tau = 0.1
             elif self.system in ['KS', 'KS_d2175']:
@@ -129,6 +248,8 @@ class RunOpts:
         if self.prior not in ['zero', 'input_pass']:
             print('Prior type not recognized.')
             raise ValueError
+        self.run_file_name = ''
+        self.run_folder_name = ''
         self.get_file_name(runflag)
 
     def get_file_name(self, runflag):
@@ -187,212 +308,196 @@ class RunOpts:
         self.run_file_name = os.path.join(data_folder, run_name + '.bz2')
         self.run_folder_name = os.path.join(data_folder, run_name + '_folder')
 
-    def get_run_opts(self, argv, runflag=True):
-
-        if runflag:
-            try:
-                opts, args = getopt.getopt(argv, "T:N:r:",
-                                           ['testtime=', 'noisetype=', 'traintype=', 'system=', 'res=',
-                                            'tests=', 'trains=', 'savepred=', 'tau=', 'rho=',
-                                            'sigma=', 'leakage=', 'bias_type=', 'debug=', 'win_type=',
-                                            'machine=', 'num_cpus=', 'pmap=', 'parallel=', 'metric=', 'returnall=',
-                                            'savetime=', 'saveeigenvals=', 'noisevals=', 'regvals=', 'maxvt=',
-                                            'noisestreams=',
-                                            'resstart=', 'trainstart=', 'teststart=',
-                                            'squarenodes=', 'regtraintimes=', 'discardlen=',
-                                            'prior=', 'synctime=', 'datarootdir=', 'savetruth='])
-            except getopt.GetoptError:
-                print('Error: Some options not recognized')
-                sys.exit(2)
-            for opt, arg in opts:
-                if opt == '-T':
-                    self.train_time = int(arg)
-                    print('Training iterations: %d' % self.train_time)
-                elif opt == '-N':
-                    self.res_size = int(arg)
-                    print('Reservoir nodes: %d' % self.res_size)
-                elif opt == '-r':
-                    self.noise_realizations = int(arg)
-                    print('Noise Realizations: %d' % self.noise_realizations)
-                elif opt == '--savetruth':
-                    if arg == 'True':
-                        self.save_truth = True
-                    elif arg == 'False':
-                        self.save_truth = False
-                    else:
-                        raise ValueError
-                elif opt == '--datarootdir':
-                    self.root_folder = str(arg)
-                    print('Root directory for data: %s' % self.root_folder)
-                elif opt == '--synctime':
-                    self.sync_time = int(arg)
-                    print('Sync time: %d' % self.sync_time)
-                elif opt == '--testtime':
-                    self.test_time = int(arg)
-                    if self.test_time == 0:
-                        print('Testing duration: default')
-                    else:
-                        print('Testing duration: %d' % self.test_time)
-                elif opt == '--resstart':
-                    self.res_start = int(arg)
-                    print('Reservoir ensemble start: %d' % self.res_start)
-                elif opt == '--trainstart':
-                    self.train_start = int(arg)
-                    print('Train ensemble start: %d' % self.train_start)
-                elif opt == '--teststart':
-                    self.test_start = int(arg)
-                    print('Test ensemble start: %d' % self.test_start)
-                elif opt == '--saveeigenvals':
-                    if arg == 'True':
-                        self.save_eigenvals = True
-                    elif arg == 'False':
-                        self.save_eigenvals = False
-                    else:
-                        raise ValueError
-                    print('Save grad reg eigenvalues: %s' % arg)
-                elif opt == '--prior':
-                    self.prior = str(arg)
-                    print('Prior type: %s' % self.prior)
-                elif opt == '--discardlen':
-                    self.discard_time = int(arg)
-                    print('Discard iterations: %d' % self.discard_time)
-                elif opt == '--squarenodes':
-                    if arg == 'True':
-                        self.squarenodes = True
-                    elif arg == 'False':
-                        self.squarenodes = False
-                    else:
-                        raise ValueError
-                    print('Square reservoir nodes: %s' % arg)
-                elif opt == '--noisestreams':
-                    self.noise_streams_per_test = int(arg)
-                    print('Noise Streams per test: %d' % self.noise_streams_per_test)
-                elif opt == '--maxvt':
-                    self.max_valid_time = int(arg)
-                    print('Maximum valid time: %d' % self.max_valid_time)
-                elif opt == '--noisevals':
-                    self.noise_values_array = np.array([float(noise) for noise in arg.split(',')])
-                    noise_str = '[ '
-                    for noise in self.noise_values_array:
-                        noise_str += '%0.3e, ' % noise
-                    noise_str = noise_str[:-2] + ' ]'
-                    print('Noise values: %s' % noise_str)
-                elif opt == '--regvals':
-                    self.reg_values = np.array([float(reg) for reg in arg.split(',')])
-                    reg_str = '[ '
-                    for reg in self.reg_values:
-                        reg_str += '%0.3e, ' % reg
-                    reg_str = reg_str[:-2] + ' ]'
-                    print('Regularization values: %s' % reg_str)
-                elif opt == '--regtraintimes':
-                    if arg != 'None':
-                        self.reg_train_times = np.array([int(reg_train) for reg_train in arg.split(',')])
-                        reg_train_str = '[ '
-                        for reg_train in self.reg_train_times:
-                            reg_train_str += '%0.3e, ' % reg_train
-                        reg_train_str = reg_train_str[:-2] + ' ]'
-                        print('Regularization training times: %s' % reg_train_str)
-                elif opt == '--savetime':
-                    if str(arg) == 'True':
-                        self.save_time_rms = True
-                    elif str(arg) == 'False':
-                        self.save_time_rms = False
-                    else:
-                        raise ValueError
-                elif opt == '--metric':
-                    self.metric = str(arg)
-                    if self.metric not in ['pmap_max_wass_dist', 'mean_rms', 'max_rms', 'mss_var']:
-                        raise ValueError
-                    print('Stability metric: %s' % self.metric)
-                elif opt == '--returnall':
-                    if arg == 'True':
-                        self.return_all = True
-                    elif arg == 'False':
-                        self.return_all = False
-                    else:
-                        raise ValueError
-                elif opt == '--parallel':
-                    parallel_in = str(arg)
-                    if parallel_in == 'True':
-                        self.ifray = True
-                    elif parallel_in == 'False':
-                        self.ifray = False
-                    else:
-                        raise ValueError
-                elif opt == '--pmap':
-                    pmap_in = str(arg)
-                    if pmap_in == 'True':
-                        self.pmap = True
-                    elif pmap_in == 'False':
-                        self.pmap = False
-                    else:
-                        raise ValueError
-                elif opt == '--machine':
-                    self.machine = str(arg)
-                    if self.machine not in ['deepthought2', 'personal']:
-                        raise ValueError
-                    print('Machine: %s' % self.machine)
-                elif opt == '--num_cpus':
-                    self.num_cpus = int(arg)
-                    print('Number of CPUS: %d' % self.num_cpus)
-                elif opt == '--rho':
-                    self.rho = float(arg)
-                    print('Rho: %f' % self.rho)
-                elif opt == '--sigma':
-                    self.sigma = float(arg)
-                    print('Sigma: %f' % self.sigma)
-                elif opt == '--leakage':
-                    self.leakage = float(arg)
-                    print('Leakage: %f' % self.leakage)
-                elif opt == '--tau':
-                    self.tau = float(arg)
-                    self.tau_flag = False
-                    print('Reservoir timestep: %f' % self.tau)
-                elif opt == '--win_type':
-                    self.win_type = str(arg)
-                    print('Win Type: %s' % self.win_type)
-                elif opt == '--bias_type':
-                    self.bias_type = str(arg)
-                    print('Bias Type: %s' % self.bias_type)
-                elif opt == '--res':
-                    self.res_per_test = int(arg)
-                    print('Number of reservoirs: %d' % self.res_per_test)
-                elif opt == '--tests':
-                    self.num_tests = int(arg)
-                    print('Number of tests: %d' % self.num_tests)
-                elif opt == '--trains':
-                    self.num_trains = int(arg)
-                    print('Number of training data sequences: %d' % self.num_trains)
-                elif opt == '--savepred':
-                    if arg == 'True':
-                        self.savepred = True
-                    elif arg == 'False':
-                        self.savepred = False
-                    print('Saving predictions: %s' % arg)
-                elif opt == '--noisetype':
-                    self.noisetype = str(arg)
-                    print('Noise type: %s' % self.noisetype)
-                elif opt == '--traintype':
-                    self.traintype = str(arg)
-                    print('Training type: %s' % self.traintype)
-                elif opt == '--system':
-                    self.system = str(arg)
-                    print('System: %s' % self.system)
-                elif opt == '--debug':
-                    if arg == 'True':
-                        self.debug_mode = True
-                    elif arg == 'False':
-                        self.debug_mode = False
-                    print('Debug Mode: %s' % arg)
-        else:
-            self.train_time, self.res_size, self.noise_realizations, self.save_time_rms, \
-            self.save_eigenvals, self.pmap, self.metric, \
-            self.return_all, self.machine, self.rho, self.sigma, self.leakage, \
-            self.tau, self.win_type, self.bias_type, self.res_per_test, \
-            self.num_tests, self.num_trains, self.savepred, self.noisetype, \
-            self.traintype, self.system, self.squarenodes, self.prior, \
-            self.res_start, self.train_start, self.test_start, self.reg_train_times, \
-            self.discard_time = argv
+    def get_run_opts(self, argv):
+        try:
+            opts, args = getopt.getopt(argv, "T:N:r:",
+                                       ['testtime=', 'noisetype=', 'traintype=', 'system=', 'res=',
+                                        'tests=', 'trains=', 'savepred=', 'tau=', 'rho=',
+                                        'sigma=', 'leakage=', 'bias_type=', 'debug=', 'win_type=',
+                                        'machine=', 'num_cpus=', 'pmap=', 'parallel=', 'metric=', 'returnall=',
+                                        'savetime=', 'saveeigenvals=', 'noisevals=', 'regvals=', 'maxvt=',
+                                        'resstart=', 'trainstart=', 'teststart=',
+                                        'squarenodes=', 'regtraintimes=', 'discardlen=',
+                                        'prior=', 'synctime=', 'datarootdir=', 'savetruth='])
+        except getopt.GetoptError:
+            print('Error: Some options not recognized')
+            sys.exit(2)
+        for opt, arg in opts:
+            if opt == '-T':
+                self.train_time = int(arg)
+                print('Training iterations: %d' % self.train_time)
+            elif opt == '-N':
+                self.res_size = int(arg)
+                print('Reservoir nodes: %d' % self.res_size)
+            elif opt == '-r':
+                self.noise_realizations = int(arg)
+                print('Noise Realizations: %d' % self.noise_realizations)
+            elif opt == '--savetruth':
+                if arg == 'True':
+                    self.save_truth = True
+                elif arg == 'False':
+                    self.save_truth = False
+                else:
+                    raise ValueError
+            elif opt == '--datarootdir':
+                self.root_folder = str(arg)
+                print('Root directory for data: %s' % self.root_folder)
+            elif opt == '--synctime':
+                self.sync_time = int(arg)
+                print('Sync time: %d' % self.sync_time)
+            elif opt == '--testtime':
+                self.test_time = int(arg)
+                if self.test_time == 0:
+                    print('Testing duration: default')
+                else:
+                    print('Testing duration: %d' % self.test_time)
+            elif opt == '--resstart':
+                self.res_start = int(arg)
+                print('Reservoir ensemble start: %d' % self.res_start)
+            elif opt == '--trainstart':
+                self.train_start = int(arg)
+                print('Train ensemble start: %d' % self.train_start)
+            elif opt == '--teststart':
+                self.test_start = int(arg)
+                print('Test ensemble start: %d' % self.test_start)
+            elif opt == '--saveeigenvals':
+                if arg == 'True':
+                    self.save_eigenvals = True
+                elif arg == 'False':
+                    self.save_eigenvals = False
+                else:
+                    raise ValueError
+                print('Save grad reg eigenvalues: %s' % arg)
+            elif opt == '--prior':
+                self.prior = str(arg)
+                print('Prior type: %s' % self.prior)
+            elif opt == '--discardlen':
+                self.discard_time = int(arg)
+                print('Discard iterations: %d' % self.discard_time)
+            elif opt == '--squarenodes':
+                if arg == 'True':
+                    self.squarenodes = True
+                elif arg == 'False':
+                    self.squarenodes = False
+                else:
+                    raise ValueError
+                print('Square reservoir nodes: %s' % arg)
+            elif opt == '--maxvt':
+                self.max_valid_time = int(arg)
+                print('Maximum valid time: %d' % self.max_valid_time)
+            elif opt == '--noisevals':
+                self.noise_values_array = np.array([float(noise) for noise in arg.split(',')])
+                noise_str = '[ '
+                for noise in self.noise_values_array:
+                    noise_str += '%0.3e, ' % noise
+                noise_str = noise_str[:-2] + ' ]'
+                print('Noise values: %s' % noise_str)
+            elif opt == '--regvals':
+                self.reg_values = np.array([float(reg) for reg in arg.split(',')])
+                reg_str = '[ '
+                for reg in self.reg_values:
+                    reg_str += '%0.3e, ' % reg
+                reg_str = reg_str[:-2] + ' ]'
+                print('Regularization values: %s' % reg_str)
+            elif opt == '--regtraintimes':
+                if arg != 'None':
+                    self.reg_train_times = np.array([int(reg_train) for reg_train in arg.split(',')])
+                    reg_train_str = '[ '
+                    for reg_train in self.reg_train_times:
+                        reg_train_str += '%0.3e, ' % reg_train
+                    reg_train_str = reg_train_str[:-2] + ' ]'
+                    print('Regularization training times: %s' % reg_train_str)
+            elif opt == '--savetime':
+                if str(arg) == 'True':
+                    self.save_time_rms = True
+                elif str(arg) == 'False':
+                    self.save_time_rms = False
+                else:
+                    raise ValueError
+            elif opt == '--metric':
+                self.metric = str(arg)
+                if self.metric not in ['pmap_max_wass_dist', 'mean_rms', 'max_rms', 'mss_var']:
+                    raise ValueError
+                print('Stability metric: %s' % self.metric)
+            elif opt == '--returnall':
+                if arg == 'True':
+                    self.return_all = True
+                elif arg == 'False':
+                    self.return_all = False
+                else:
+                    raise ValueError
+            elif opt == '--parallel':
+                parallel_in = str(arg)
+                if parallel_in == 'True':
+                    self.ifray = True
+                elif parallel_in == 'False':
+                    self.ifray = False
+                else:
+                    raise ValueError
+            elif opt == '--pmap':
+                pmap_in = str(arg)
+                if pmap_in == 'True':
+                    self.pmap = True
+                elif pmap_in == 'False':
+                    self.pmap = False
+                else:
+                    raise ValueError
+            elif opt == '--machine':
+                self.machine = str(arg)
+                if self.machine not in ['deepthought2', 'personal']:
+                    raise ValueError
+                print('Machine: %s' % self.machine)
+            elif opt == '--num_cpus':
+                self.num_cpus = int(arg)
+                print('Number of CPUS: %d' % self.num_cpus)
+            elif opt == '--rho':
+                self.rho = float(arg)
+                print('Rho: %f' % self.rho)
+            elif opt == '--sigma':
+                self.sigma = float(arg)
+                print('Sigma: %f' % self.sigma)
+            elif opt == '--leakage':
+                self.leakage = float(arg)
+                print('Leakage: %f' % self.leakage)
+            elif opt == '--tau':
+                self.tau = float(arg)
+                print('Reservoir timestep: %f' % self.tau)
+            elif opt == '--win_type':
+                self.win_type = str(arg)
+                print('Win Type: %s' % self.win_type)
+            elif opt == '--bias_type':
+                self.bias_type = str(arg)
+                print('Bias Type: %s' % self.bias_type)
+            elif opt == '--res':
+                self.res_per_test = int(arg)
+                print('Number of reservoirs: %d' % self.res_per_test)
+            elif opt == '--tests':
+                self.num_tests = int(arg)
+                print('Number of tests: %d' % self.num_tests)
+            elif opt == '--trains':
+                self.num_trains = int(arg)
+                print('Number of training data sequences: %d' % self.num_trains)
+            elif opt == '--savepred':
+                if arg == 'True':
+                    self.savepred = True
+                elif arg == 'False':
+                    self.savepred = False
+                print('Saving predictions: %s' % arg)
+            elif opt == '--noisetype':
+                self.noisetype = str(arg)
+                print('Noise type: %s' % self.noisetype)
+            elif opt == '--traintype':
+                self.traintype = str(arg)
+                print('Training type: %s' % self.traintype)
+            elif opt == '--system':
+                self.system = str(arg)
+                print('System: %s' % self.system)
+            elif opt == '--debug':
+                if arg == 'True':
+                    self.debug_mode = True
+                elif arg == 'False':
+                    self.debug_mode = False
+                print('Debug Mode: %s' % arg)
 
 
 class Reservoir:
