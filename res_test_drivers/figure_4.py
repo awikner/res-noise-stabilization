@@ -1,10 +1,8 @@
 import sys,os
-from res_reg_lmnt_awikner.set_numba import set_numba
+from res_reg_lmnt_awikner.helpers import set_numba, get_windows_path
 from res_reg_lmnt_awikner.reservoir_train_test import start_reservoir_test
 from res_reg_lmnt_awikner.process_test_data import process_data
-from res_reg_lmnt_awikner.RunOpts import RunOpts
-from res_reg_lmnt_awikner.ResData import ResData, ResPreds
-from res_reg_lmnt_awikner.get_windows_path import get_windows_path
+from res_reg_lmnt_awikner.classes import RunOpts, ResData, ResPreds
 
 import subprocess
 import numpy as np

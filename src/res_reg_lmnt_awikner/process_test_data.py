@@ -12,20 +12,16 @@
 #SBATCH --mail-user=awikner1@umd.edu
 #SBATCH --mail-type=BEGIN
 #SBATCH --mail-type=END
-import warnings
 from itertools import product
-import sys, os
-#sys.path.append(os.getcwd())
-#sys.path.append(os.path.join(os.getcwd(), 'helpers'))
-import shutil
-
-from datetime import datetime
+import sys
+import os
 import numpy as np
 import pandas as pd
 import time
 
 from res_reg_lmnt_awikner.classes import RunOpts
-from res_reg_lmnt_awikner.get_windows_path import get_windows_path
+from res_reg_lmnt_awikner.helpers import get_windows_path
+
 
 def process_data(argv=None, run_opts=None):
 
@@ -37,15 +33,10 @@ def process_data(argv=None, run_opts=None):
 
     raw_data_size = 0
     for ele in os.scandir(run_opts.run_folder_name):
-        raw_data_size+=os.stat(ele).st_size
+        raw_data_size += os.stat(ele).st_size
     print('Raw data size: %0.2f kB' % (raw_data_size/1000.))
-
-
-
     noise_vals      = run_opts.noise_values_array
-
-    reg_values    = run_opts.reg_values
-
+    reg_values      = run_opts.reg_values
     reg_train_times = run_opts.reg_train_times
 
 
@@ -94,7 +85,7 @@ def process_data(argv=None, run_opts=None):
         #variances_all = np.zeros((res_per_test, train_vals.size, run_opts.num_tests, noise_vals.size, (rkTime-split)+1, reg_values.size))
         rms = np.zeros((run_opts.res_per_test, train_vals.size, run_opts.num_tests, noise_vals.size, (rkTime-split), reg_values.size, reg_train_times.size))
     if run_opts.pmap:
-        run_opts.pmap_max_wass_dist = np.zeros((run_opts.res_per_test, train_vals.size, run_opts.num_tests, noise_vals.size, reg_values.size, reg_train_times.size))
+        pmap_max_wass_dist = np.zeros((run_opts.res_per_test, train_vals.size, run_opts.num_tests, noise_vals.size, reg_values.size, reg_train_times.size))
     if run_opts.save_eigenvals:
         eigenvals_in = np.zeros((run_opts.res_per_test, train_vals.size, noise_vals.size, reg_train_times.size), dtype = object)
 
@@ -105,7 +96,7 @@ def process_data(argv=None, run_opts=None):
     print('Loading in raw data...')
     load_tic = time.perf_counter()
     if os.name == 'nt':
-        for (i, res),(j, train),(k, noise),(l,reg_train_time) in product(enumerate(np.arange(run_opts.res_start, run_opts.res_start+run_opts.res_per_test, dtype = int)),\
+        for (i, res),(j, train),(k, noise),(l,reg_train_time) in product(enumerate(np.arange(run_opts.res_start, run_opts.res_start+run_opts.res_per_test, dtype = int)),
                 enumerate(np.arange(run_opts.train_start, run_opts.train_start+run_opts.num_trains, dtype = int)), enumerate(noise_vals), enumerate(reg_train_times)):
             stable_frac[i,j,k,:,l]    = np.loadtxt(get_windows_path(os.path.join(run_opts.run_folder_name, 'stable_frac_res%d_train%d_noise%e_regtrain%d.csv' % (res,train,noise,reg_train_time))), delimiter = ',')
             train_mean_rms[i,j,k,:,l] = np.loadtxt(get_windows_path(os.path.join(run_opts.run_folder_name, 'train_mean_rms_res%d_train%d_noise%e_regtrain%d.csv' % (res,train,noise,reg_train_time))), delimiter = ',')
@@ -116,7 +107,7 @@ def process_data(argv=None, run_opts=None):
             for (m,test) in enumerate(np.arange(run_opts.test_start, run_opts.test_start+run_opts.num_tests)):
                 valid_time[i,j,m,k,:,:,l]    = np.transpose(np.loadtxt(get_windows_path(os.path.join(run_opts.run_folder_name, 'valid_time_res%d_train%d_test%d_noise%e_regtrain%d.csv' % (res,train,test,noise,reg_train_time))), delimiter = ',')).reshape((num_vt_tests, reg_values.size))
             if run_opts.pmap:
-                run_opts.pmap_max_wass_dist[i,j,:,k,:,l] = np.transpose(np.loadtxt(get_windows_path(os.path.join(run_opts.run_folder_name, 'pmap_max_wass_dist_res%d_train%d_noise%e_regtrain%d.csv' % (res,train,noise,reg_train_time))), delimiter = ',')).reshape((run_opts.num_tests, reg_values.size))
+                pmap_max_wass_dist[i,j,:,k,:,l] = np.transpose(np.loadtxt(get_windows_path(os.path.join(run_opts.run_folder_name, 'pmap_max_wass_dist_res%d_train%d_noise%e_regtrain%d.csv' % (res,train,noise,reg_train_time))), delimiter = ',')).reshape((run_opts.num_tests, reg_values.size))
             if run_opts.save_eigenvals:
                 eigenvals_in[i,j,k,l] = np.loadtxt(get_windows_path(os.path.join(run_opts.run_folder_name, 'gradreg_eigenvals_res%d_train%d_noise%e_regtrain%d.csv' % (res,train,noise,reg_train_time))), delimiter = ',')
             if run_opts.save_time_rms:
@@ -129,7 +120,7 @@ def process_data(argv=None, run_opts=None):
             print('Eigenvals shape:')
             print(eigenvals.shape)
     else:
-        for (i,res),(j,train),(k, noise),(l,reg_train_time) in product(enumerate(np.arange(run_opts.res_start, run_opts.res_start+run_opts.res_per_test, dtype = int)),\
+        for (i,res),(j,train),(k, noise),(l,reg_train_time) in product(enumerate(np.arange(run_opts.res_start, run_opts.res_start+run_opts.res_per_test, dtype = int)),
                 enumerate(np.arange(run_opts.train_start, run_opts.train_start+run_opts.num_trains, dtype = int)), enumerate(noise_vals), enumerate(reg_train_times)):
             stable_frac[i,j,k,:,l]    = np.loadtxt(os.path.join(run_opts.run_folder_name, 'stable_frac_res%d_train%d_noise%e_regtrain%d.csv' % (res,train,noise,reg_train_time)), delimiter = ',')
             train_mean_rms[i,j,k,:,l] = np.loadtxt(os.path.join(run_opts.run_folder_name, 'train_mean_rms_res%d_train%d_noise%e_regtrain%d.csv' % (res,train,noise,reg_train_time)), delimiter = ',')
@@ -140,7 +131,7 @@ def process_data(argv=None, run_opts=None):
             for (m,test) in enumerate(np.arange(run_opts.test_start, run_opts.test_start + run_opts.num_tests)):
                 valid_time[i,j,m,k,:,:,l]    = np.transpose(np.loadtxt(os.path.join(run_opts.run_folder_name, 'valid_time_res%d_train%d_test%d_noise%e_regtrain%d.csv' % (res,train,test,noise,reg_train_time)), delimiter = ',')).reshape((num_vt_tests, reg_values.size))
             if run_opts.pmap:
-                run_opts.pmap_max_wass_dist[i,j,:,k,:,l] = np.transpose(np.loadtxt(os.path.join(run_opts.run_folder_name, 'pmap_max_wass_dist_res%d_train%d_noise%e_regtrain%d.csv' % (res,train,noise,reg_train_time)), delimiter = ',')).reshape((run_opts.num_tests, reg_values.size))
+                pmap_max_wass_dist[i,j,:,k,:,l] = np.transpose(np.loadtxt(os.path.join(run_opts.run_folder_name, 'pmap_max_wass_dist_res%d_train%d_noise%e_regtrain%d.csv' % (res,train,noise,reg_train_time)), delimiter = ',')).reshape((run_opts.num_tests, reg_values.size))
             if run_opts.save_eigenvals:
                 eigenvals_in[i,j,k,l] = np.loadtxt(os.path.join(run_opts.run_folder_name, 'gradreg_eigenvals_res%d_train%d_noise%e_regtrain%d.csv' % (res,train,noise,reg_train_time)), delimiter = ',')
             if run_opts.save_time_rms:
@@ -166,9 +157,9 @@ def process_data(argv=None, run_opts=None):
             save_toc = time.perf_counter()
             print('Saved data loaded in %0.2f sec.' % (save_toc - save_tic))
 
-        all_res_idx, all_train_idx, all_test_idx, all_noise_idx, all_reg_idx, all_reg_train_idx = np.meshgrid(\
-                np.arange(run_opts.res_per_test, dtype = int), np.arange(train_vals.size, dtype = int),\
-                np.arange(run_opts.num_tests, dtype = int), np.arange(noise_vals.size, dtype = int),\
+        all_res_idx, all_train_idx, all_test_idx, all_noise_idx, all_reg_idx, all_reg_train_idx = np.meshgrid(
+                np.arange(run_opts.res_per_test, dtype = int), np.arange(train_vals.size, dtype = int),
+                np.arange(run_opts.num_tests, dtype = int), np.arange(noise_vals.size, dtype = int),
                 np.arange(reg_values.size, dtype = int), np.arange(reg_train_times.size, dtype = int))
 
         all_res_idx   = all_res_idx.flatten()
@@ -198,7 +189,7 @@ def process_data(argv=None, run_opts=None):
         data_out['mean_rms'] = mean_rms[all_res_idx, all_train_idx, all_test_idx, all_noise_idx, all_reg_idx, all_reg_train_idx]
         data_out['max_rms'] = max_rms[all_res_idx, all_train_idx, all_test_idx, all_noise_idx, all_reg_idx, all_reg_train_idx]
         data_out['variance'] = variances[all_res_idx, all_train_idx, all_test_idx, all_noise_idx, all_reg_idx, all_reg_train_idx]
-        data_out = pd.concat([data_out, pd.DataFrame(valid_time[all_res_idx, all_train_idx, all_test_idx, all_noise_idx, :, all_reg_idx, all_reg_train_idx],\
+        data_out = pd.concat([data_out, pd.DataFrame(valid_time[all_res_idx, all_train_idx, all_test_idx, all_noise_idx, :, all_reg_idx, all_reg_train_idx],
                 columns = ['valid_time%d' % i for i in range(num_vt_tests)])], axis = 1)
 
         if run_opts.pmap:
@@ -219,7 +210,7 @@ def process_data(argv=None, run_opts=None):
             #data_out = pd.concat([data_out, pd.DataFrame(variances_all[all_res, all_train_idx, all_test, all_noise_idx, :, all_reg_idx],\
             #        columns = ['variances_all%d' % i for i in range((rkTime-split)+1)])], axis = 1)
             #print('Concatendated variances_all')
-            data_out = pd.concat([data_out, pd.DataFrame(rms[all_res_idx, all_train_idx, all_test_idx, all_noise_idx, :, all_reg_idx, all_reg_train_idx],\
+            data_out = pd.concat([data_out, pd.DataFrame(rms[all_res_idx, all_train_idx, all_test_idx, all_noise_idx, :, all_reg_idx, all_reg_train_idx],
                     columns = ['rms%d' % (i+1) for i in range((rkTime-split))])], axis = 1)
             print('Concatenated rms')
 
@@ -259,42 +250,42 @@ def process_data(argv=None, run_opts=None):
             #best_mean_all = np.zeros((res_per_test, train_vals.size, run_opts.num_tests, noise_vals.size, (rkTime-split)+1))
             #best_variances_all = np.zeros((res_per_test, train_vals.size, run_opts.num_tests, noise_vals.size, (rkTime-split)+1))
             best_rms = np.zeros((run_opts.res_per_test, train_vals.size, run_opts.num_tests, noise_vals.size, (rkTime-split), reg_train_times.size))
-        best_run_opts.pmap_max_wass_dist = np.zeros((run_opts.res_per_test, train_vals.size, run_opts.num_tests, noise_vals.size, reg_train_times.size))
+        best_pmap_max_wass_dist = np.zeros((run_opts.res_per_test, train_vals.size, run_opts.num_tests, noise_vals.size, reg_train_times.size))
         stable_frac_alpha = np.zeros(noise_vals.size, reg_train_times.size)
         best_j = np.zeros(noise_vals.size, reg_train_times.size)
         for (i, noise), (k, reg_train_time) in product(enumerate(noise_vals), enumerate(reg_train_times)):
-            if runn_opts.metric in ['mss_var', 'valid_time']:
+            if run_opts.metric in ['mss_var', 'valid_time']:
                 best_alpha_val = 0
-            elif runn_opts.metric in ['pmap_max_wass_dist', 'mean_rms', 'max_rms']:
+            elif run_opts.metric in ['pmap_max_wass_dist', 'mean_rms', 'max_rms']:
                 best_alpha_val = np.inf
             for j in range(reg_values.size):
-                if runn_opts.metric == 'mss_var':
+                if run_opts.metric == 'mss_var':
                     metric_flag = np.mean(
                         stable_frac[:, :, i,  j, k]) > best_alpha_val
-                elif runn_opts.metric == 'valid_time':
+                elif run_opts.metric == 'valid_time':
                     metric_flag = np.median(valid_time[:,:,:,i,:,j,k]) > best_alpha_val
-                elif runn_opts.metric == 'pmap_max_wass_dist':
+                elif run_opts.metric == 'pmap_max_wass_dist':
                     #print(j)
                     #print(np.mean(run_opts.pmap_max_wass_dist[:, i, :, :, j-1]))
                     metric_flag = np.mean(
                             run_opts.pmap_max_wass_dist[:, :, :, i, j, k]) <= best_alpha_val
-                elif runn_opts.metric == 'mean_rms':
+                elif run_opts.metric == 'mean_rms':
                     metric_flag = np.mean(mean_rms[:,:,:,i,j,k]) <= best_alpha_val
-                elif runn_opts.metric == 'max_rms':
+                elif run_opts.metric == 'max_rms':
                     metric_flag = np.median(max_rms[:,:,:,i,j,k]) <= best_alpha_val
-                if metric_flag or (runn_opts.metric in ['mss_var', 'valid_time'] and best_alpha_val == 0 and j == reg_values.size-1) or \
-                        (runn_opts.metric in ['pmap_max_wass_dist', 'mean_rms', 'max_rms'] \
+                if metric_flag or (run_opts.metric in ['mss_var', 'valid_time'] and best_alpha_val == 0 and j == reg_values.size-1) or \
+                        (run_opts.metric in ['pmap_max_wass_dist', 'mean_rms', 'max_rms']
                         and np.isinf(best_alpha_val) and j == reg_values.size-1):
-                    if runn_opts.metric == 'mss_var':
+                    if run_opts.metric == 'mss_var':
                         best_alpha_val = np.mean(stable_frac[:, :, i, j, k])
-                    elif runn_opts.metric == 'valid_time':
+                    elif run_opts.metric == 'valid_time':
                         best_alpha_val = np.median(valid_time[:,:,:,i,:,j, k])
-                    elif runn_opts.metric == 'pmap_max_wass_dist':
+                    elif run_opts.metric == 'pmap_max_wass_dist':
                         best_alpha_val = np.mean(
                                 run_opts.pmap_max_wass_dist[:,:,:,i,j,k])
-                    elif runn_opts.metric == 'mean_rms':
+                    elif run_opts.metric == 'mean_rms':
                         best_alpha_val = np.mean(mean_rms[:,:,:,i,j,k])
-                    elif runn_opts.metric == 'max_rms':
+                    elif run_opts.metric == 'max_rms':
                         best_alpha_val = np.median(max_rms[:,:,:,i,j,k])
                     best_stable_frac[:,:,:,i,k] = -stable_frac[:, :, i, j,k]
                     best_train_mean_rms[:,:,:,i,k] = train_mean_rms[:, :, i, j,k]
@@ -303,15 +294,15 @@ def process_data(argv=None, run_opts=None):
                     best_mean_rms[:,:,:,i,k] = mean_rms[:, :, :, i, j,k]
                     best_max_rms[:,:,:,i,k] = max_rms[:, :, :, i, j,k]
                     best_valid_time[:,:,:,i,:,k] = valid_time[:, :, :, i, :,j,k]
-                    best_run_opts.pmap_max_wass_dist[:,i] = pmap_max_wass_dist[:, :, :, i, j, k]
+                    best_pmap_max_wass_dist[:,i] = pmap_max_wass_dist[:, :, :, i, j, k]
                     stable_frac_alpha[i,k] = reg_values[j]
                     best_j[i,k] = int(j)
                     if run_opts.save_time_rms:
                         #best_mean_all[:,:,:,i] = mean_all[:,:,:,i,:,j]
                         #best_variances_all[:,:,:,i] = variances_all[:,:,:,i,:,j]
                         best_rms[:,:,:,i,:,k] = rms[:,:,:,i,:,j,k]
-        all_res_idx, all_train_idx, all_test_idx, all_noise_idx, all_reg_train_idx = np.meshgrid(np.arange(run_opts.res_per_test, dtype = int),\
-                np.arange(train_vals.size, dtype = int), np.arange(noise_vals.size, dtype = int), \
+        all_res_idx, all_train_idx, all_test_idx, all_noise_idx, all_reg_train_idx = np.meshgrid(np.arange(run_opts.res_per_test, dtype = int),
+                np.arange(train_vals.size, dtype = int), np.arange(noise_vals.size, dtype = int),
                 np.arange(run_opts.num_tests, dtype = int), np.arange(reg_train_times.size, dtype = int))
 
         all_res_idx   = all_res_idx.flatten()
@@ -340,7 +331,7 @@ def process_data(argv=None, run_opts=None):
         data_out['mean_rms'] = best_mean_rms[all_res_idx, all_train_idx, all_test_idx, all_noise_idx, all_reg_train_idx]
         data_out['max_rms'] = best_max_rms[all_res_idx, all_train_idx, all_test_idx, all_noise_idx, all_reg_train_idx]
         data_out['variance'] = best_variances[all_res_idx, all_train_idx, all_test_idx, all_noise_idx, all_reg_train_idx]
-        data_out = pd.concat([data_out, pd.DataFrame(best_valid_time[all_res_idx, all_train_idx, all_test_idx, all_noise_idx,:, all_reg_train_idx],\
+        data_out = pd.concat([data_out, pd.DataFrame(best_valid_time[all_res_idx, all_train_idx, all_test_idx, all_noise_idx,:, all_reg_train_idx],
                 columns = ['valid_time%d' % i for i in range(num_vt_tests)])], axis = 1)
 
         if run_opts.pmap:
@@ -352,7 +343,7 @@ def process_data(argv=None, run_opts=None):
             #data_out = pd.concat([data_out, pd.DataFrame(best_variances_all[all_res, all_train_idx, all_test, all_noise_idx],\
             #         columns = ['variances_all%d' % i for i in range((rkTime-split)+1)])], axis = 1)
             #print('Concatenated variances_all')
-            data_out = pd.concat([data_out, pd.DataFrame(best_rms[all_res_idx, all_train_idx, all_test_idx, all_noise_idx,: , all_reg_train_idx],\
+            data_out = pd.concat([data_out, pd.DataFrame(best_rms[all_res_idx, all_train_idx, all_test_idx, all_noise_idx,: , all_reg_train_idx],
                 columns = ['rms%d' % i for i in range((rkTime-split))])], axis = 1)
             print('Concatenated rms')
 
@@ -368,19 +359,19 @@ def process_data(argv=None, run_opts=None):
     if run_opts.savepred:
         if run_opts.return_all:
             pred_files = ['pred_res%d_train%d_test%d_noise%e_regtrain%d_reg%e.csv' % (res,train,test,noise,reg_train_time,reg) \
-                        for res,train,test,noise, reg_train_time, reg in zip(data_out['res'],data_out['train'],data_out['test'],\
+                        for res,train,test,noise, reg_train_time, reg in zip(data_out['res'],data_out['train'],data_out['test'],
                         data_out['noise'], data_out['reg_train'], data_out['reg'])]
         else:
-            noise_vals_set_idx, reg_train_times_set_idx = np.meshgrid(np.arange(noise_vals.size, dtype = int),\
+            noise_vals_set_idx, reg_train_times_set_idx = np.meshgrid(np.arange(noise_vals.size, dtype = int),
                 np.arange(reg_train_times.size, dtype = int))
             noise_vals_set_idx = noise_vals_set_idx.flatten()
             reg_train_times_set_idx = reg_train_times_set_idx.flatten()
             noise_vals_set = noise_vals[noise_vals_set_idx]
             reg_train_times_set = reg_train_times[reg_train_times_set_idx]
             pred_files = ['pred_res%d_train%d_test%d_noise%e_regtrain%d_reg%e.csv' % (res,train,test,noise,reg_train_time,reg) \
-                         for res,train,test,(noise, reg_train_time, reg) in product(np.arange(run_opts.res_start, run_opts.res_start+run_opts.res_per_test),\
-                         np.arange(run_opts.train_start, run_opts.train_start+run_opts.num_trains), \
-                         np.arange(run_opts.test_start, run_opts.test_start + run_opts.num_tests),\
+                         for res,train,test,(noise, reg_train_time, reg) in product(np.arange(run_opts.res_start, run_opts.res_start+run_opts.res_per_test),
+                         np.arange(run_opts.train_start, run_opts.train_start+run_opts.num_trains),
+                         np.arange(run_opts.test_start, run_opts.test_start + run_opts.num_tests),
                          zip(noise_vals_set, reg_train_times_set, reg_values[best_j[noise_vals_set_idx, reg_train_times_set_idx]]))]
         print('Pred file names')
         for file in pred_files:
