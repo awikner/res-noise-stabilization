@@ -171,14 +171,14 @@ def process_data(argv=None, run_opts=None):
                 get_filename(run_opts.run_folder_name, 'train_max_rms', res, train, noise, reg_train_time),
                 delimiter=',')
             mean_rms[i, j, :, k, :, l] = np.transpose(
-                np.loadtxt(get_filename(run_opts.run_folder_name, 'mean_rms', res, train, noise, reg_train_time)),
-                delimiter=',').reshape((run_opts.num_tests, reg_values.size))
+                np.loadtxt(get_filename(run_opts.run_folder_name, 'mean_rms', res, train, noise, reg_train_time),
+                delimiter=',')).reshape((run_opts.num_tests, reg_values.size))
             max_rms[i, j, :, k, :, l] = np.transpose(
-                np.loadtxt(get_filename(run_opts.run_folder_name, 'max_rms', res, train, noise, reg_train_time)),
-                delimiter=',').reshape((run_opts.num_tests, reg_values.size))
+                np.loadtxt(get_filename(run_opts.run_folder_name, 'max_rms', res, train, noise, reg_train_time),
+                delimiter=',')).reshape((run_opts.num_tests, reg_values.size))
             variances[i, j, :, k, :, l] = np.transpose(
-                np.loadtxt(get_filename(run_opts.run_folder_name, 'variance', res, train, noise, reg_train_time)),
-                delimiter=',').reshape((run_opts.num_tests, reg_values.size))
+                np.loadtxt(get_filename(run_opts.run_folder_name, 'variance', res, train, noise, reg_train_time),
+                delimiter=',')).reshape((run_opts.num_tests, reg_values.size))
             for (m, test) in enumerate(np.arange(run_opts.test_start, run_opts.test_start + run_opts.num_tests)):
                 valid_time[i, j, m, k, :, :, l] = np.transpose(np.loadtxt(
                     get_filename(run_opts.run_folder_name, 'valid_time', res, train, noise, reg_train_time,
@@ -187,8 +187,8 @@ def process_data(argv=None, run_opts=None):
                     (num_vt_tests, reg_values.size))
             if run_opts.pmap:
                 pmap_max_wass_dist[i, j, :, k, :, l] = np.transpose(np.loadtxt(
-                    get_filename(run_opts.run_folder_name, 'pmap_max_wass_dist', res, train, noise, reg_train_time)),
-                    delimiter=',').reshape((run_opts.num_tests, reg_values.size))
+                    get_filename(run_opts.run_folder_name, 'pmap_max_wass_dist', res, train, noise, reg_train_time),
+                    delimiter=',')).reshape((run_opts.num_tests, reg_values.size))
             if run_opts.save_eigenvals:
                 eigenvals_in[i, j, k, l] = np.loadtxt(
                     get_filename(run_opts.run_folder_name, 'gradreg_eigenvals', res, train, noise, reg_train_time),

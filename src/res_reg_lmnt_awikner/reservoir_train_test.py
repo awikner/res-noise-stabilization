@@ -573,7 +573,7 @@ def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indice
         X_0, u_arr_train_noise = get_X_wrapped(
             u_arr_train, res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_indices, W_indptr, W_shape,
             leakage, noise[0])
-        X_0 = np.ascontiguousarray(X_0[:, skip + 1:(res_X[0].size - 1)])
+        X_0 = np.ascontiguousarray(X_0[:, skip:(res_d - 2)])
         X_train_0 = np.ascontiguousarray(np.concatenate(
             (np.ones((1, d - (skip + 1))), X_0, u_arr_train[:, skip - 1:-2]), axis=0))
         X_train_0 = get_squared(X_train_0, rsvr_size, squarenodes)
@@ -609,7 +609,7 @@ def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indice
         X_0, u_arr_train_noise = get_X_wrapped(
             u_arr_train, res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_indices, W_indptr, W_shape,
             leakage, noise[0])
-        X_0 = np.ascontiguousarray(X_0[:, skip + 1:(res_X[0].size - 1)])
+        X_0 = np.ascontiguousarray(X_0[:, skip:(res_d - 2)])
         X_train_0 = np.ascontiguousarray(np.concatenate(
             (np.ones((1, d - (skip + 1))), X_0, u_arr_train[:, skip - 1:-2]), axis=0))
         X_train_0 = get_squared(X_train_0, rsvr_size, squarenodes)
@@ -643,7 +643,7 @@ def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indice
         X_0, u_arr_train_noise = get_X_wrapped(
             u_arr_train, res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_indices, W_indptr, W_shape,
             leakage, noise[0])
-        X_0 = np.ascontiguousarray(X_0[:, skip + 1:(res_X[0].size - 1)])
+        X_0 = np.ascontiguousarray(X_0[:, skip:(res_d - 2)])
         X_train_0 = np.ascontiguousarray(np.concatenate(
             (np.ones((1, d - (skip + 1))), X_0, u_arr_train[:, skip - 1:-2]), axis=0))
         X_train_0 = get_squared(X_train_0, rsvr_size, squarenodes)

@@ -146,6 +146,7 @@ data_scripts/process_test_data_*.py
 *.nfs*
 restats
 *.yaml
+*.nc
 
 # Folders
 log_files/
