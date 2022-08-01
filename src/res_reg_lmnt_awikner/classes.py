@@ -16,126 +16,6 @@ from scipy.sparse import csc_matrix
 class RunOpts:
     """This class contains the various parameters and options that will be used during the time series data generation,
     reservoir generation, training, testing, and output."""
-    argv: None
-    """Command line input for generating a RunOpts object. If left as None, then the object will be generated using
-    the other inputs or defaults. If multiple instances of the same variable are given, the class will default to the
-    command line input. See RunOpts.get_run_opts for more information."""
-    system: str = 'KS'
-    """String denoting which dynamical system we are obtaining time series data from. Options: 'lorenz' for the 
-    Lorenz 63 equations, 'KS' for the Kuramoto-Sivashinsky equation with 64 grid points and a periodicity length of 22,
-    and KS_d2175 for the Kuramoto-Sivashinksy equation with 64 grid points and a periodicity length of 21.75."""
-    tau: None
-    """Time between each data point in the time series data. If system = 'lorenz', this value must be evenly divided
-    by 0.01 (the integration time step). If left as None, then the class will set tau to the default value for the
-    particular dynamical system."""
-    train_time: int = 20000
-    """Number of training data points."""
-    test_time = None
-    """Number of testing data points. If left as None, then the class will default to 4000 if system = 'lorenz', or 
-    16000 if system = 'KS' or 'KS_d2175'."""
-    sync_time: int = 500
-    """Number of data points used to synchronize the reservoir to each test data set."""
-    discard_time: int = 500
-    """Number of data points used to synchronize the reservoir to each training data set."""
-    res_size: int = 500
-    """Number of nodes in the reservoir."""
-    rho: float = 0.6
-    """Reservoir spectral radius."""
-    sigma: float = 0.1
-    """Reservoir input scaling."""
-    theta: float = 0.1
-    """Reservoir input bias."""
-    leakage: float = 1.0
-    """Reservoir leaking rate."""
-    squarenodes: bool = True
-    """Boolean denoting whether or not the squared node states are including in the reservoir feature vector."""
-    bias_type: str = 'new_random'
-    """Type of reservoir input bias to be used. See the Reservoir class for available options."""
-    win_type: str = 'full_0centered'
-    """Type of input coupling matrix to be used. See the Reservoir class for available options."""
-    traintype: str = 'normal'
-    """Type of training to be used to determine the reservoir output coupling matrix. There are a number of options
-    available, but those used in the paper are:
-    
-    'normal' - Standard reservoir training, potentially with input noise added.
-    
-    'gradientk%d' % (Number of noise steps) - Reservoir training with no noise and LMNT regularization for a number of 
-    noise steps > 1, or Jacobian regularization for a number of noise steps = 1.
-    
-    'regzerok%d' % (Number of noise steps) - Reservoir training with no noise and LMNT/Jacobian regularization computed
-    using a zero-input and zero reservoir state.
-    """
-    noisetype: str = 'none'
-    """Type of noise to be added to the reservoir input during training. Options are 'none' and 'gaussian'.
-    """
-    noise_values_array: np.ndarray = np.logspace(-4, 3, num=3, base=10)
-    """Numpy array containing the variance of the added input noise (if noisetype = 'gaussian') or the LMNT/Jacobian
-    regularization parameter value (if traintype = 'gradientk%d' or 'regzerok%d'). Each value contained in the array
-    will be tested separately using each of the reservoirs, training, and testing data sets."""
-    reg_train_times = None
-    """Numpy array containing the number of training data points to be used to train the LMNT or Jacobian 
-    regularization. If left as None, then the class will default to an array containing only
-    the total number of training data points for standard LMNT/Jacobian or the number of noise steps 
-    if using zero-input LMNT."""
-    noise_realizations: int = 1
-    """Number of input noise realizations used to train the reservoir (if training with noise). If not training with
-    noise, set to 1."""
-    reg_values: np.ndarray = np.append(0., np.logspace(-11, -9, 5))
-    """Numpy array containing the Tikhonov regularization parameter values. Each value contained in the array
-    will be tested separately using each of the reservoirs, training, and testing data sets."""
-    prior: str = 'zero'
-    """Prior to be used when computing the output coupling matrix using Tikhonov regularization. Options are:
-    
-    'zero' - Standard Tikhonov regularization with a zero prior.
-    
-    'input_pass' - Tikhonov regularization with a persistence prior (i.e., set the input pass-through weights to 1)."""
-    max_valid_time: int = 2000
-    """Maximum valid time for each valid time test during the testing period. This should be set so that
-    test_time / max_valid_time is a whole number greater than 0."""
-    res_per_test: int = 1
-    """Number of random reservoir realizations to test."""
-    num_trains: int = 1
-    """Number of independently generated training data sets to test with."""
-    num_tests: int = 1
-    """Number of independently generated testing data sets to test with."""
-    res_start: int = 0
-    """Starting iterate for generating the random seeds that are used to generate the reservoir."""
-    train_start: int = 0
-    """Starting iterate for generating the random seeds that are used to generate the training data sets."""
-    test_start: int = 0
-    """Starting iterate for generating the random seeds that are used to generate the testing data sets."""
-    root_folder = None
-    """Location where output data will be stored in the Data folder. If None, then defaults to the current working 
-    directory."""
-    return_all: bool = True
-    """Boolean for determining of all results should be returned, or only the results with the obtained using the
-    "best" Tikhonov regularization parameter value based on the selected metric."""
-    metric: str = 'mean_rms'
-    """Metric for determining the "best" results. Not used if return_all = True. Options include 'mean_rms', 'max_rms',
-    and 'stable_frac'. Caution: Some options may be deprecated."""
-    savepred: bool = False
-    """Boolean for determining if reservoir prediction time series should be saved."""
-    save_time_rms: bool = False
-    """Boolean for determining if reservoir prediction RMS error should be saved."""
-    pmap: bool = False
-    """Boolean for determining if reservoir prediction Poincare maximum map should be saved."""
-    save_eigenvals: bool = False
-    """Boolean for determining if the eigenvalues of the LMNT/Jacobian regularization matrices should be saved."""
-    save_truth: bool = False
-    """Boolean for determining if the true testing data should be saved."""
-    ifray: bool = False
-    """Boolean for determining if ray should be used to compute results for multiple reservoirs and training 
-    data sets."""
-    num_cpus: int = 1
-    """If using ray for paralellization, this sets the number of cpus to be used."""
-    machine = 'personal'
-    """Machine which results are computed on. Leave as personal unless you are connecting to a ray cluster elsewhere."""
-    runflag: bool = True
-    """True indicates that we are about to compute results, and the appropriate directories should be created.
-    Otherwise, we do not create additional directories."""
-    debug_mode: bool = False
-    """Boolean for determining if errors during reservoir training which could arise from non-convergence of the 
-    eigenvalue solver should be suppressed."""
     def __init__(self, argv=None,
                  runflag=True,
                  train_time=20000,
@@ -155,6 +35,7 @@ class RunOpts:
                  squarenodes=True,
                  rho=0.6,
                  sigma=0.1,
+                 theta=0.1,
                  leakage=1.0,
                  bias_type='new_random',
                  win_type='full_0centered',
@@ -177,45 +58,141 @@ class RunOpts:
                  root_folder=None,
                  prior='zero',
                  save_truth=False):
-        self.train_time = train_time
-        self.test_time = test_time
-        self.sync_time = sync_time
-        self.discard_time = discard_time
-        self.res_size = res_size
-        self.res_per_test = res_per_test
-        self.noise_realizations = noise_realizations
-        self.num_tests = num_tests
-        self.num_trains = num_trains
-        self.traintype = traintype
-        self.noisetype = noisetype
+        self.argv = argv
+        """Command line input for generating a RunOpts object. If left as None, then the object will be generated using
+            the other inputs or defaults. If multiple instances of the same variable are given, the class will default
+            to the command line input. See RunOpts.get_run_opts for more information. Default: None"""
         self.system = system
-        self.savepred = savepred
-        self.save_time_rms = save_time_rms
-        self.squarenodes = squarenodes
-        self.rho = rho
-        self.sigma = sigma
-        self.leakage = leakage
-        self.bias_type = bias_type
-        self.win_type = win_type
-        self.debug_mode = debug_mode
-        self.pmap = pmap
-        self.machine = machine
-        self.ifray = ifray
+        """String denoting which dynamical system we are obtaining time series data from. Options: 'lorenz' for the 
+        Lorenz 63 equations, 'KS' for the Kuramoto-Sivashinsky equation with 64 grid points and a periodicity length of
+        22, and KS_d2175 for the Kuramoto-Sivashinksy equation with 64 grid points and a periodicity length of 21.75.
+        Default: 'KS'"""
         self.tau = tau
-        self.num_cpus = num_cpus
-        self.metric = metric
-        self.return_all = return_all
-        self.save_eigenvals = save_eigenvals
-        self.max_valid_time = max_valid_time
+        """Time between each data point in the time series data. If system = 'lorenz', this value must be evenly divided
+        by 0.01 (the integration time step). If left as None, then the class will set tau to the default value for the
+        particular dynamical system. Default: None"""
+        self.train_time = train_time
+        """Number of training data points. Default: 20000"""
+        self.test_time = test_time
+        """Number of testing data points. If left as None, then the class will default to 4000 if system = 'lorenz', or 
+        16000 if system = 'KS' or 'KS_d2175'. Default: None"""
+        self.sync_time = sync_time
+        """Number of data points used to synchronize the reservoir to each test data set. Default: 2000"""
+        self.discard_time = discard_time
+        """Number of data points used to synchronize the reservoir to each training data set. Default: 500"""
+        self.res_size = res_size
+        """Number of nodes in the reservoir. Default: 500"""
+        self.rho = rho
+        """Reservoir spectral radius. Default: 0.6"""
+        self.sigma = sigma
+        """Reservoir input scaling. Default: 0.1"""
+        self.theta = theta
+        """Reservoir input bias scaling. Default: 0.1"""
+        self.leakage = leakage
+        """Reservoir leaking rate. Default: 1.0"""
+        self.squarenodes = squarenodes
+        """Boolean denoting whether or not the squared node states are including in the reservoir feature vector.
+        Default: True"""
+        self.bias_type = bias_type
+        """Type of reservoir input bias to be used. See the Reservoir class for available options. 
+        Default: new_random"""
+        self.win_type = win_type
+        """Type of input coupling matrix to be used. See the Reservoir class for available options. 
+        Default: full_0centered"""
+        self.traintype = traintype
+        """Type of training to be used to determine the reservoir output coupling matrix. There are a number of options
+        available, but those used in the paper are:
+
+        'normal' - Standard reservoir training, potentially with input noise added.
+
+        'gradientk%d' % (Number of noise steps) - Reservoir training with no noise and LMNT regularization for a number of 
+        noise steps > 1, or Jacobian regularization for a number of noise steps = 1.
+
+        'regzerok%d' % (Number of noise steps) - Reservoir training with no noise and LMNT/Jacobian regularization computed
+        using a zero-input and zero reservoir state.
+        
+        Default: 'normal'
+        """
+        self.noisetype = noisetype
+        """Type of noise to be added to the reservoir input during training. Options are 'none' and 'gaussian'.
+        Default: 'none'"""
         self.noise_values_array = noise_values_array
-        self.reg_values = reg_values
-        self.res_start = res_start
-        self.train_start = train_start
-        self.test_start = test_start
-        self.prior = prior
+        """Numpy array containing the variance of the added input noise (if noisetype = 'gaussian') or the LMNT/Jacobian
+        regularization parameter value (if traintype = 'gradientk%d' or 'regzerok%d'). Each value contained in the array
+        will be tested separately using each of the reservoirs, training, and testing data sets.
+        Default: np.logspace(-4, 3, num=3, base=10)"""
         self.reg_train_times = reg_train_times
+        """Numpy array containing the number of training data points to be used to train the LMNT or Jacobian 
+        regularization. If left as None, then the class will default to an array containing only
+        the total number of training data points for standard LMNT/Jacobian or the number of noise steps 
+        if using zero-input LMNT. Default: None"""
+        self.noise_realizations = noise_realizations
+        """Number of input noise realizations used to train the reservoir (if training with noise). If not training with
+        noise, set to 1. Default: 1"""
+        self.reg_values = reg_values
+        """Numpy array containing the Tikhonov regularization parameter values. Each value contained in the array
+        will be tested separately using each of the reservoirs, training, and testing data sets.
+        Default: np.append(0., np.logspace(-11, -9, 5))"""
+        self.prior = prior
+        """Prior to be used when computing the output coupling matrix using Tikhonov regularization. Options are:
+
+        'zero' - Standard Tikhonov regularization with a zero prior.
+
+        'input_pass' - Tikhonov regularization with a persistence prior (i.e., set the input pass-through weights to 1).
+        
+        Default: 'zero'"""
+        self.max_valid_time = max_valid_time
+        """Maximum valid time for each valid time test during the testing period. This should be set so that
+        test_time / max_valid_time is a whole number greater than 0. Default: 2000"""
+        self.res_per_test = res_per_test
+        """Number of random reservoir realizations to test. Default: 1"""
+        self.num_trains = num_trains
+        """Number of independently generated training data sets to test with. Default: 1"""
+        self.num_tests = num_tests
+        """Number of independently generated testing data sets to test with. Default: 1"""
+        self.res_start = res_start
+        """Starting iterate for generating the random seeds that are used to generate the reservoir. Default: 0"""
+        self.train_start = train_start
+        """Starting iterate for generating the random seeds that are used to generate the training data sets.
+        Default: 0"""
+        self.test_start = test_start
+        """Starting iterate for generating the random seeds that are used to generate the testing data sets.
+        Default: 0"""
         self.root_folder = root_folder
+        """Location where output data will be stored in the Data folder. If None, then defaults to the current working 
+        directory. Default: None"""
+        self.return_all = return_all
+        """Boolean for determining of all results should be returned, or only the results with the obtained using the
+        "best" Tikhonov regularization parameter value based on the selected metric. Default: True"""
+        self.metric = metric
+        """Metric for determining the "best" results. Not used if return_all = True. Options include 'mean_rms', 'max_rms',
+        and 'stable_frac'. Caution: Some options may be deprecated. Default: 'mss-var'"""
+        self.savepred = savepred
+        """Boolean for determining if reservoir prediction time series should be saved. Default: False"""
+        self.save_time_rms = save_time_rms
+        """Boolean for determining if reservoir prediction RMS error should be saved. Default: False"""
+        self.pmap = pmap
+        """Boolean for determining if reservoir prediction Poincare maximum map should be saved. Default: False"""
+        self.save_eigenvals = save_eigenvals
+        """Boolean for determining if the eigenvalues of the LMNT/Jacobian regularization matrices should be saved.
+        Default: False"""
         self.save_truth = save_truth
+        """Boolean for determining if the true testing data should be saved. Default: False"""
+        self.ifray = ifray
+        """Boolean for determining if ray should be used to compute results for multiple reservoirs and training 
+        data sets. Default: False"""
+        self.num_cpus = num_cpus
+        """If using ray for paralellization, this sets the number of cpus to be used. Default: 1"""
+        self.machine = machine
+        """Machine which results are computed on. Leave as personal unless you are connecting to a ray cluster 
+        elsewhere. Default: 'personal'"""
+        self.runflag = runflag
+        """True indicates that we are about to compute results, and the appropriate directories should be created.
+        Otherwise, we do not create additional directories. Default: True"""
+        self.debug_mode = debug_mode
+        """Boolean for determining if errors during reservoir training which could arise from non-convergence of the 
+        eigenvalue solver should be suppressed. If left as False, will suppress errors im much of the core code,
+        so this shiuld be set to True if making changes. Default: False"""
         if not isinstance(argv, type(None)):
             self.get_run_opts(argv)
         if isinstance(self.tau, type(None)):
