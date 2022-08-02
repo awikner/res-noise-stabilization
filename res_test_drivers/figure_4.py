@@ -4,13 +4,11 @@ from res_reg_lmnt_awikner.reservoir_train_test import start_reservoir_test
 from res_reg_lmnt_awikner.process_test_data import process_data
 from res_reg_lmnt_awikner.classes import RunOpts, ResData, ResPreds
 
-import subprocess
 import numpy as np
 import time
-from itertools import product
-import re
 rho = 0.6
 sigma = 0.1
+theta = 0.1
 leakage = 1.0
 
 discard_time = 500
@@ -69,7 +67,7 @@ debug_mode      = False
 ifray           = False
 just_process    = False
 just_display    = False
-nojit           = False
+nojit           = True
 res_per_test    = 1
 #res_per_test    = 4
 num_trains      = 1
@@ -93,7 +91,7 @@ for i, (noisetype, traintype, noise_values_array, reg_values, reg_train_times_in
             savepred = savepred, save_time_rms = save_time_rms, squarenodes = squarenodes, debug_mode = debug_mode,\
             res_per_test = res_per_test, num_trains = num_trains, num_tests = num_tests,\
             metric = metric, pmap = pmap, return_all = return_all, machine = machine,\
-            max_valid_time = max_valid_time, ifray = ifray,\
+            max_valid_time = max_valid_time, ifray = ifray, theta = theta,\
             reg_values = reg_values, reg_train_times = reg_train_times_in, discard_time = discard_time,\
             prior = prior, save_eigenvals = save_eigenvals, num_cpus = cpus_per_node,\
             res_start = res_start, train_start = train_start, test_start = test_start)
