@@ -14,7 +14,7 @@ from res_reg_lmnt_awikner.lorenzrungekutta_numba import rungekutta, rungekutta_p
 from res_reg_lmnt_awikner.ks_etdrk4 import kursiv_predict, kursiv_predict_pred
 from res_reg_lmnt_awikner.csc_mult import *
 from res_reg_lmnt_awikner.helpers import get_windows_path, poincare_max
-from res_reg_lmnt_awikner.classes import RunOpts, RungeKutta, Reservoir, ResOutput
+from res_reg_lmnt_awikner.classes import RunOpts, NumericalModel, Reservoir, ResOutput
 
 warnings.filterwarnings("ignore", category=NumbaPerformanceWarning)
 
@@ -131,13 +131,13 @@ def numba_eigsh(A):
 
 
 @jit(nopython=True, fastmath=True)
-def runge_kutta_wrapped(x0=2, y0=2, z0=23, h=0.01, tau=0.1, T=300, ttsplit=5000, u0=0, system='lorenz',
+def numerical_model_wrapped(h=0.01, tau=0.1, T=300, ttsplit=5000, u0=0, system='lorenz',
                         params=np.array([[], []], dtype=np.complex128)):
     # Numba function for obtaining training and testing dynamical system time series data
     if system == 'lorenz':
         int_step = int(tau / h)
         u_arr = np.ascontiguousarray(rungekutta(
-            x0, y0, z0, h, T, tau)[:, ::int_step])
+            u0[0], u0[1], u0[2], T, tau, int_step))
 
         u_arr[0] = (u_arr[0] - 0) / 7.929788629895004
         u_arr[1] = (u_arr[1] - 0) / 8.9932616136662
@@ -159,14 +159,14 @@ def runge_kutta_wrapped(x0=2, y0=2, z0=23, h=0.01, tau=0.1, T=300, ttsplit=5000,
 
 
 @jit(nopython=True, fastmath=True)
-def runge_kutta_wrapped_pred(h=0.01, tau=0.1, T=300, ttsplit=5000, u0_array=np.array([[], []], dtype=np.complex128),
+def numerical_model_wrapped_pred(h=0.01, tau=0.1, T=300, ttsplit=5000, u0_array=np.array([[], []], dtype=np.complex128),
                              system='lorenz', params=np.array([[], []], dtype=np.complex128)):
     # Numba function for obtaining training and testing dynamical system time series data for a set of initial conditions.
     # This is used during test to compute the map error instead of a for loop over the entire prediction period.
     if system == 'lorenz':
         int_step = int(tau / h)
         u_arr = np.ascontiguousarray(
-            rungekutta_pred(u0_array, h, tau, int_step))
+            rungekutta_pred(u0_array, tau, int_step))
 
         u_arr[0] = (u_arr[0] - 0) / 7.929788629895004
         u_arr[1] = (u_arr[1] - 0) / 8.9932616136662
@@ -1172,15 +1172,13 @@ def get_test_data(run_opts, test_stream, overall_idx, rkTime, split):
     # Uses an array of random number generators
     if run_opts.system == 'lorenz':
         ic = test_stream[0].random(3) * 2 - 1
-        u0 = np.zeros(64)
+        u0 = np.array([ic[0], ic[1], 30*ic[2]])
     elif run_opts.system in ['KS', 'KS_d2175']:
-        ic = np.zeros(3)
         u0 = (test_stream[0].random(64) * 2 - 1) * 0.6
         u0 = u0 - np.mean(u0)
     transient = 2000
-    u_arr_train_nonoise, u_arr_test, p, params = runge_kutta_wrapped(x0=ic[0],
-                                                                     y0=ic[1], z0=30 * ic[2], tau=run_opts.tau,
-                                                                     T=rkTime + transient + split, ttsplit=split + transient,
+    u_arr_train_nonoise, u_arr_test, p, params = numerical_model_wrapped(tau=run_opts.tau, T=rkTime + transient + split,
+                                                                     ttsplit=split + transient,
                                                                      u0=u0, system=run_opts.system)
     u_arr_train_nonoise = u_arr_train_nonoise[:, transient:]
     rktest_u_arr_train_nonoise = np.zeros(
@@ -1197,14 +1195,11 @@ def get_test_data(run_opts, test_stream, overall_idx, rkTime, split):
         # np.random.seed(i)
         if run_opts.system == 'lorenz':
             ic = test_stream[i].random(3) * 2 - 1
-            u0 = np.zeros(64)
+            u0 = np.array([ic[0],ic[1], 30 * ic[2]])
         elif run_opts.system in ['KS', 'KS_d2175']:
-            ic = np.zeros(3)
             u0 = (test_stream[i].random(64) * 2 - 1) * 0.6
             u0 = u0 - np.mean(u0)
-        u_arr_train_nonoise, rktest_u_arr_test[:, :, i], p, params = runge_kutta_wrapped(x0=ic[0],
-                                                                                         y0=ic[1], z0=30 * ic[2],
-                                                                                         tau=run_opts.tau,
+        u_arr_train_nonoise, rktest_u_arr_test[:, :, i], p, params = numerical_model_wrapped(tau=run_opts.tau,
                                                                                          T=rkTime + transient,
                                                                                          ttsplit=split + transient,
                                                                                          u0=u0, system=run_opts.system,
@@ -1333,19 +1328,18 @@ def test_wrapped(res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_
                 check_vt = True
         if array_compute:
             if system == 'lorenz':
-                rkmap_u_arr_train = runge_kutta_wrapped_pred(u0_array=np.stack((pred_full[0] * 7.929788629895004,
-                                                                                pred_full[1] * 8.9932616136662,
-                                                                                pred_full[
-                                                                                    2] * 8.575917849311919 + 23.596294463016896)),
+                rkmap_u_arr_train = numerical_model_wrapped_pred(u0_array=np.stack((pred_full[0] * 7.929788629895004,
+                                                                pred_full[1] * 8.9932616136662,
+                                                                pred_full[2] * 8.575917849311919 + 23.596294463016896)),
                                                              h=0.01, system=system, params=params, tau=tau,
                                                              ttsplit=pred_full.shape[1])[0]
             elif system == 'KS':
                 u0 = pred_full * 1.1876770355823614
-                rkmap_u_arr_train = runge_kutta_wrapped_pred(
+                rkmap_u_arr_train = numerical_model_wrapped_pred(
                     u0_array=u0, h=tau, T=1, system=system, params=params, ttsplit=pred_full.shape[1])[0]
             elif system == 'KS_d2175':
                 u0 = pred_full * 1.2146066380280796
-                rkmap_u_arr_train = runge_kutta_wrapped_pred(
+                rkmap_u_arr_train = numerical_model_wrapped_pred(
                     u0_array=u0, h=tau, T=1, system=system, params=params, ttsplit=pred_full.shape[1])[0]
             # print(rkmap_u_arr_train[0,:10])
             x2y2z2 = sum_numba_axis0(
@@ -1356,19 +1350,16 @@ def test_wrapped(res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_
 
                 if system == 'lorenz':
                     rkmap_u_arr_train = \
-                        runge_kutta_wrapped(pred_full[0][j - 1] * 7.929788629895004,
+                        numerical_model_wrapped(u0 = np.array([pred_full[0][j - 1] * 7.929788629895004,
                                             pred_full[1][j - 1] * 8.9932616136662,
-                                            pred_full[2]
-                                            [j - 1] * 8.575917849311919 + 23.596294463016896, h=0.01, T=1, tau=tau,
-                                            system=system, params=params)[0]
+                                            pred_full[2][j - 1] * 8.575917849311919 + 23.596294463016896]),
+                                            h=0.01, T=1, tau=tau, system=system, params=params)[0]
                 elif system == 'KS':
                     u0 = pred_full[:, j - 1] * (1.1876770355823614)
-                    rkmap_u_arr_train = runge_kutta_wrapped(
-                        0, 0, 0, h=tau, T=1, u0=u0, system=system, params=params)[0]
+                    rkmap_u_arr_train = numerical_model_wrapped(h=tau, T=1, u0=u0, system=system, params=params)[0]
                 elif system == 'KS_d2175':
                     u0 = pred_full[:, j - 1] * (1.2146066380280796)
-                    rkmap_u_arr_train = runge_kutta_wrapped(
-                        0, 0, 0, h=tau, T=1, u0=u0, system=system, params=params)[0]
+                    rkmap_u_arr_train = numerical_model_wrapped(h=tau, T=1, u0=u0, system=system, params=params)[0]
 
                 x2y2z2[j - 1] = np.sum((pred_full[:, j] - rkmap_u_arr_train[:, 1]) ** 2)
         rms_test = np.sqrt(x2y2z2 / pred_full.shape[0])
@@ -1393,7 +1384,7 @@ def test_wrapped(res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_
 
 def generate_res(run_opts, res_gen, res_itr, rk, noise_stream, noise_scaling=0):
     # Function for generating a reservoir and obtaining matrices used for training the reservoir
-    reservoir = Reservoir(run_opts, rk, res_gen, res_itr, rk.u_arr_train.shape[0])
+    reservoir = Reservoir(run_opts, res_gen, res_itr, rk.u_arr_train.shape[0])
     data_shape = rk.u_arr_train.shape
     res_shape = reservoir.X.shape
     noise_in = gen_noise_driver(run_opts, data_shape, res_shape, noise_scaling, noise_stream)
@@ -1527,13 +1518,13 @@ def find_stability(run_opts, noise, train_seed, train_gen, res_itr, res_gen, tes
     # np.random.seed(train_seed)
     if run_opts.system == 'lorenz':
         ic = train_gen.random(3) * 2 - 1
-        rk = RungeKutta(x0=ic[0], y0=ic[1], z0=30 * ic[2], tau=run_opts.tau,
+        rk = NumericalModel(u0 = np.array([ic[0], ic[1], 30 * ic[2]]), tau=run_opts.tau,
                         T=run_opts.train_time + run_opts.discard_time,
                         ttsplit=run_opts.train_time + run_opts.discard_time, system=run_opts.system, params=params)
     elif run_opts.system in ['KS', 'KS_d2175']:
         u0 = 0.6 * (train_gen.random(64) * 2 - 1)
         u0 = u0 - np.mean(u0)
-        rk = RungeKutta(0, 0, 0, tau=run_opts.tau, T=run_opts.train_time + run_opts.discard_time,
+        rk = NumericalModel(tau=run_opts.tau, T=run_opts.train_time + run_opts.discard_time,
                         ttsplit=run_opts.train_time + run_opts.discard_time, u0=u0, system=run_opts.system,
                         params=params)
     if run_opts.pmap:

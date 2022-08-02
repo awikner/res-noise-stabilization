@@ -12,6 +12,8 @@ from res_reg_lmnt_awikner.ks_etdrk4 import kursiv_predict
 from scipy.sparse.linalg import eigs
 from scipy.sparse import csc_matrix
 
+__docformat__ = "google"
+
 
 class RunOpts:
     """This class contains the various parameters and options that will be used during the time series data generation,
@@ -58,6 +60,11 @@ class RunOpts:
                  root_folder=None,
                  prior='zero',
                  save_truth=False):
+        """Initializes the RunOpts class.
+
+        Raises:
+            ValueError: If an input instance variable has an unaccepted value.
+            TypeError: If an input instance variable has an incorrect type."""
         self.argv = argv
         """Command line input for generating a RunOpts object. If left as None, then the object will be generated using
             the other inputs or defaults. If multiple instances of the same variable are given, the class will default
@@ -192,7 +199,7 @@ class RunOpts:
         self.debug_mode = debug_mode
         """Boolean for determining if errors during reservoir training which could arise from non-convergence of the 
         eigenvalue solver should be suppressed. If left as False, will suppress errors im much of the core code,
-        so this shiuld be set to True if making changes. Default: False"""
+        so this should be set to True if making changes. Default: False"""
         if not isinstance(argv, type(None)):
             self.get_run_opts(argv)
         if isinstance(self.tau, type(None)):
@@ -227,9 +234,16 @@ class RunOpts:
             raise ValueError
         self.run_file_name = ''
         self.run_folder_name = ''
-        self.get_file_name(runflag)
+        self.get_file_name()
 
-    def get_file_name(self, runflag):
+    def get_file_name(self):
+        """Creates the folder and final data file name for the tests about to be run.
+        Args:
+            self: RunOpts object.
+        Returns:
+            RunOpts object with initialized folder and file name variables. Also creates the aforementioned folder
+            if not already created.
+        """
         if self.prior == 'zero':
             prior_str = ''
         else:
@@ -277,7 +291,7 @@ class RunOpts:
                            self.leakage, self.win_type, self.bias_type, self.tau, self.res_size, self.train_time,
                            self.noise_realizations, self.noisetype, self.traintype, prior_str)
 
-        if runflag:
+        if self.runflag:
             if not os.path.isdir(data_folder):
                 os.mkdir(data_folder)
             if not os.path.isdir(os.path.join(data_folder, run_name + '_folder')):
@@ -285,12 +299,19 @@ class RunOpts:
         self.run_file_name = os.path.join(data_folder, run_name + '.bz2')
         self.run_folder_name = os.path.join(data_folder, run_name + '_folder')
 
-    def get_run_opts(self, argv):
+    def get_run_opts(self):
+        """Processes the command line input into instance variables.
+        Args:
+            self: RunOpts object.
+        Returns:
+            RunOpts object with instance variables set from command line input.
+        Raises:
+            GetoptError: Raises an error of command line arguments no recognized."""
         try:
-            opts, args = getopt.getopt(argv, "T:N:r:",
+            opts, args = getopt.getopt(self.argv, "T:N:r:",
                                        ['testtime=', 'noisetype=', 'traintype=', 'system=', 'res=',
                                         'tests=', 'trains=', 'savepred=', 'tau=', 'rho=',
-                                        'sigma=', 'leakage=', 'bias_type=', 'debug=', 'win_type=',
+                                        'sigma=', 'theta=','leakage=', 'bias_type=', 'debug=', 'win_type=',
                                         'machine=', 'num_cpus=', 'pmap=', 'parallel=', 'metric=', 'returnall=',
                                         'savetime=', 'saveeigenvals=', 'noisevals=', 'regvals=', 'maxvt=',
                                         'resstart=', 'trainstart=', 'teststart=',
@@ -433,6 +454,9 @@ class RunOpts:
             elif opt == '--sigma':
                 self.sigma = float(arg)
                 print('Sigma: %f' % self.sigma)
+            elif opt == '--theta':
+                self.theta = float(arg)
+                print('Theta: %f' % self.theta)
             elif opt == '--leakage':
                 self.leakage = float(arg)
                 print('Leakage: %f' % self.leakage)
@@ -478,17 +502,22 @@ class RunOpts:
 
 
 class Reservoir:
-    def __init__(self, run_opts, rk, res_gen, res_itr, input_size, avg_degree=3):
+    """Class for initializing and storing the reservoir matrices and internal states."""
+    def __init__(self, run_opts, res_gen, res_itr, input_size, avg_degree=3):
+        """Initializes the Reservoir object.
+        Args:
+            run_opts: RunOpts object containing parameters used to generate the reservoir.
+            res_gen: A numpy.random.Generator object used to generate the random matrices in the Reservoir.
+            res_itr: Reservoir iteration tag.
+            input_size: Number of elements in reservoir input.
+            avg_degree: Average in-degree of each reservoir node (i.e., the average number of edges that connect into each vertex in the graph). Default: 3
+        Returns:
+            Constructed Reservoir object.
+        Raises:
+            ValueError: If win_type or bias_type is not recognized."""
         # Define class for storing reservoir layers generated from input parameters and an input random number generator
         self.rsvr_size = run_opts.res_size
         self.res_itr = res_itr
-        """
-        print('Spectral Radius: %0.2f' % spectral_radius)
-        print('Input Weight: %0.2f' % input_weight)
-        print('Leakage: %0.3f' % leakage)
-        print('Win Type: %s' % win_type)
-        print('Bias type: %s' % bias_type)
-        """
 
         density = avg_degree / self.rsvr_size
 
@@ -524,19 +553,22 @@ class Reservoir:
                 input_vars = np.arange(input_size)
             elif run_opts.win_type == 'x':
                 input_vars = np.array([0])
+            else:
+                print('Win_type not recognized.')
+                raise ValueError()
             if run_opts.bias_type == 'old':
                 const_frac = 0.15
                 const_conn = int(self.rsvr_size * const_frac)
                 Win = np.zeros((self.rsvr_size, input_size + 1))
                 Win[:const_conn, 0] = (res_gen.random(
-                    Win[:const_conn, 0].size) * 2 - 1) * run_opts.sigma
+                    Win[:const_conn, 0].size) * 2 - 1) * run_opts.theta
                 q = int((self.rsvr_size - const_conn) // input_vars.size)
                 for i, var in enumerate(input_vars):
                     Win[const_conn + q * i:const_conn + q *
                                            (i + 1), var + 1] = (res_gen.random(q) * 2 - 1) * run_opts.sigma
             elif run_opts.bias_type == 'new_random':
                 Win = np.zeros((self.rsvr_size, input_size + 1))
-                Win[:, 0] = (res_gen.random(self.rsvr_size) * 2 - 1) * run_opts.sigma
+                Win[:, 0] = (res_gen.random(self.rsvr_size) * 2 - 1) * run_opts.theta
                 q = int(self.rsvr_size // input_vars.size)
                 for i, var in enumerate(input_vars):
                     Win[q * i:q * (i + 1), var + 1] = (res_gen.random(q) * 2 - 1) * run_opts.sigma
@@ -546,7 +578,7 @@ class Reservoir:
                         (res_gen.random() * 2 - 1) * run_opts.sigma
             elif run_opts.bias_type == 'new_new_random':
                 Win = np.zeros((self.rsvr_size, input_size + 1))
-                Win[:, 0] = (res_gen.random(self.rsvr_size) * 2 - 1) * run_opts.sigma
+                Win[:, 0] = (res_gen.random(self.rsvr_size) * 2 - 1) * run_opts.theta
                 q = int(self.rsvr_size // input_vars.size)
                 for i, var in enumerate(input_vars):
                     Win[q * i:q * (i + 1), var + 1] = (res_gen.random(q) * 2 - 1) * run_opts.sigma
@@ -557,7 +589,7 @@ class Reservoir:
                                                       1] = (res_gen.random(leftover_nodes) * 2 - 1) * run_opts.sigma
             elif run_opts.bias_type == 'new_const':
                 Win = np.zeros((self.rsvr_size, input_size + 1))
-                Win[:, 0] = run_opts.sigma
+                Win[:, 0] = run_opts.theta
                 q = int(self.rsvr_size // input_vars.size)
                 for i, var in enumerate(input_vars):
                     Win[q * i:q * (i + 1), var + 1] = (res_gen.random(q) * 2 - 1) * run_opts.sigma
@@ -566,6 +598,9 @@ class Reservoir:
                     input_vars.size, size=leftover_nodes)]
                 Win[self.rsvr_size - leftover_nodes:, var +
                                                       1] = (res_gen.random(leftover_nodes) * 2 - 1) * run_opts.sigma
+            else:
+                print('bias_type not recognized.')
+                raise ValueError()
 
         Win_sp = csc_matrix(Win)
         self.Win_data, self.Win_indices, self.Win_indptr, self.Win_shape = \
@@ -574,13 +609,22 @@ class Reservoir:
             np.ascontiguousarray(Win_sp.indptr), \
             np.array(list(Win_sp.shape))
 
-        self.X = (res_gen.random((self.rsvr_size, rk.train_length + 2)) * 2 - 1)
+        self.X = (res_gen.random((self.rsvr_size, run_opts.train_time + run_opts.discard_time + 2)) * 2 - 1)
         self.Wout = np.array([])
         self.leakage = run_opts.leakage
 
 
 class ResOutput:
+    """Class for holding the output from a reservoir computer test. Is typically used to save the output from one of
+    the (potentially parallel) runs."""
     def __init__(self, run_opts, noise_array):
+        """Creates the ResOutput object.
+        Args:
+            self: ResOutput object
+            run_opts: RunOpts object for the test.
+            noise_array: Array of noise/Jacobian/LMNT regularization parameter values used in this test.
+        Returns:
+            self: initialized ResOutput object."""
         self.stable_frac_out = np.zeros((noise_array.size, run_opts.reg_values.size, run_opts.reg_train_times.size),
                                         dtype=object)
         self.mean_rms_out = np.zeros((noise_array.size, run_opts.reg_values.size, run_opts.reg_train_times.size),
@@ -612,6 +656,16 @@ class ResOutput:
                                  dtype=object)
 
     def save(self, run_opts, noise_array, res_itr, train_seed, test_idxs):
+        """Saves the data in the ResOutput object to a series of .csv files.
+        Args:
+            self: ResOutput object
+            run_opts: RunOpts object for test.
+            noise_array: Array of noise/Jacobian/LMNT regularization parameter values used in this test.
+            res_itr: Index for the reservoir iteration used.
+            train_seed: Index for the training data iteration used.
+            test_idxs: Indices for the testing data iterations used.
+        Returns:
+            Saves .csv files."""
         for (i, noise_val), (j, reg_train_time) in product(enumerate(noise_array), enumerate(run_opts.reg_train_times)):
             print((i, j))
             stable_frac = np.zeros(run_opts.reg_values.size)
@@ -709,14 +763,26 @@ class ResOutput:
                         pred[k, l], delimiter=',')
 
 
-class RungeKutta:
-    def __init__(self, x0=2, y0=2, z0=23, h=0.01, tau=0.1, T=300, ttsplit=5000, u0=0, system='lorenz',
+class NumericalModel:
+    """Class for generating training or testing data using one of the test numerical models."""
+    def __init__(self, tau=0.1, int_step=1, T=300, ttsplit=5000, u0=0, system='lorenz',
                  params=np.array([[], []], dtype=np.complex128)):
-        # Class for obtaining training and testing dynamical system time series data
+        """Creates the NumericalModel object.
+        Args:
+            self: NumericalModel object.
+            tau: Time step between measurements of the system dynamics.
+            int_step: the number of numerical integration steps between each measurement.
+            T: Total number of measurements.
+            ttsplit: Number of measurements to be used in the training data set.
+            u0: Initial condition for integration.
+            system: Name of system to generate data from. Options: 'lorenz', 'KS','KS_d2175'
+            params: Internal parameters for model integration. Currently only used by KS options.
+        Returns:
+            Complete NumericalModel object with precomputed internal parameters."""
+
         if system == 'lorenz':
-            int_step = int(tau / h)
             u_arr = np.ascontiguousarray(rungekutta(
-                x0, y0, z0, h, T, tau)[:, ::int_step])
+                u0[0], u0[1], u0[2], T, tau))
             self.input_size = 3
 
             u_arr[0] = (u_arr[0] - 0) / 7.929788629895004
@@ -743,7 +809,11 @@ class RungeKutta:
 
 
 class ResPreds:
+    """Class for loading and storing prediction time series data generated from reservoir computer tests."""
     def __init__(self, run_opts):
+        """Loads the prediction data from .csv files.
+        Args:
+            run_opts: RunOpts object containing the run parameters."""
         self.data_filename, self.pred_folder = run_opts.run_file_name, run_opts.run_folder_name
         self.noise_vals = run_opts.noise_values_array
         self.reg_train_vals = run_opts.reg_train_times
@@ -768,7 +838,12 @@ class ResPreds:
 
 
 class ResPmap:
+    """Class for loading and storing Poincare maximum map data from reservoir predictions
+    generated from reservoir computer tests."""
     def __init__(self, run_opts):
+        """Loads the Poincare maxmimum map data from .csv files.
+        Args:
+            run_opts: RunOpts object containing the run parameters."""
         self.data_filename, self.pred_folder = run_opts.run_file_name, run_opts.run_folder_name
         self.noise_vals = run_opts.noise_values_array
         self.reg_train_vals = run_opts.reg_train_times
@@ -795,7 +870,11 @@ class ResPmap:
 
 
 class ResData:
+    """Class for loading and storing prediction analysis data generated from reservoir computer tests."""
     def __init__(self, run_opts):
+        """Loads the prediction analysis data from a compressed pandas data file.
+            Args:
+                run_opts: RunOpts object containing the run parameters."""
         self.data_filename, self.pred_folder = run_opts.run_file_name, run_opts.run_folder_name
         print('Starding data read...')
         tic = time.perf_counter()
@@ -814,15 +893,40 @@ class ResData:
         self.nan = pd.isna(self.data['variance'])
 
     def shape(self):
+        """Returns the shape of the pandas data frame"""
         return self.data.shape
 
     def size(self):
+        """Returns the size of the pandas data frame"""
         return self.data.size
 
     def data_slice(self, res=np.array([]), train=np.array([]), test=np.array([]),
                    reg_train=np.array([]), noise=np.array([]), reg=np.array([]), median_flag=False,
                    reduce_axes=[], metric='', gross_frac_metric='valid_time', gross_err_bnd=1e2,
                    reduce_fun=pd.DataFrame.median):
+        """Slices and/or finds the best results using a metric computed by the reduce_fun.
+        Args:
+            self: ResPreds object
+            res: Indices for reservoir results to be returned/optimized over. If left as an empty array, uses all indices.
+            train: Indices for training data set results to be returned/optimized over. If left as an empty array, uses all indices.
+            test: Indices for testing data set results to be returned/optimized over. If left as an empty array, uses all indices.
+            reg_train: Number of training data points for regularization to be returned/optimized over. If left as an empty array, uses all values.
+            noise: Noise/Jacobian/LMNT regularization parameter value results to be returned/optimized over. If left as an empty array, uses all values.
+            reg: Tikhonov regularization paramter value results to be returned/optimized over. If left as an empty array, uses all values.
+            median_flag: Boolean indicating whether the data should be optimized.
+            reduce_axes: List containing the axes to be optimized over. Elements can be 'res', 'train', 'test', 'reg_train', 'noise', or 'reg'.
+            metric: Metric to be used to compute which parameters give the best result. Options are:
+                'gross_frac': Lowest fraction of gross error
+                'mean_rms': Lowest mean map error.
+                'max_rms: Lowest maximum map error.
+                'valid_time': Highest valid prediction time.'
+            gross_frac_metrix: If using 'gross_frac' as a metric, this is the secondary metric that will be used if multiple parameters give equally good prediction results.
+            gross_err_bnd: The cutoff in the mean map error above which predictions are considered to have gross error.
+            reduce_fun: Function for computing the overall performance for a given set of parameters over many tests.
+        Returns:
+            Pandas DataFrame containing the sliced and optimized prediction results.
+        Raises:
+            ValueError: If any of the inputs are not recognized/incompatible."""
         input_list = [res, train, test, reg_train, noise, reg]
         name_list = np.array(['res', 'train', 'test', 'reg_train', 'noise', 'reg'])
         data_names = [name for name in self.data.columns if name not in name_list]
@@ -835,7 +939,7 @@ class ResData:
             elif len(reduce_axes) == 0:
                 print('median_flag is True, but no axes to compute the median over are specified.')
                 raise ValueError
-            elif not all(axis in ['res', 'train', 'test', 'noise', 'reg'] for axis in reduce_axes) or \
+            elif not all(axis in ['res', 'train', 'test', 'noise', 'reg','reg_train'] for axis in reduce_axes) or \
                     len(reduce_axes) != len(set(reduce_axes)):
                 print('reduce_axis max only contain res, train, test, noise, or reg.')
                 raise ValueError
