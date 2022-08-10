@@ -4,27 +4,6 @@ from numpy.fft import fft, ifft
 
 from numba import jit, prange, objmode
 
-
-class ModelParams():
-    def __init__(N, d, tau, M = 16, const = 0):
-        self.N = N
-        self.d = d
-        self.L = L
-        self.tau = tau
-        self.M = M
-        self.const = const
-        self.k = np.concatenate((np.arange(int(N/2)), np.arange(-int(N/2), 0)))*2*np.pi/d
-        L = (1+const)*k**2.0 - k**4.0
-        self.E = np.exp(tau*L)
-        self.E2 = np.exp(tau/2*L)
-        r = np.exp(1j * np.pi * (np.arange(1, M+1)-0.5)/M)
-        LR = tau*(np.zeros((1,M)) + L.reshape(-1,1)) + (np.zeros((N,1)) + r)
-        self.Q  = tau*np.real(np.mean((np.exp(LR/2)-1)/LR, axis = 1))
-        self.f1 = tau*np.real(np.mean((-4-LR+np.exp(LR)*(4-3*LR+LR**2.0))/(LR**3.0), axis = 1))
-        self.f2 = tau*np.real(np.mean((2+LR+np.exp(LR)*(-2+LR))/(LR**3.0), axis = 1))
-        self.f3 = tau*np.real(np.mean((-4-3*LR-LR**2.0+np.exp(LR)*(4-LR))/(LR**3.0), axis = 1))
-        self.g  = -0.5*1j*k
-
 @jit(nopython = True, fastmath = True, parallel = True)
 def mean_numba_axis1(mat):
 

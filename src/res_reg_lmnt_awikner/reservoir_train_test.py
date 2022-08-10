@@ -1200,7 +1200,7 @@ def get_test_data(run_opts, test_stream, overall_idx, rkTime, split):
             u0 = (test_stream[i].random(64) * 2 - 1) * 0.6
             u0 = u0 - np.mean(u0)
         u_arr_train_nonoise, rktest_u_arr_test[:, :, i], p, params = numerical_model_wrapped(tau=run_opts.tau,
-                                                                                         T=rkTime + transient,
+                                                                                         T=rkTime + transient + split,
                                                                                          ttsplit=split + transient,
                                                                                          u0=u0, system=run_opts.system,
                                                                                          params=params)
@@ -1314,8 +1314,8 @@ def test_wrapped(res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_
                 else:
                     # if check_vt:
                     check_vt = False
-            print('Valid Time')
-            print(valid_time[i, k])
+            #print('Valid Time')
+            #print(valid_time[i, k])
             res_X = np.zeros((res_X.shape[0], max_valid_time + 2))
             res_X, p = get_X_wrapped(np.ascontiguousarray(
                 rktest_u_arr_test[:, k * max_valid_time:(k + 1) * max_valid_time + 1, i]), res_X, Win_data, Win_indices,
@@ -1511,8 +1511,6 @@ def find_stability(run_opts, noise, train_seed, train_gen, res_itr, res_gen, tes
             rkTime_test = int(run_opts.test_time)
         split_test = int(run_opts.sync_time)
 
-        # rkTime_test = 3000
-    # split_test  = 2000
     rktest_u_arr_train_nonoise, rktest_u_arr_test, params = get_test_data(
         run_opts, test_stream, overall_idx, rkTime=rkTime_test, split=split_test)
     # np.random.seed(train_seed)

@@ -38,10 +38,10 @@ def process_data(argv=None, run_opts=None):
     reg_values = run_opts.reg_values
     reg_train_times = run_opts.reg_train_times
 
-    print("Regularization training times:")
-    print(reg_train_times)
-    print(type(reg_train_times))
-    print(reg_train_times.shape)
+    #print("Regularization training times:")
+    #print(reg_train_times)
+    #print(type(reg_train_times))
+    #print(reg_train_times.shape)
 
     rkTime = run_opts.test_time
     split = run_opts.sync_time
@@ -54,14 +54,14 @@ def process_data(argv=None, run_opts=None):
     res_vals = np.arange(run_opts.res_start, run_opts.res_start + run_opts.res_per_test)
     train_vals = np.arange(run_opts.train_start, run_opts.train_start + run_opts.num_trains)
     test_vals = np.arange(run_opts.test_start, run_opts.test_start + run_opts.num_tests)
-    print('Trains:')
-    print(train_vals)
-    print('Noise:')
-    print(noise_vals)
-    print('Res')
-    print(run_opts.res_per_test)
-    print('Regs:')
-    print(reg_values)
+    #print('Trains:')
+    #print(train_vals)
+    #print('Noise:')
+    #print(noise_vals)
+    #print('Res')
+    #print(run_opts.res_per_test)
+    #print('Regs:')
+    #print(reg_values)
 
     stable_frac = np.zeros(
         (run_opts.res_per_test, train_vals.size, noise_vals.size, reg_values.size, reg_train_times.size))
@@ -89,10 +89,10 @@ def process_data(argv=None, run_opts=None):
         eigenvals_in = np.zeros((run_opts.res_per_test, train_vals.size, noise_vals.size, reg_train_times.size),
                                 dtype=object)
 
-    print(np.arange(run_opts.res_per_test, dtype=int))
-    print(np.arange(run_opts.num_trains, dtype=int))
-    print(list(enumerate(noise_vals)))
-    print(list(enumerate(reg_train_times)))
+    #print(np.arange(run_opts.res_per_test, dtype=int))
+    #print(np.arange(run_opts.num_trains, dtype=int))
+    #print(list(enumerate(noise_vals)))
+    #print(list(enumerate(reg_train_times)))
     print('Loading in raw data...')
     load_tic = time.perf_counter()
     if os.name == 'nt':
@@ -154,8 +154,8 @@ def process_data(argv=None, run_opts=None):
                                       np.arange(train_vals.size, dtype=int), np.arange(noise_vals.size, dtype=int),
                                       np.arange(reg_train_times.size, dtype=int)):
                 eigenvals[i, j, k, l] = eigenvals_in[i, j, k, l]
-            print('Eigenvals shape:')
-            print(eigenvals.shape)
+            #print('Eigenvals shape:')
+            #print(eigenvals.shape)
     else:
         for (i, res), (j, train), (k, noise), (l, reg_train_time) in product(
                 enumerate(np.arange(run_opts.res_start, run_opts.res_start + run_opts.res_per_test, dtype=int)),
@@ -206,8 +206,8 @@ def process_data(argv=None, run_opts=None):
         for i, j, k, l in product(np.arange(run_opts.res_per_test, dtype=int), np.arange(train_vals.size, dtype=int),
                                   np.arange(noise_vals.size, dtype=int), np.arange(reg_train_times.size, dtype=int)):
             eigenvals[i, j, k, l] = eigenvals_in[i, j, k, l]
-        print('Eigenvals shape:')
-        print(eigenvals.shape)
+        #print('Eigenvals shape:')
+        #print(eigenvals.shape)
     load_toc = time.perf_counter()
     print('All data loaded in %0.2f sec.' % (load_toc - load_tic))
 
@@ -267,10 +267,10 @@ def process_data(argv=None, run_opts=None):
             data_out['pmap_max_wass_dist'] = pmap_max_wass_dist[
                 all_res_idx, all_train_idx, all_test_idx, all_noise_idx, all_reg_idx, all_reg_train_idx]
         if run_opts.save_eigenvals:
-            print(data_out[all_test_idx == 0].shape)
-            print(data_out[all_test_idx == 0][['res', 'train', 'test', 'noise', 'reg', 'reg_train']])
-            print(eigenvals[all_res_idx, all_train_idx, all_noise_idx, all_reg_train_idx].shape)
-            print(['eig%d' % (i + 1) for i in range(eigenvals.shape[-1])])
+            #print(data_out[all_test_idx == 0].shape)
+            #print(data_out[all_test_idx == 0][['res', 'train', 'test', 'noise', 'reg', 'reg_train']])
+            #print(eigenvals[all_res_idx, all_train_idx, all_noise_idx, all_reg_train_idx].shape)
+            #print(['eig%d' % (i + 1) for i in range(eigenvals.shape[-1])])
             eigenval_idx = (all_test_idx == 0) & (all_reg_idx == 0)
             data_out.at[eigenval_idx, ['eig%d' % (i + 1) for i in range(eigenvals.shape[-1])]] = \
                 eigenvals[all_res_idx[eigenval_idx], all_train_idx[eigenval_idx], all_noise_idx[eigenval_idx], \
@@ -285,7 +285,7 @@ def process_data(argv=None, run_opts=None):
             data_out = pd.concat([data_out, pd.DataFrame(
                 rms[all_res_idx, all_train_idx, all_test_idx, all_noise_idx, :, all_reg_idx, all_reg_train_idx],
                 columns=['rms%d' % (i + 1) for i in range((rkTime - split))])], axis=1)
-            print('Concatenated rms')
+            #print('Concatenated rms')
 
         if saved_flag:
             saved_cols = saved_data.columns.to_list()
@@ -460,9 +460,9 @@ def process_data(argv=None, run_opts=None):
                                   np.arange(run_opts.test_start, run_opts.test_start + run_opts.num_tests),
                                   zip(noise_vals_set, reg_train_times_set,
                                       reg_values[best_j[noise_vals_set_idx, reg_train_times_set_idx]]))]
-        print('Pred file names')
-        for file in pred_files:
-            print(file)
+        #print('Pred file names')
+        #for file in pred_files:
+        #    print(file)
         all_files = os.listdir(run_opts.run_folder_name)
         for file in all_files:
             if file not in pred_files and 'true_test' not in file:
