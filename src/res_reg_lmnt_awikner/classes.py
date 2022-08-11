@@ -59,7 +59,8 @@ class RunOpts:
                  reg_train_times=None,
                  root_folder=None,
                  prior='zero',
-                 save_truth=False):
+                 save_truth=False,
+                 dyn_noise=0):
         """Initializes the RunOpts class.
 
         Raises:
@@ -78,6 +79,8 @@ class RunOpts:
         """Time between each data point in the time series data. If system = 'lorenz', this value must be evenly divided
         by 0.01 (the integration time step). If left as None, then the class will set tau to the default value for the
         particular dynamical system. Default: None"""
+        self.dyn_noise = dyn_noise
+        """Magnitude of dynamical noise added to true system state at each integration step. Default: 0"""
         self.train_time = train_time
         """Number of training data points. Default: 20000"""
         self.test_time = test_time
@@ -268,6 +271,10 @@ class RunOpts:
             pmap_flag = '_wpmap0'
         else:
             pmap_flag = ''
+        if self.dyn_noise == 0:
+            dyn_noise_str = ''
+        else:
+            dyn_noise_str = '_dnoise%e' % self.dyn_noise
         data_folder_base = os.path.join(self.root_folder, 'Data')
         if not os.path.isdir(data_folder_base):
             os.mkdir(data_folder_base)
@@ -275,19 +282,19 @@ class RunOpts:
         if not self.return_all:
             data_folder = os.path.join(data_folder_base, '%s_noisetest_noisetype_%s_traintype_%s' % (
                 self.system, self.noisetype, self.traintype))
-            run_name = ('%s%s%s%s%s%s_rho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f'
+            run_name = ('%s%s%s%s%s%s%s_rho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f'
                         '_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s%s_metric_%s') \
-                       % (self.system, predflag, timeflag, eigenval_flag, pmap_flag, squarenodes_flag, self.rho,
-                          self.sigma, self.leakage, self.win_type, self.bias_type, self.tau, self.res_size,
+                       % (self.system, predflag, timeflag, eigenval_flag, pmap_flag, squarenodes_flag, dyn_noise_str,
+                          self.rho, self.sigma, self.leakage, self.win_type, self.bias_type, self.tau, self.res_size,
                           self.train_time, self.noise_realizations, self.noisetype, self.traintype, prior_str,
                           self.metric)
         else:
             data_folder = os.path.join(data_folder_base, '%s_noisetest_noisetype_%s_traintype_%s' % (
                 self.system, self.noisetype, self.traintype))
-            run_name = ('%s%s%s%s%s%s_rho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f'
+            run_name = ('%s%s%s%s%s%s%s_rho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f'
                         '_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s%s') % (
-                           self.system, predflag, timeflag, eigenval_flag, pmap_flag, squarenodes_flag, self.rho,
-                           self.sigma,
+                           self.system, predflag, timeflag, eigenval_flag, pmap_flag, squarenodes_flag, dyn_noise_str,
+                           self.rho, self.sigma,
                            self.leakage, self.win_type, self.bias_type, self.tau, self.res_size, self.train_time,
                            self.noise_realizations, self.noisetype, self.traintype, prior_str)
 
@@ -782,7 +789,7 @@ class NumericalModel:
 
         if system == 'lorenz':
             u_arr = np.ascontiguousarray(rungekutta(
-                u0[0], u0[1], u0[2], T, tau))
+                u0, T, tau, int_step))
             self.input_size = 3
 
             u_arr[0] = (u_arr[0] - 0) / 7.929788629895004

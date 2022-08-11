@@ -39,10 +39,10 @@ def precompute_KS_params(N, d, tau, M = 16, const = 0):
 
 
 @jit(nopython = True, fastmath = True)
-def kursiv_forecast(u, params):
+def kursiv_forecast(u, params, noise = np.zeros(1, dtype = np.double)):
 
     with objmode(unext = 'double[:]'):
-        v  = fft(u)
+        v  = fft(u + noise)
         Nv = params[6]*fft(np.real(ifft(v))**2.0)
         a  = params[1]*v + params[2]*Nv
         Na = params[6]*fft(np.real(ifft(a))**2.0)
@@ -55,10 +55,10 @@ def kursiv_forecast(u, params):
     return unext
 
 @jit(nopython = True, fastmath = True)
-def kursiv_forecast_pred(u, params):
+def kursiv_forecast_pred(u, params, noise = np.zeros((1,1), dtype = np.double)):
     u = np.ascontiguousarray(u.T)
     with objmode(unext = 'double[:,:]'):
-        v  = fft(u,axis = 1)
+        v  = fft(u + noise,axis = 1)
         Nv = params[6]*fft(np.real(ifft(v, axis = 1))**2.0, axis = 1)
         a  = params[1]*v + params[2]*Nv
         Na = params[6]*fft(np.real(ifft(a, axis = 1))**2.0, axis = 1)
@@ -72,7 +72,8 @@ def kursiv_forecast_pred(u, params):
 
 
 @jit(nopython = True, fastmath = True)
-def kursiv_predict(u0, tau = 0.25, N = 64, d = 22, T = 100, params = np.array([[],[]], dtype = np.complex128), int_steps = 1):
+def kursiv_predict(u0, tau = 0.25, N = 64, d = 22, T = 100, params = np.array([[],[]], dtype = np.complex128),
+                   int_steps = 1, noise = np.zeros((1,1), dtype = np.double)):
     if params.size == 0:
         new_params = precompute_KS_params(N, d, tau)
     else:
@@ -82,17 +83,23 @@ def kursiv_predict(u0, tau = 0.25, N = 64, d = 22, T = 100, params = np.array([[
 
     u_arr = np.zeros((N, steps+int_steps))
     u_arr[:,0] = u0
-    for i in range(steps+int_steps-1):
-        u_arr[:,i+1] = kursiv_forecast(u_arr[:,i], new_params)
+    if noise.size == 1 and noise[0,0] == 0.:
+        for i in range(steps+int_steps-1):
+            u_arr[:,i+1] = kursiv_forecast(u_arr[:,i], new_params)
+    else:
+        for i in range(steps+int_steps-1):
+            u_arr[:,i+1] = kursiv_forecast(u_arr[:,i], new_params, noise[:,i])
     return np.ascontiguousarray(u_arr[:,::int_steps]), new_params
 
 @jit(nopython = True, fastmath = True)
-def kursiv_predict_pred(u0_array, tau = 0.25, N = 64, d = 22, T = 100, params = np.array([[],[]], dtype = np.complex128)):
+def kursiv_predict_pred(u0_array, tau = 0.25, N = 64, d = 22, T = 100, params = np.array([[],[]], dtype = np.complex128),
+                        noise = np.zeros((1,1), dtype = np.double)):
     if params.size == 0:
         new_params = precompute_KS_params(N, d, tau)
     else:
         new_params = params
-    steps = T
-
-    u_arr = kursiv_forecast_pred(u0_array, new_params)
+    if noise.size == 1 and noise[0, 0] == 0.:
+        u_arr = kursiv_forecast_pred(u0_array, new_params)
+    else:
+        u_arr = kursiv_forecast_pred(u0_array, new_params, noise)
     return u_arr, new_params
