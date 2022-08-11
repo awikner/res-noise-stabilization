@@ -8,6 +8,7 @@ from scipy.linalg import solve, solve_sylvester
 from scipy.sparse.linalg import eigsh
 from numba import njit
 from numba.typed import List
+import math
 import time
 
 from res_reg_lmnt_awikner.lorenzrungekutta_numba import rungekutta, rungekutta_pred
@@ -1334,19 +1335,20 @@ def test_wrapped(res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_
                 check_vt = True
         if array_compute:
             if system == 'lorenz':
+                int_step = math.trunc(tau / 0.01)
                 rkmap_u_arr_train = numerical_model_wrapped_pred(u0_array=np.stack((pred_full[0] * 7.929788629895004,
                                                                 pred_full[1] * 8.9932616136662,
                                                                 pred_full[2] * 8.575917849311919 + 23.596294463016896)),
-                                                             h=0.01, system=system, params=params, tau=tau,
+                                                             int_step = int_step, system=system, params=params, tau=tau,
                                                              ttsplit=pred_full.shape[1])[0]
             elif system == 'KS':
                 u0 = pred_full * 1.1876770355823614
                 rkmap_u_arr_train = numerical_model_wrapped_pred(
-                    u0_array=u0, h=tau, T=1, system=system, params=params, ttsplit=pred_full.shape[1])[0]
+                    u0_array=u0, h=tau, T=1, int_step = 1, system=system, params=params, ttsplit=pred_full.shape[1])[0]
             elif system == 'KS_d2175':
                 u0 = pred_full * 1.2146066380280796
                 rkmap_u_arr_train = numerical_model_wrapped_pred(
-                    u0_array=u0, h=tau, T=1, system=system, params=params, ttsplit=pred_full.shape[1])[0]
+                    u0_array=u0, h=tau, T=1, int_step = 1, system=system, params=params, ttsplit=pred_full.shape[1])[0]
             # print(rkmap_u_arr_train[0,:10])
             x2y2z2 = sum_numba_axis0(
                 (pred_full[:, 1:] - rkmap_u_arr_train[:, :-1]) ** 2.0)
@@ -1355,17 +1357,18 @@ def test_wrapped(res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_
             for j in range(1, pred_full[0].size):
 
                 if system == 'lorenz':
+                    int_step = math.trunc(tau / 0.01)
                     rkmap_u_arr_train = \
                         numerical_model_wrapped(u0 = np.array([pred_full[0][j - 1] * 7.929788629895004,
                                             pred_full[1][j - 1] * 8.9932616136662,
                                             pred_full[2][j - 1] * 8.575917849311919 + 23.596294463016896]),
-                                            h=0.01, T=1, tau=tau, system=system, params=params)[0]
+                                            int_step = int_step, T=1, tau=tau, system=system, params=params)[0]
                 elif system == 'KS':
                     u0 = pred_full[:, j - 1] * (1.1876770355823614)
-                    rkmap_u_arr_train = numerical_model_wrapped(h=tau, T=1, u0=u0, system=system, params=params)[0]
+                    rkmap_u_arr_train = numerical_model_wrapped(h=tau, T=1, u0=u0, system=system, int_step = 1, params=params)[0]
                 elif system == 'KS_d2175':
                     u0 = pred_full[:, j - 1] * (1.2146066380280796)
-                    rkmap_u_arr_train = numerical_model_wrapped(h=tau, T=1, u0=u0, system=system, params=params)[0]
+                    rkmap_u_arr_train = numerical_model_wrapped(h=tau, T=1, u0=u0, system=system, int_step = 1, params=params)[0]
 
                 x2y2z2[j - 1] = np.sum((pred_full[:, j] - rkmap_u_arr_train[:, 1]) ** 2)
         rms_test = np.sqrt(x2y2z2 / pred_full.shape[0])
