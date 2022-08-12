@@ -1,8 +1,8 @@
 import sys,os
 from res_reg_lmnt_awikner.helpers import set_numba
-from res_reg_lmnt_awikner.reservoir_train_test import start_reservoir_test
-from res_reg_lmnt_awikner.process_test_data import process_data
-from res_reg_lmnt_awikner.classes import RunOpts, ResData
+from src.res_reg_lmnt_awikner.reservoir_train_test import start_reservoir_test
+from src.res_reg_lmnt_awikner.process_test_data import process_data
+from src.res_reg_lmnt_awikner.classes import RunOpts, ResData
 
 import subprocess
 import numpy as np
@@ -44,15 +44,15 @@ test_time       = 16000
 return_all      = True
 savepred        = False
 save_time_rms   = False
-debug_mode      = False
+debug_mode      = True
 ifray           = True
-just_process    = True
-just_display    = True
-nojit           = True
-res_per_test    = 20
-#res_per_test    = 4
-num_trains      = 10
-#num_trains      = 3
+just_process    = False
+just_display    = False
+nojit           = False
+#res_per_test    = 20
+res_per_test    = 4
+#num_trains      = 10
+num_trains      = 3
 num_tests       = 5
 cpus_per_node   = 4
 metric          = 'mss_var'

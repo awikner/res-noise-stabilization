@@ -11,11 +11,11 @@ from numba.typed import List
 import math
 import time
 
-from res_reg_lmnt_awikner.lorenzrungekutta_numba import rungekutta, rungekutta_pred
-from res_reg_lmnt_awikner.ks_etdrk4 import kursiv_predict, kursiv_predict_pred
+from src.res_reg_lmnt_awikner.lorenzrungekutta_numba import rungekutta, rungekutta_pred
+from src.res_reg_lmnt_awikner.ks_etdrk4 import kursiv_predict, kursiv_predict_pred
 from res_reg_lmnt_awikner.csc_mult import *
 from res_reg_lmnt_awikner.helpers import get_windows_path, poincare_max
-from res_reg_lmnt_awikner.classes import RunOpts, NumericalModel, Reservoir, ResOutput
+from src.res_reg_lmnt_awikner.classes import RunOpts, NumericalModel, Reservoir, ResOutput
 
 warnings.filterwarnings("ignore", category=NumbaPerformanceWarning)
 
@@ -1344,11 +1344,11 @@ def test_wrapped(res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_
             elif system == 'KS':
                 u0 = pred_full * 1.1876770355823614
                 rkmap_u_arr_train = numerical_model_wrapped_pred(
-                    u0_array=u0, h=tau, T=1, int_step = 1, system=system, params=params, ttsplit=pred_full.shape[1])[0]
+                    u0_array=u0, tau=tau, T=1, int_step = 1, system=system, params=params, ttsplit=pred_full.shape[1])[0]
             elif system == 'KS_d2175':
                 u0 = pred_full * 1.2146066380280796
                 rkmap_u_arr_train = numerical_model_wrapped_pred(
-                    u0_array=u0, h=tau, T=1, int_step = 1, system=system, params=params, ttsplit=pred_full.shape[1])[0]
+                    u0_array=u0, tau=tau, T=1, int_step = 1, system=system, params=params, ttsplit=pred_full.shape[1])[0]
             # print(rkmap_u_arr_train[0,:10])
             x2y2z2 = sum_numba_axis0(
                 (pred_full[:, 1:] - rkmap_u_arr_train[:, :-1]) ** 2.0)
@@ -1365,10 +1365,10 @@ def test_wrapped(res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_
                                             int_step = int_step, T=1, tau=tau, system=system, params=params)[0]
                 elif system == 'KS':
                     u0 = pred_full[:, j - 1] * (1.1876770355823614)
-                    rkmap_u_arr_train = numerical_model_wrapped(h=tau, T=1, u0=u0, system=system, int_step = 1, params=params)[0]
+                    rkmap_u_arr_train = numerical_model_wrapped(tau=tau, T=1, u0=u0, system=system, int_step = 1, params=params)[0]
                 elif system == 'KS_d2175':
                     u0 = pred_full[:, j - 1] * (1.2146066380280796)
-                    rkmap_u_arr_train = numerical_model_wrapped(h=tau, T=1, u0=u0, system=system, int_step = 1, params=params)[0]
+                    rkmap_u_arr_train = numerical_model_wrapped(tau=tau, T=1, u0=u0, system=system, int_step = 1, params=params)[0]
 
                 x2y2z2[j - 1] = np.sum((pred_full[:, j] - rkmap_u_arr_train[:, 1]) ** 2)
         rms_test = np.sqrt(x2y2z2 / pred_full.shape[0])
