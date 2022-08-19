@@ -29,7 +29,7 @@ def rk4(x, tau, dxdt):
     return xnext
 
 @jit(nopython = True, fastmath = True)
-def rungekutta(u0 = np.array([1,1,1]), T = 100, tau = 0.1, int_step = 10):
+def lorenzrungekutta(u0 = np.array([1,1,30]), T = 100, tau = 0.1, int_step = 10):
     steps = T*int_step
     output = np.zeros((3,steps+int_step))
     output[:,0] = u0
@@ -42,7 +42,7 @@ def rungekutta(u0 = np.array([1,1,1]), T = 100, tau = 0.1, int_step = 10):
     return output[:,::int_step]
 
 @jit(nopython = True, fastmath = True)
-def rungekutta_pred(u0_array, tau = 0.1, int_step = 10):
+def lorenzrungekutta_pred(u0_array, tau = 0.1, int_step = 10):
 
     #loops from t = 0 to T
     for i in range(0, int_step):

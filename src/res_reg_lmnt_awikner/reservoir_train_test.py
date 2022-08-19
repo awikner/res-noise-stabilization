@@ -10,7 +10,7 @@ from numba import njit
 from numba.typed import List
 import time
 
-from res_reg_lmnt_awikner.lorenzrungekutta_numba import rungekutta, rungekutta_pred
+from res_reg_lmnt_awikner.lorenzrungekutta_numba import lorenzrungekutta, lorenzrungekutta_pred
 from res_reg_lmnt_awikner.ks_etdrk4 import kursiv_predict, kursiv_predict_pred
 from res_reg_lmnt_awikner.csc_mult import *
 from res_reg_lmnt_awikner.helpers import get_windows_path, poincare_max
@@ -136,8 +136,7 @@ def numerical_model_wrapped(h=0.01, tau=0.1, T=300, ttsplit=5000, u0=0, system='
     # Numba function for obtaining training and testing dynamical system time series data
     if system == 'lorenz':
         int_step = int(tau / h)
-        u_arr = np.ascontiguousarray(rungekutta(
-            u0[0], u0[1], u0[2], T, tau, int_step))
+        u_arr = np.ascontiguousarray(lorenzrungekutta(u0, T, tau, int_step))
 
         u_arr[0] = (u_arr[0] - 0) / 7.929788629895004
         u_arr[1] = (u_arr[1] - 0) / 8.9932616136662
@@ -166,7 +165,7 @@ def numerical_model_wrapped_pred(h=0.01, tau=0.1, T=300, ttsplit=5000, u0_array=
     if system == 'lorenz':
         int_step = int(tau / h)
         u_arr = np.ascontiguousarray(
-            rungekutta_pred(u0_array, tau, int_step))
+            lorenzrungekutta_pred(u0_array, tau, int_step))
 
         u_arr[0] = (u_arr[0] - 0) / 7.929788629895004
         u_arr[1] = (u_arr[1] - 0) / 8.9932616136662
