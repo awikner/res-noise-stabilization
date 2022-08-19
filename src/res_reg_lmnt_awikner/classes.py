@@ -7,7 +7,7 @@ import sys
 import os
 import getopt
 from res_reg_lmnt_awikner.helpers import get_windows_path, get_filename
-from res_reg_lmnt_awikner.lorenzrungekutta_numba import rungekutta
+from res_reg_lmnt_awikner.lorenzrungekutta_numba import lorenzrungekutta
 from res_reg_lmnt_awikner.ks_etdrk4 import kursiv_predict
 from scipy.sparse.linalg import eigs
 from scipy.sparse import csc_matrix
@@ -781,7 +781,7 @@ class NumericalModel:
             Complete NumericalModel object with precomputed internal parameters."""
 
         if system == 'lorenz':
-            u_arr = np.ascontiguousarray(rungekutta(
+            u_arr = np.ascontiguousarray(lorenzrungekutta(
                 u0[0], u0[1], u0[2], T, tau))
             self.input_size = 3
 
