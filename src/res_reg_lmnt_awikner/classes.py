@@ -782,7 +782,7 @@ class NumericalModel:
 
         if system == 'lorenz':
             u_arr = np.ascontiguousarray(lorenzrungekutta(
-                u0[0], u0[1], u0[2], T, tau))
+                u0, T, tau, int_step))
             self.input_size = 3
 
             u_arr[0] = (u_arr[0] - 0) / 7.929788629895004
@@ -791,11 +791,11 @@ class NumericalModel:
             self.params = params
 
         elif system == 'KS':
-            u_arr, self.params = kursiv_predict(u0, tau=tau, T=T, params=params)
+            u_arr, self.params = kursiv_predict(u0, tau=tau, T=T, params=params, int_steps = int_step)
             self.input_size = u_arr.shape[0]
             u_arr = np.ascontiguousarray(u_arr) / (1.1876770355823614)
         elif system == 'KS_d2175':
-            u_arr, self.params = kursiv_predict(u0, tau=tau, T=T, d=21.75, params=params)
+            u_arr, self.params = kursiv_predict(u0, tau=tau, T=T, d=21.75, params=params, int_steps = int_step)
             self.input_size = u_arr.shape[0]
             u_arr = np.ascontiguousarray(u_arr) / (1.2146066380280796)
         else:
