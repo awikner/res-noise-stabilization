@@ -1,8 +1,8 @@
 import sys,os
 from res_reg_lmnt_awikner.helpers import set_numba
-from res_reg_lmnt_awikner.reservoir_train_test import start_reservoir_test
-from res_reg_lmnt_awikner.process_test_data import process_data
-from res_reg_lmnt_awikner.classes import RunOpts, ResData
+from src.res_reg_lmnt_awikner.reservoir_train_test import start_reservoir_test
+from src.res_reg_lmnt_awikner.process_test_data import process_data
+from src.res_reg_lmnt_awikner.classes import RunOpts, ResData
 
 import subprocess
 import numpy as np
@@ -49,10 +49,10 @@ ifray           = True
 just_process    = False
 just_display    = False
 nojit           = False
-res_per_test    = 20
-#res_per_test    = 4
-num_trains      = 10
-#num_trains      = 3
+#res_per_test    = 20
+res_per_test    = 4
+#num_trains      = 10
+num_trains      = 3
 num_tests       = 5
 cpus_per_node   = 4
 metric          = 'mss_var'
@@ -71,7 +71,7 @@ reg_train_times_all = [np.array([20000]),
 set_numba(os.getcwd(),nojit)
 all_data = []
 all_run_opts = []
-for i, (noisetype, traintype, noise_values_array, reg_values, reg_train_times_in) in enumerate(zip(noisetypes, traintypes, noise_values_array_all, reg_values_all, reg_train_times_all)): 
+for i, (noisetype, traintype, noise_values_array, reg_values, reg_train_times_in) in enumerate(zip(noisetypes, traintypes, noise_values_array_all, reg_values_all, reg_train_times_all)):
     run_opts = RunOpts(system = system, traintype = traintype, noisetype = noisetype, noise_realizations = noise_realizations,
             res_size = res_size, train_time = train_time, test_time = test_time, rho = rho, sigma = sigma, leakage = leakage,
             tau = tau, win_type = win_type, bias_type = bias_type, noise_values_array = noise_values_array,
@@ -83,10 +83,10 @@ for i, (noisetype, traintype, noise_values_array, reg_values, reg_train_times_in
             prior = prior, save_eigenvals = save_eigenvals, num_cpus = cpus_per_node)
     if not just_process:
         start_reservoir_test(run_opts=run_opts)
-        time.sleep(5)    
+        time.sleep(5)
     if not just_display:
         process_data(run_opts=run_opts)
-    all_data.append(ResData(run_opts)) 
+    all_data.append(ResData(run_opts))
     all_run_opts.append(run_opts)
 
 lyapunov_time = 1./tau/0.048

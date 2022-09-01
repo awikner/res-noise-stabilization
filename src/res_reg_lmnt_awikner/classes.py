@@ -59,7 +59,8 @@ class RunOpts:
                  reg_train_times=None,
                  root_folder=None,
                  prior='zero',
-                 save_truth=False):
+                 save_truth=False,
+                 dyn_noise=0):
         """Initializes the RunOpts class.
 
         Raises:
@@ -70,7 +71,7 @@ class RunOpts:
             the other inputs or defaults. If multiple instances of the same variable are given, the class will default
             to the command line input. See RunOpts.get_run_opts for more information. Default: None"""
         self.system = system
-        """String denoting which dynamical system we are obtaining time series data from. Options: 'lorenz' for the 
+        """String denoting which dynamical system we are obtaining time series data from. Options: 'lorenz' for the
         Lorenz 63 equations, 'KS' for the Kuramoto-Sivashinsky equation with 64 grid points and a periodicity length of
         22, and KS_d2175 for the Kuramoto-Sivashinksy equation with 64 grid points and a periodicity length of 21.75.
         Default: 'KS'"""
@@ -78,10 +79,12 @@ class RunOpts:
         """Time between each data point in the time series data. If system = 'lorenz', this value must be evenly divided
         by 0.01 (the integration time step). If left as None, then the class will set tau to the default value for the
         particular dynamical system. Default: None"""
+        self.dyn_noise = dyn_noise
+        """Magnitude of dynamical noise added to true system state at each integration step. Default: 0"""
         self.train_time = train_time
         """Number of training data points. Default: 20000"""
         self.test_time = test_time
-        """Number of testing data points. If left as None, then the class will default to 4000 if system = 'lorenz', or 
+        """Number of testing data points. If left as None, then the class will default to 4000 if system = 'lorenz', or
         16000 if system = 'KS' or 'KS_d2175'. Default: None"""
         self.sync_time = sync_time
         """Number of data points used to synchronize the reservoir to each test data set. Default: 2000"""
@@ -101,10 +104,10 @@ class RunOpts:
         """Boolean denoting whether or not the squared node states are including in the reservoir feature vector.
         Default: True"""
         self.bias_type = bias_type
-        """Type of reservoir input bias to be used. See the Reservoir class for available options. 
+        """Type of reservoir input bias to be used. See the Reservoir class for available options.
         Default: new_random"""
         self.win_type = win_type
-        """Type of input coupling matrix to be used. See the Reservoir class for available options. 
+        """Type of input coupling matrix to be used. See the Reservoir class for available options.
         Default: full_0centered"""
         self.traintype = traintype
         """Type of training to be used to determine the reservoir output coupling matrix. There are a number of options
@@ -112,12 +115,12 @@ class RunOpts:
 
         'normal' - Standard reservoir training, potentially with input noise added.
 
-        'gradientk%d' % (Number of noise steps) - Reservoir training with no noise and LMNT regularization for a number of 
+        'gradientk%d' % (Number of noise steps) - Reservoir training with no noise and LMNT regularization for a number of
         noise steps > 1, or Jacobian regularization for a number of noise steps = 1.
 
         'regzerok%d' % (Number of noise steps) - Reservoir training with no noise and LMNT/Jacobian regularization computed
         using a zero-input and zero reservoir state.
-        
+
         Default: 'normal'
         """
         self.noisetype = noisetype
@@ -129,9 +132,9 @@ class RunOpts:
         will be tested separately using each of the reservoirs, training, and testing data sets.
         Default: np.logspace(-4, 3, num=3, base=10)"""
         self.reg_train_times = reg_train_times
-        """Numpy array containing the number of training data points to be used to train the LMNT or Jacobian 
+        """Numpy array containing the number of training data points to be used to train the LMNT or Jacobian
         regularization. If left as None, then the class will default to an array containing only
-        the total number of training data points for standard LMNT/Jacobian or the number of noise steps 
+        the total number of training data points for standard LMNT/Jacobian or the number of noise steps
         if using zero-input LMNT. Default: None"""
         self.noise_realizations = noise_realizations
         """Number of input noise realizations used to train the reservoir (if training with noise). If not training with
@@ -146,7 +149,7 @@ class RunOpts:
         'zero' - Standard Tikhonov regularization with a zero prior.
 
         'input_pass' - Tikhonov regularization with a persistence prior (i.e., set the input pass-through weights to 1).
-        
+
         Default: 'zero'"""
         self.max_valid_time = max_valid_time
         """Maximum valid time for each valid time test during the testing period. This should be set so that
@@ -166,7 +169,7 @@ class RunOpts:
         """Starting iterate for generating the random seeds that are used to generate the testing data sets.
         Default: 0"""
         self.root_folder = root_folder
-        """Location where output data will be stored in the Data folder. If None, then defaults to the current working 
+        """Location where output data will be stored in the Data folder. If None, then defaults to the current working
         directory. Default: None"""
         self.return_all = return_all
         """Boolean for determining of all results should be returned, or only the results with the obtained using the
@@ -186,18 +189,18 @@ class RunOpts:
         self.save_truth = save_truth
         """Boolean for determining if the true testing data should be saved. Default: False"""
         self.ifray = ifray
-        """Boolean for determining if ray should be used to compute results for multiple reservoirs and training 
+        """Boolean for determining if ray should be used to compute results for multiple reservoirs and training
         data sets. Default: False"""
         self.num_cpus = num_cpus
         """If using ray for paralellization, this sets the number of cpus to be used. Default: 1"""
         self.machine = machine
-        """Machine which results are computed on. Leave as personal unless you are connecting to a ray cluster 
+        """Machine which results are computed on. Leave as personal unless you are connecting to a ray cluster
         elsewhere. Default: 'personal'"""
         self.runflag = runflag
         """True indicates that we are about to compute results, and the appropriate directories should be created.
         Otherwise, we do not create additional directories. Default: True"""
         self.debug_mode = debug_mode
-        """Boolean for determining if errors during reservoir training which could arise from non-convergence of the 
+        """Boolean for determining if errors during reservoir training which could arise from non-convergence of the
         eigenvalue solver should be suppressed. If left as False, will suppress errors im much of the core code,
         so this should be set to True if making changes. Default: False"""
         if not isinstance(argv, type(None)):
@@ -268,6 +271,10 @@ class RunOpts:
             pmap_flag = '_wpmap0'
         else:
             pmap_flag = ''
+        if self.dyn_noise == 0:
+            dyn_noise_str = ''
+        else:
+            dyn_noise_str = '_dnoise%e' % self.dyn_noise
         data_folder_base = os.path.join(self.root_folder, 'Data')
         if not os.path.isdir(data_folder_base):
             os.mkdir(data_folder_base)
@@ -275,19 +282,19 @@ class RunOpts:
         if not self.return_all:
             data_folder = os.path.join(data_folder_base, '%s_noisetest_noisetype_%s_traintype_%s' % (
                 self.system, self.noisetype, self.traintype))
-            run_name = ('%s%s%s%s%s%s_rho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f'
+            run_name = ('%s%s%s%s%s%s%s_rho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f'
                         '_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s%s_metric_%s') \
-                       % (self.system, predflag, timeflag, eigenval_flag, pmap_flag, squarenodes_flag, self.rho,
-                          self.sigma, self.leakage, self.win_type, self.bias_type, self.tau, self.res_size,
+                       % (self.system, predflag, timeflag, eigenval_flag, pmap_flag, squarenodes_flag, dyn_noise_str,
+                          self.rho, self.sigma, self.leakage, self.win_type, self.bias_type, self.tau, self.res_size,
                           self.train_time, self.noise_realizations, self.noisetype, self.traintype, prior_str,
                           self.metric)
         else:
             data_folder = os.path.join(data_folder_base, '%s_noisetest_noisetype_%s_traintype_%s' % (
                 self.system, self.noisetype, self.traintype))
-            run_name = ('%s%s%s%s%s%s_rho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f'
+            run_name = ('%s%s%s%s%s%s%s_rho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f'
                         '_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s%s') % (
-                           self.system, predflag, timeflag, eigenval_flag, pmap_flag, squarenodes_flag, self.rho,
-                           self.sigma,
+                           self.system, predflag, timeflag, eigenval_flag, pmap_flag, squarenodes_flag, dyn_noise_str,
+                           self.rho, self.sigma,
                            self.leakage, self.win_type, self.bias_type, self.tau, self.res_size, self.train_time,
                            self.noise_realizations, self.noisetype, self.traintype, prior_str)
 

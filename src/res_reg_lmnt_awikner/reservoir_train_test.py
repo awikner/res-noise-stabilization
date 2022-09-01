@@ -8,13 +8,14 @@ from scipy.linalg import solve, solve_sylvester
 from scipy.sparse.linalg import eigsh
 from numba import njit
 from numba.typed import List
+import math
 import time
 
 from res_reg_lmnt_awikner.lorenzrungekutta_numba import lorenzrungekutta, lorenzrungekutta_pred
 from res_reg_lmnt_awikner.ks_etdrk4 import kursiv_predict, kursiv_predict_pred
 from res_reg_lmnt_awikner.csc_mult import *
 from res_reg_lmnt_awikner.helpers import get_windows_path, poincare_max
-from res_reg_lmnt_awikner.classes import RunOpts, NumericalModel, Reservoir, ResOutput
+from src.res_reg_lmnt_awikner.classes import RunOpts, NumericalModel, Reservoir, ResOutput
 
 warnings.filterwarnings("ignore", category=NumbaPerformanceWarning)
 
@@ -131,8 +132,8 @@ def numba_eigsh(A):
 
 
 @jit(nopython=True, fastmath=True)
-def numerical_model_wrapped(h=0.01, tau=0.1, T=300, ttsplit=5000, u0=0, system='lorenz',
-                        params=np.array([[], []], dtype=np.complex128)):
+def numerical_model_wrapped(tau=0.1, T=300, ttsplit=5000, u0=0, system='lorenz', int_step = 1,
+                            noise = np.zeros((1,1), dtype = np.double), params=np.array([[], []], dtype=np.complex128)):
     # Numba function for obtaining training and testing dynamical system time series data
     if system == 'lorenz':
         int_step = int(tau / h)
@@ -143,10 +144,10 @@ def numerical_model_wrapped(h=0.01, tau=0.1, T=300, ttsplit=5000, u0=0, system='
         u_arr[2] = (u_arr[2] - 23.596294463016896) / 8.575917849311919
         new_params = params
     elif system == 'KS':
-        u_arr, new_params = kursiv_predict(u0, tau=tau, T=T, params=params)
+        u_arr, new_params = kursiv_predict(u0, tau=tau, T=T, params=params, noise = noise)
         u_arr = np.ascontiguousarray(u_arr) / (1.1876770355823614)
     elif system == 'KS_d2175':
-        u_arr, new_params = kursiv_predict(u0, tau=tau, T=T, d=21.75, params=params)
+        u_arr, new_params = kursiv_predict(u0, tau=tau, T=T, d=21.75, params=params, noise = noise)
         u_arr = np.ascontiguousarray(u_arr) / (1.2146066380280796)
     else:
         raise ValueError
@@ -158,12 +159,12 @@ def numerical_model_wrapped(h=0.01, tau=0.1, T=300, ttsplit=5000, u0=0, system='
 
 
 @jit(nopython=True, fastmath=True)
-def numerical_model_wrapped_pred(h=0.01, tau=0.1, T=300, ttsplit=5000, u0_array=np.array([[], []], dtype=np.complex128),
-                             system='lorenz', params=np.array([[], []], dtype=np.complex128)):
+def numerical_model_wrapped_pred(tau=0.1, T=300, ttsplit=5000, u0_array=np.array([[], []], dtype=np.complex128),
+                             system='lorenz', int_step = 1, noise = np.zeros((1,1), dtype = np.double),
+                             params=np.array([[], []], dtype=np.complex128)):
     # Numba function for obtaining training and testing dynamical system time series data for a set of initial conditions.
     # This is used during test to compute the map error instead of a for loop over the entire prediction period.
     if system == 'lorenz':
-        int_step = int(tau / h)
         u_arr = np.ascontiguousarray(
             lorenzrungekutta_pred(u0_array, tau, int_step))
 
@@ -954,7 +955,7 @@ def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indice
             (Win[:, 1:].T @ Win[:, 1:])
         left_mat = left_mat_base.reshape(1, left_mat_base.shape[0], left_mat_base.shape[1])
         return data_trstates, states_trstates, Y_train, X_train, left_mat
-        
+
     elif traintype == 'sylvester_wD':
         # Sylvester regularization with derivative
         X, D = get_X_wrapped(u_arr_train, res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_indices, W_indptr,
@@ -1166,19 +1167,24 @@ def predictwrapped(res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, 
     return Y
 
 
-def get_test_data(run_opts, test_stream, overall_idx, rkTime, split):
+def get_test_data(run_opts, test_stream, dnoise_test_stream, overall_idx, rkTime, split):
     # Function for obtaining test data sets used to validate reservoir performance
     # Uses an array of random number generators
     if run_opts.system == 'lorenz':
         ic = test_stream[0].random(3) * 2 - 1
         u0 = np.array([ic[0], ic[1], 30*ic[2]])
+        int_step = int(run_opts.tau / 0.01)
     elif run_opts.system in ['KS', 'KS_d2175']:
         u0 = (test_stream[0].random(64) * 2 - 1) * 0.6
         u0 = u0 - np.mean(u0)
+        int_step = 1
     transient = 2000
-    u_arr_train_nonoise, u_arr_test, p, params = numerical_model_wrapped(tau=run_opts.tau, T=rkTime + transient + split,
+    total_iterations = rkTime + transient + split
+    dnoise = dnoise_test_stream[0].standard_normal((u0.size, total_iterations)) * np.sqrt(run_opts.dyn_noise)
+    u_arr_train_nonoise, u_arr_test, p, params = numerical_model_wrapped(tau=run_opts.tau, T=total_iterations,
                                                                      ttsplit=split + transient,
-                                                                     u0=u0, system=run_opts.system)
+                                                                     u0=u0, system=run_opts.system, int_step = int_step,
+                                                                     noise  = dnoise)
     u_arr_train_nonoise = u_arr_train_nonoise[:, transient:]
     rktest_u_arr_train_nonoise = np.zeros(
         (u_arr_train_nonoise.shape[0], u_arr_train_nonoise.shape[1], run_opts.num_tests))
@@ -1198,11 +1204,13 @@ def get_test_data(run_opts, test_stream, overall_idx, rkTime, split):
         elif run_opts.system in ['KS', 'KS_d2175']:
             u0 = (test_stream[i].random(64) * 2 - 1) * 0.6
             u0 = u0 - np.mean(u0)
+        dnoise = dnoise_test_stream[i].standard_normal((u0.size, total_iterations * int_step)) * np.sqrt(run_opts.dyn_noise)
         u_arr_train_nonoise, rktest_u_arr_test[:, :, i], p, params = numerical_model_wrapped(tau=run_opts.tau,
                                                                                          T=rkTime + transient + split,
                                                                                          ttsplit=split + transient,
                                                                                          u0=u0, system=run_opts.system,
-                                                                                         params=params)
+                                                                                         int_step = int_step,
+                                                                                         params=params, noise = dnoise)
         rktest_u_arr_train_nonoise[:, :, i] = u_arr_train_nonoise[:, transient:]
         """
         print('Test data %d' % i)
@@ -1327,19 +1335,20 @@ def test_wrapped(res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_
                 check_vt = True
         if array_compute:
             if system == 'lorenz':
+                int_step = math.trunc(tau / 0.01)
                 rkmap_u_arr_train = numerical_model_wrapped_pred(u0_array=np.stack((pred_full[0] * 7.929788629895004,
                                                                 pred_full[1] * 8.9932616136662,
                                                                 pred_full[2] * 8.575917849311919 + 23.596294463016896)),
-                                                             h=0.01, system=system, params=params, tau=tau,
+                                                             int_step = int_step, system=system, params=params, tau=tau,
                                                              ttsplit=pred_full.shape[1])[0]
             elif system == 'KS':
                 u0 = pred_full * 1.1876770355823614
                 rkmap_u_arr_train = numerical_model_wrapped_pred(
-                    u0_array=u0, h=tau, T=1, system=system, params=params, ttsplit=pred_full.shape[1])[0]
+                    u0_array=u0, tau=tau, T=1, int_step = 1, system=system, params=params, ttsplit=pred_full.shape[1])[0]
             elif system == 'KS_d2175':
                 u0 = pred_full * 1.2146066380280796
                 rkmap_u_arr_train = numerical_model_wrapped_pred(
-                    u0_array=u0, h=tau, T=1, system=system, params=params, ttsplit=pred_full.shape[1])[0]
+                    u0_array=u0, tau=tau, T=1, int_step = 1, system=system, params=params, ttsplit=pred_full.shape[1])[0]
             # print(rkmap_u_arr_train[0,:10])
             x2y2z2 = sum_numba_axis0(
                 (pred_full[:, 1:] - rkmap_u_arr_train[:, :-1]) ** 2.0)
@@ -1348,17 +1357,18 @@ def test_wrapped(res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_
             for j in range(1, pred_full[0].size):
 
                 if system == 'lorenz':
+                    int_step = math.trunc(tau / 0.01)
                     rkmap_u_arr_train = \
                         numerical_model_wrapped(u0 = np.array([pred_full[0][j - 1] * 7.929788629895004,
                                             pred_full[1][j - 1] * 8.9932616136662,
                                             pred_full[2][j - 1] * 8.575917849311919 + 23.596294463016896]),
-                                            h=0.01, T=1, tau=tau, system=system, params=params)[0]
+                                            int_step = int_step, T=1, tau=tau, system=system, params=params)[0]
                 elif system == 'KS':
                     u0 = pred_full[:, j - 1] * (1.1876770355823614)
-                    rkmap_u_arr_train = numerical_model_wrapped(h=tau, T=1, u0=u0, system=system, params=params)[0]
+                    rkmap_u_arr_train = numerical_model_wrapped(tau=tau, T=1, u0=u0, system=system, int_step = 1, params=params)[0]
                 elif system == 'KS_d2175':
                     u0 = pred_full[:, j - 1] * (1.2146066380280796)
-                    rkmap_u_arr_train = numerical_model_wrapped(h=tau, T=1, u0=u0, system=system, params=params)[0]
+                    rkmap_u_arr_train = numerical_model_wrapped(tau=tau, T=1, u0=u0, system=system, int_step = 1, params=params)[0]
 
                 x2y2z2[j - 1] = np.sum((pred_full[:, j] - rkmap_u_arr_train[:, 1]) ** 2)
         rms_test = np.sqrt(x2y2z2 / pred_full.shape[0])
@@ -1481,8 +1491,8 @@ def get_res_results(run_opts, res_itr, res_gen, rk, noise, noise_stream,
     return res_out, train_seed, noise_array, res_itr
 
 
-def find_stability(run_opts, noise, train_seed, train_gen, res_itr, res_gen, test_stream, test_idxs, noise_stream,
-                   overall_idx):
+def find_stability(run_opts, noise, train_seed, train_gen, dnoise_train_gen, res_itr, res_gen, test_stream,
+                   dnoise_test_stream, test_idxs, noise_stream, overall_idx):
     # Main function for training and testing reservoir performance. This function first generates the training and testing data,
     # the passes to get_res_results to obtain th reservoir performance.
     import warnings
@@ -1511,7 +1521,7 @@ def find_stability(run_opts, noise, train_seed, train_gen, res_itr, res_gen, tes
         split_test = int(run_opts.sync_time)
 
     rktest_u_arr_train_nonoise, rktest_u_arr_test, params = get_test_data(
-        run_opts, test_stream, overall_idx, rkTime=rkTime_test, split=split_test)
+        run_opts, test_stream, dnoise_test_stream, overall_idx, rkTime=rkTime_test, split=split_test)
     # np.random.seed(train_seed)
     if run_opts.system == 'lorenz':
         ic = train_gen.random(3) * 2 - 1
@@ -1589,6 +1599,8 @@ def start_reservoir_test(argv=None, run_opts=None):
     ss_train = np.random.SeedSequence(34)
     ss_test = np.random.SeedSequence(56)
     ss_noise = np.random.SeedSequence(78)
+    ss_dnoise_train = np.random.SeedSequence(910)
+    ss_dnoise_test  = np.random.SeedSequence(1112)
     if run_opts.traintype in ['gradient1', 'gradient2',
                               'gradient12'] or 'gradientk' in run_opts.traintype or 'regzerok' in run_opts.traintype:
         res_seeds = ss_res.spawn(run_opts.res_per_test + run_opts.res_start)
@@ -1602,12 +1614,21 @@ def start_reservoir_test(argv=None, run_opts=None):
             test_streams[i] = np.array([np.random.default_rng(test_seeds[s]) for \
                                         s in test_idxs], dtype=object)
         noise_streams = np.empty(run_opts.noise_realizations, dtype=object)
+
         tr, rt = np.meshgrid(np.arange(run_opts.num_trains), np.arange(run_opts.res_per_test))
         tr = tr.flatten() + run_opts.train_start
         rt = rt.flatten() + run_opts.res_start
         for i in range(run_opts.res_per_test * run_opts.num_trains):
             res_streams[i] = np.random.default_rng(res_seeds[rt[i]])
             train_streams[i] = np.random.default_rng(train_seeds[tr[i]])
+        dnoise_train_streams = np.zeros(run_opts.res_per_test * run_opts.num_trains, dtype=object)
+        dnoise_test_streams = np.zeros((run_opts.res_per_test * run_opts.num_trains, run_opts.num_tests), dtype=object)
+        dnoise_train_seeds = ss_dnoise_train.spawn(run_opts.num_trains + run_opts.train_start)
+        dnoise_test_seeds = ss_dnoise_test.spawn(run_opts.num_tests + run_opts.test_start)
+        for i in range(run_opts.res_per_test * run_opts.num_trains):
+            dnoise_test_streams[i] = np.array([np.random.default_rng(dnoise_test_seeds[s]) for \
+                                        s in test_idxs], dtype=object)
+            dnoise_train_streams[i] = np.random.default_rng(dnoise_train_seeds[tr[i]])
         incomplete_idxs = []
         for i in range(tr.size):
             if not os.path.exists(os.path.join(run_opts.run_folder_name,
@@ -1622,12 +1643,14 @@ def start_reservoir_test(argv=None, run_opts=None):
         tic = time.perf_counter()
         if run_opts.ifray:
             out_base = ray.get(
-                [find_stability_remote.remote(run_opts, run_opts.noise_values_array, tr[i], train_streams[i], \
-                                              rt[i], res_streams[i], test_streams[i], test_idxs, noise_streams, i) for i
+                [find_stability_remote.remote(run_opts, run_opts.noise_values_array, tr[i], train_streams[i],
+                                              dnoise_train_streams[i], rt[i], res_streams[i], test_streams[i],
+                                              dnoise_test_streams[i], test_idxs, noise_streams, i) for i
                  in incomplete_idxs])
         else:
-            out_base = [find_stability_serial(run_opts, run_opts.noise_values_array, tr[i], train_streams[i], \
-                                              rt[i], res_streams[i], test_streams[i], test_idxs, noise_streams, i) for i
+            out_base = [find_stability_serial(run_opts, run_opts.noise_values_array, tr[i], train_streams[i],
+                                              dnoise_train_streams[i], rt[i], res_streams[i], test_streams[i],
+                                              dnoise_test_streams[i], test_idxs, noise_streams, i) for i
                         in incomplete_idxs]
 
     else:
@@ -1659,6 +1682,17 @@ def start_reservoir_test(argv=None, run_opts=None):
             test_streams[i] = np.array([np.random.default_rng(test_seeds[j]) for \
                                         j in test_idxs])
             noise_streams[i] = np.array([np.random.default_rng(j) for j in noise_seeds])
+        dnoise_train_streams = np.zeros(run_opts.num_trains * run_opts.res_per_test * run_opts.noise_values_array.size,
+                                        dtype=object)
+        dnoise_test_streams = np.zeros(
+            (run_opts.num_trains * run_opts.res_per_test * run_opts.noise_values_array.size, run_opts.num_tests),
+            dtype=object)
+        dnoise_train_seeds = ss_dnoise_train.spawn(run_opts.num_trains + run_opts.train_start)
+        dnoise_test_seeds = ss_dnoise_test.spawn(run_opts.num_tests + run_opts.test_start)
+        for i in range(run_opts.num_trains * run_opts.res_per_test * run_opts.noise_values_array.size):
+            dnoise_test_streams[i] = np.array([np.random.default_rng(dnoise_test_seeds[j]) for \
+                                        j in test_idxs])
+            dnoise_train_streams[i] = np.random.default_rng(dnoise_train_seeds[tnr[i]])
         incomplete_idxs = []
         for i in range(tnr.size):
             if not os.path.exists(os.path.join(run_opts.run_folder_name,
@@ -1669,13 +1703,14 @@ def start_reservoir_test(argv=None, run_opts=None):
         print('Starting Ray Computation')
         tic = time.perf_counter()
         if run_opts.ifray:
-            out_base = ray.get([find_stability_remote.remote(run_opts, ntr[i], tnr[i], train_streams[i], \
-                                                             rtn[i], res_streams[i], test_streams[i], test_idxs,
+            out_base = ray.get([find_stability_remote.remote(run_opts, ntr[i], tnr[i], train_streams[i],
+                                                             dnoise_train_streams[i], rtn[i], res_streams[i],
+                                                             test_streams[i], dnoise_test_streams[i], test_idxs,
                                                              noise_streams[i], i) for i in incomplete_idxs])
         else:
-            out_base = [find_stability_serial(run_opts, ntr[i], tnr[i], train_streams[i], rtn[i], \
-                                              res_streams[i], test_streams[i], test_idxs, noise_streams[i], i) for i in
-                        incomplete_idxs]
+            out_base = [find_stability_serial(run_opts, ntr[i], tnr[i], train_streams[i], dnoise_train_streams[i],
+                                              rtn[i], res_streams[i], test_streams[i], dnoise_test_streams[i],
+                                              test_idxs, noise_streams[i], i) for i in incomplete_idxs]
     if len(incomplete_idxs) != 0:
         toc = time.perf_counter()
         runtime = toc - tic
