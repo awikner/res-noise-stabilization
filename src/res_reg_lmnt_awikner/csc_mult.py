@@ -196,6 +196,15 @@ def matrix_sparse_sparseT_mult(mat1_data, mat1_indices, mat1_indptr, mat1_shape)
     return out
 
 @jit(nopython = True, fastmath = True)
+def matrix_sparse_diag_sparseT_mult(mat1_data, mat1_indices, mat1_indptr, mat1_shape, diag_mat):
+    with objmode(out = 'double[:,:]'):
+        mat_sp = csc_matrix((mat1_data, mat1_indices, mat1_indptr), shape = (mat1_shape[0],
+            mat1_shape[1])).dot(diags(diag_mat, format = "csc"))
+        mat_sp2 = mat_sp @ mat_sp.T
+        out = mat_sp2.toarray()
+    return out
+
+@jit(nopython = True, fastmath = True)
 def matrix_sparse_sparse_mult(mat1_data, mat1_indices, mat1_indptr, mat1_shape,\
                               mat2_data, mat2_indices, mat2_indptr, mat2_shape):
     with objmode(data = 'double[:]', indices = 'int32[:]', indptr = 'int32[:]', shape = 'int32[:]'):
@@ -223,6 +232,14 @@ def matrix_sparse_sparse_conv_mult(mat1_data, mat1_indices, mat1_indptr, mat1_sh
 def matrix_sparse_sparseT_conv_mult(mat1_data, mat1_indices, mat1_indptr, mat1_shape):
     with objmode(out = 'double[:,:]'):
         mat = csc_matrix((mat1_data, mat1_indices, mat1_indptr), shape = (mat1_shape[0], mat1_shape[1])).toarray()
+        out = mat @ mat.T
+    return out
+
+@jit(nopython = True, fastmath = True)
+def matrix_sparse_diag_sparseT_conv_mult(mat1_data, mat1_indices, mat1_indptr, mat1_shape, diag_mat):
+    with objmode(out = 'double[:,:]'):
+        mat = csc_matrix((mat1_data, mat1_indices, mat1_indptr), shape = (mat1_shape[0],
+            mat1_shape[1])).dot(diags(diag_mat, format = "csc")).toarray()
         out = mat @ mat.T
     return out
 

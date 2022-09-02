@@ -11,9 +11,9 @@ from numba.typed import List
 import math
 import time
 
-from res_reg_lmnt_awikner.lorenzrungekutta_numba import lorenzrungekutta, lorenzrungekutta_pred
-from res_reg_lmnt_awikner.ks_etdrk4 import kursiv_predict, kursiv_predict_pred
-from res_reg_lmnt_awikner.csc_mult import *
+from src.res_reg_lmnt_awikner.lorenzrungekutta_numba import lorenzrungekutta, lorenzrungekutta_pred
+from src.res_reg_lmnt_awikner.ks_etdrk4 import kursiv_predict, kursiv_predict_pred
+from src.res_reg_lmnt_awikner.csc_mult import *
 from res_reg_lmnt_awikner.helpers import get_windows_path, poincare_max
 from src.res_reg_lmnt_awikner.classes import RunOpts, NumericalModel, Reservoir, ResOutput
 
@@ -136,7 +136,6 @@ def numerical_model_wrapped(tau=0.1, T=300, ttsplit=5000, u0=0, system='lorenz',
                             noise = np.zeros((1,1), dtype = np.double), params=np.array([[], []], dtype=np.complex128)):
     # Numba function for obtaining training and testing dynamical system time series data
     if system == 'lorenz':
-        int_step = int(tau / h)
         u_arr = np.ascontiguousarray(lorenzrungekutta(u0, T, tau, int_step))
 
         u_arr[0] = (u_arr[0] - 0) / 7.929788629895004
@@ -325,6 +324,25 @@ def get_X_wrapped(u_training, res_X, Win_data, Win_indices, Win_indptr, Win_shap
         else:
             raise ValueError
         return res_X, u_training_wnoise
+    elif 'gaussianmult' in noisetype:
+        if traintype in ['normal', 'rmean', 'rplusq', 'rmeanq', 'rqmean', 'rq'] or 'confined' in traintype:
+            mean_input_var = np.sqrt(mean_numba_axis1(u_training**2.0))
+            # noise = gen_noise(u_training.shape[0], u_training.shape[1], noisetype, noise_scaling, noise_gen, noise_realization)
+            for i in range(0, u_training[0].size):
+                if 'varmean' in noisetype:
+                    noise_scaling = mean_input_var
+                else:
+                    noise_scaling = u_training[:,i]
+                if 'statemean' in noisetype:
+                    noise_scaling = np.sqrt(np.mean(noise_scaling**2.0))*np.ones(noise_scaling.size)
+                res_X[:, i + 1] = (1.0 - leakage) * res_X[:, i] + leakage * np.tanh(
+                    mult_vec(Win_data, Win_indices, Win_indptr, Win_shape, np.append(
+                        1., u_training[:, i] + noise_scaling*noise[:, i])) + mult_vec(W_data, W_indices, W_indptr, W_shape,
+                                                                        res_X[:, i]))
+            u_training_wnoise = u_training + noise
+        else:
+            raise ValueError
+        return res_X, u_training_wnoise
     elif 'gaussian' in noisetype:
         noise_steps = str_to_int(noisetype.replace('gaussian', ''))
 
@@ -372,7 +390,7 @@ def get_X_wrapped(u_training, res_X, Win_data, Win_indices, Win_indptr, Win_shap
 
 def gen_noise_driver(run_opts, data_shape, res_shape, noise_scaling, noise_stream):
     # Generates an array of noise states for a given noise type, number of noise realizations, and array of random number generators
-    if run_opts.noisetype in ['gaussian', 'perturbation']:
+    if run_opts.noisetype in ['gaussian', 'perturbation'] or 'gaussianmult' in run_opts.noisetype:
         if run_opts.traintype in ['normal', 'rmean', 'rplusq', 'rmeanq', 'rqmean',
                                   'rq'] or 'confined' in run_opts.traintype:
             noise = gen_noise(data_shape[0], data_shape[1], run_opts.noisetype,
@@ -670,7 +688,7 @@ def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indice
         data_trstates = Y_fit @ X_fit.T
         states_trstates[0] = X_fit @ X_fit.T
         return data_trstates, states_trstates, Y_train, X_train, gradient_reg
-    elif 'gradientk' in traintype and 'only' not in traintype:
+    elif 'gradientk' in traintype and 'only' not in traintype and 'mult' not in traintype:
         # Linearized k-step noise
         k = str_to_int(traintype.replace('gradientk', ''))
         reg_train_fracs = 1.0 / (reg_train_times - (k - 1))
@@ -796,6 +814,158 @@ def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indice
                 else:
                     gradient_reg_base += matrix_sparse_sparseT_mult(reg_comp_datas[j], reg_comp_indices[j],
                                                                     reg_comp_indptrs[j], reg_comp_shape)
+            assign_grad_reg = i + 1 == reg_train_times
+            if np.any(assign_grad_reg):
+                print(assign_grad_reg)
+                gradient_reg[assign_grad_reg] = gradient_reg_base * reg_train_fracs[assign_grad_reg]
+        data_trstates = Y_train @ X_train.T
+        states_trstates[0] = X_train @ X_train.T
+        for i in range(1, reg_train_times.size):
+            states_trstates[i] = np.ascontiguousarray(states_trstates[0])
+        return data_trstates, states_trstates, Y_train, X_train, gradient_reg
+    elif 'gradientmult' in traintype:
+        if 'varmean' in traintype and 'statemean' not in traintype:
+            k = str_to_int(traintype.replace('gradientmult_varmeank', ''))
+            U = np.sqrt(mean_numba_axis1(u_arr_train**2.0)).reshape(-1,1) @ \
+                np.ones((1,u_arr_train[:, skip - 1:-2].shape[1]))
+        elif 'varmean' not in traintype and 'statemean' in traintype:
+            k = str_to_int(traintype.replace('gradientmult_statemeank', ''))
+            U = np.ones((n,1)) @ np.sqrt(sum_numba_axis0(u_arr_train**2.0)/n).reshape(1,-1)
+        elif 'varmean' not in traintype and 'statemean' in traintype:
+            k = str_to_int(traintype.replace('gradientmult_varmean_statemeank', ''))
+            U = np.ones(u_arr_train[:, skip - 1:-2].shape) * np.sqrt(np.mean(u_arr_train**2.0))
+        else:
+            k = str_to_int(traintype.replace('gradientmultk', ''))
+            U = u_arr_train[:, skip - 1:-2]
+        # Linearized k-step noise
+        # k = str_to_int(traintype.replace('gradientk', ''))
+        reg_train_fracs = 1.0 / (reg_train_times - (k - 1))
+        sparse_cutoff = 0.89
+        break_flag = False
+        X, D = get_X_wrapped(u_arr_train, res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_indices,
+                             W_indptr,
+                             W_shape, leakage, noise[0], noisetype, noise_scaling, 1, traintype)
+        X = X[:, skip:(res_d - 2)]
+        D = D[:, skip:(res_d - 2)]
+        X_train = np.concatenate(
+            (np.ones((1, d - (skip + 1))), X, u_arr_train[:, skip - 1:-2]), axis=0)
+        X_train = get_squared(X_train, rsvr_size, squarenodes)
+        gradient_reg_base = np.zeros((res_feature_size + n + 1, res_feature_size + n + 1))
+        Win_nobias_data, Win_nobias_indices, Win_nobias_indptr, Win_nobias_shape = \
+            get_Win_nobias(Win_data, Win_indices, Win_indptr, Win_shape)
+        D_n_datas = List()
+        D_n_indices = List()
+        D_n_indptrs = List()
+        D_n_shape = np.array([res_feature_size + n + 1, n])
+        E_n_datas = List()
+        E_n_indices = List()
+        E_n_indptrs = List()
+        E_n_shape = np.array([res_feature_size + n + 1, res_feature_size + n + 1])
+        reg_comp_datas = List()
+        reg_comp_indices = List()
+        reg_comp_indptrs = List()
+        reg_comp_shape = np.array([res_feature_size + n + 1, n])
+        W_mat_data, W_mat_indices, W_mat_indptr, W_mat_shape = construct_jac_mat_csc_csc(
+            Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_indices, W_indptr, W_shape, rsvr_size, n,
+            squarenodes)
+        leakage_data, leakage_indices, leakage_indptr, leakage_shape = construct_leakage_mat(rsvr_size, n, leakage,
+                                                                                             squarenodes)
+        reg_sum_avg_runtime = 0.
+        E_n_avg_runtime = 0.
+        reg_mult_avg_runtime = 0.
+        D_n_avg_runtime = 0.
+
+        for i in range(k):
+            D_n_data, D_n_idx, D_n_indptr = get_D_n(D[:, i], X[:, i], Win_nobias_data, Win_nobias_indices,
+                                                    Win_nobias_indptr, Win_nobias_shape, D_n_shape, rsvr_size,
+                                                    res_feature_size, n, squarenodes)
+            D_n_datas.append(np.ascontiguousarray(D_n_data))
+            D_n_indices.append(np.ascontiguousarray(D_n_idx))
+            D_n_indptrs.append(np.ascontiguousarray(D_n_indptr))
+        if k > 1:
+            for i in range(1, k):
+                E_n_data, E_n_idx, E_n_indptr = get_E_n(D[:, i], X[:, i], E_n_shape, rsvr_size, W_mat_data,
+                                                        W_mat_indices, W_mat_indptr, W_mat_shape, leakage_data,
+                                                        leakage_indices,
+                                                        leakage_indptr, leakage_shape, squarenodes)
+                E_n_datas.append(np.ascontiguousarray(E_n_data))
+                E_n_indices.append(np.ascontiguousarray(E_n_idx))
+                E_n_indptrs.append(np.ascontiguousarray(E_n_indptr))
+
+        for i in range(k - 1):
+            reg_comp_data, reg_comp_idx, reg_comp_indptr = \
+                np.copy(D_n_datas[i]), np.copy(D_n_indices[i]), np.copy(D_n_indptrs[i])
+            if k > 1:
+                for j in range(i, k - 1):
+                    reg_comp_data, reg_comp_idx, reg_comp_indptr, tmp = matrix_sparse_sparse_mult(
+                        E_n_datas[j], E_n_indices[j], E_n_indptrs[j], E_n_shape,
+                        reg_comp_data, reg_comp_idx, reg_comp_indptr, reg_comp_shape)
+            reg_comp_datas.append(np.ascontiguousarray(reg_comp_data))
+            reg_comp_indices.append(np.ascontiguousarray(reg_comp_idx))
+            reg_comp_indptrs.append(np.ascontiguousarray(reg_comp_indptr))
+        reg_comp_datas.append(np.ascontiguousarray(D_n_datas[-1]))
+        reg_comp_indices.append(np.ascontiguousarray(D_n_indices[-1]))
+        reg_comp_indptrs.append(np.ascontiguousarray(D_n_indptrs[-1]))
+        sparsity = np.array([reg_comp_datas[j].size / (reg_comp_shape[0] * reg_comp_shape[1]) for j in range(k)])
+
+        for i in range(k, X.shape[1]):
+            for j in range(k):
+                if sparsity[j] < sparse_cutoff:
+                    gradient_reg_base += matrix_sparse_diag_sparseT_conv_mult(
+                        reg_comp_datas[j], reg_comp_indices[j], reg_comp_indptrs[j], reg_comp_shape,
+                        U[:, i - (k - j)])
+                else:
+                    gradient_reg_base += matrix_sparse_diag_sparseT_mult(reg_comp_datas[j], reg_comp_indices[j],
+                                                                    reg_comp_indptrs[j], reg_comp_shape,
+                                                                    U[:, i - (k - j)])
+            assign_grad_reg = (i == reg_train_times)
+            if np.any(assign_grad_reg):
+                print(assign_grad_reg)
+                print(gradient_reg[assign_grad_reg].shape)
+                print((gradient_reg_base * reg_train_fracs[assign_grad_reg]).shape)
+                gradient_reg[assign_grad_reg] = gradient_reg_base * reg_train_fracs[assign_grad_reg]
+            if assign_grad_reg[-1]:
+                break_flag = True
+                break
+            if k > 1:
+                E_n_data, E_n_idx, E_n_indptr = get_E_n(D[:, i], X[:, i],
+                                                        E_n_shape, rsvr_size, W_mat_data, W_mat_indices, W_mat_indptr,
+                                                        W_mat_shape,
+                                                        leakage_data, leakage_indices, leakage_indptr, leakage_shape,
+                                                        squarenodes)
+                E_n_datas[k - 2] = np.ascontiguousarray(E_n_data)
+                E_n_indices[k - 2] = np.ascontiguousarray(E_n_idx)
+                E_n_indptrs[k - 2] = np.ascontiguousarray(E_n_indptr)
+            for j in range(k - 1):
+                if k > 1:
+                    if sparsity[j + 1] < sparse_cutoff:
+                        reg_comp_data, reg_comp_idx, reg_comp_indptr, tmp = matrix_sparse_sparse_conv_mult(
+                            E_n_datas[k - 2], E_n_indices[k - 2], E_n_indptrs[k - 2], E_n_shape,
+                            reg_comp_datas[j + 1], reg_comp_indices[j + 1], reg_comp_indptrs[j + 1], reg_comp_shape)
+                    else:
+                        reg_comp_data, reg_comp_idx, reg_comp_indptr, tmp = matrix_sparse_sparse_mult(
+                            E_n_datas[k - 2], E_n_indices[k - 2], E_n_indptrs[k - 2], E_n_shape,
+                            reg_comp_datas[j + 1], reg_comp_indices[j + 1], reg_comp_indptrs[j + 1], reg_comp_shape)
+                    reg_comp_datas[j], reg_comp_indices[j], reg_comp_indptrs[j] = \
+                        np.ascontiguousarray(reg_comp_data), np.ascontiguousarray(reg_comp_idx), \
+                        np.ascontiguousarray(reg_comp_indptr)
+            reg_comp_data, reg_comp_idx, reg_comp_indptr = get_D_n(D[:, i], X[:, i],
+                                                                   Win_nobias_data, Win_nobias_indices,
+                                                                   Win_nobias_indptr, Win_nobias_shape, D_n_shape,
+                                                                   rsvr_size, res_feature_size, n, squarenodes)
+            reg_comp_datas[k - 1], reg_comp_indices[k - 1], reg_comp_indptrs[k - 1] = \
+                np.ascontiguousarray(reg_comp_data), np.ascontiguousarray(reg_comp_idx), \
+                np.ascontiguousarray(reg_comp_indptr)
+        if not break_flag:
+            for j in range(k):
+                if sparsity[j] < sparse_cutoff:
+                    gradient_reg_base += matrix_sparse_diag_sparseT_conv_mult(
+                        reg_comp_datas[j], reg_comp_indices[j], reg_comp_indptrs[j], reg_comp_shape,
+                        U[:, i - (k - j)])
+                else:
+                    gradient_reg_base += matrix_sparse_diag_sparseT_mult(reg_comp_datas[j], reg_comp_indices[j],
+                                                                    reg_comp_indptrs[j], reg_comp_shape,
+                                                                    U[:, i - (k - j)])
             assign_grad_reg = i + 1 == reg_train_times
             if np.any(assign_grad_reg):
                 print(assign_grad_reg)
