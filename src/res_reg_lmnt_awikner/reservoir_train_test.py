@@ -11,11 +11,11 @@ from numba.typed import List
 import math
 import time
 
-from src.res_reg_lmnt_awikner.lorenzrungekutta_numba import lorenzrungekutta, lorenzrungekutta_pred
-from src.res_reg_lmnt_awikner.ks_etdrk4 import kursiv_predict, kursiv_predict_pred
-from src.res_reg_lmnt_awikner.csc_mult import *
+from res_reg_lmnt_awikner.lorenzrungekutta_numba import lorenzrungekutta, lorenzrungekutta_pred
+from res_reg_lmnt_awikner.ks_etdrk4 import kursiv_predict, kursiv_predict_pred
+from res_reg_lmnt_awikner.csc_mult import *
 from res_reg_lmnt_awikner.helpers import get_windows_path, poincare_max
-from src.res_reg_lmnt_awikner.classes import RunOpts, NumericalModel, Reservoir, ResOutput
+from res_reg_lmnt_awikner.classes import RunOpts, NumericalModel, Reservoir, ResOutput
 
 warnings.filterwarnings("ignore", category=NumbaPerformanceWarning)
 
@@ -831,12 +831,14 @@ def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indice
         elif 'varmean' not in traintype and 'statemean' in traintype:
             k = str_to_int(traintype.replace('gradientmult_statemeank', ''))
             U = np.ones((n,1)) @ np.sqrt(sum_numba_axis0(u_arr_train**2.0)/n).reshape(1,-1)
-        elif 'varmean' not in traintype and 'statemean' in traintype:
+        elif 'varmean' in traintype and 'statemean' in traintype:
             k = str_to_int(traintype.replace('gradientmult_varmean_statemeank', ''))
             U = np.ones(u_arr_train[:, skip - 1:-2].shape) * np.sqrt(np.mean(u_arr_train**2.0))
         else:
             k = str_to_int(traintype.replace('gradientmultk', ''))
             U = u_arr_train[:, skip - 1:-2]
+            print('Gradient mult k:')
+            print(k)
         # Linearized k-step noise
         # k = str_to_int(traintype.replace('gradientk', ''))
         reg_train_fracs = 1.0 / (reg_train_times - (k - 1))
@@ -1491,8 +1493,8 @@ def test_wrapped(res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_
                 else:
                     # if check_vt:
                     check_vt = False
-            #print('Valid Time')
-            #print(valid_time[i, k])
+            print('Valid Time')
+            print(valid_time[i, k])
             res_X = np.zeros((res_X.shape[0], max_valid_time + 2))
             res_X, p = get_X_wrapped(np.ascontiguousarray(
                 rktest_u_arr_test[:, k * max_valid_time:(k + 1) * max_valid_time + 1, i]), res_X, Win_data, Win_indices,
