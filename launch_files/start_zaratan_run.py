@@ -117,7 +117,7 @@ def start_zaratan_run(system = 'KS', traintype = 'normal', noisetype = 'gaussian
                 % (launch_script, parallel_str_bash, testname, options_str, num_nodes, cpus_str, runtime, account, debug_part_str)
     print(input_str)
     run_out = subprocess.check_output(input_str, shell=True)
-    time.sleep(1)
+    time.sleep(10)
 
     log_file = re.search('log_files/(.*).log', str(run_out))
     time_str = log_file.group(1)[-11:]
