@@ -4,19 +4,17 @@ import subprocess
 import re
 import time
 
-def start_zaratan_run(system = 'KS', traintype = 'normal', noisetype = 'gaussian', \
-        noise_realizations = 1, res_size = 500, trainlen = 3000, testlen = 0, rho = 0.5, sigma = 1.0,\
-        leakage = 1.0, tau = 0.25, win_type = 'full', bias_type = 'old',\
-        noise_values_array = np.logspace(-3, 0, num = 19, base = 10)[5:11], \
-        alpha_values = np.append(0., np.logspace(-7, -3, 9)), num_res = 3,\
-        num_trains = 4, num_tests = 4, metric = 'mss_var', machine = 'zaratan', \
-        returnall = False, savepred = False, squarenodes = False, savetime = False, max_valid_time = 500, \
-        debug = False, num_nodes = 4, cpus_per_node = None, runtime = '2:00:00', \
-        account = 'physics-hi',debug_part = False, just_process = False, parallel = True,\
-        res_start = 0, train_start = 0, test_start = 0, \
-        import_res = False, import_train = False, import_test = False,\
-        import_noise = False, reg_train_times = None, discard_time = 500, prior = 'zero',\
-        save_eigenvals = False, pmap = False,
+def start_zaratan_run(system = 'KS', traintype = 'normal', noisetype = 'gaussian',
+        noise_realizations = 1, res_size = 500, trainlen = 3000, testlen = 0, rho = 0.5, sigma = 1.0, theta = 1.0,
+        leakage = 1.0, tau = 0.25, win_type = 'full', bias_type = 'old',
+        noise_values_array = np.logspace(-3, 0, num = 19, base = 10)[5:11],
+        alpha_values = np.append(0., np.logspace(-7, -3, 9)), num_res = 3,
+        num_trains = 4, num_tests = 4, metric = 'mss_var', machine = 'zaratan',
+        returnall = False, savepred = False, squarenodes = False, savetime = False, max_valid_time = 500, 
+        debug = False, num_nodes = 4, cpus_per_node = None, runtime = '2:00:00',
+        account = 'physics-hi',debug_part = False, just_process = False, parallel = True,
+        res_start = 0, train_start = 0, test_start = 0, reg_train_times = None, discard_time = 500, prior = 'zero',
+        save_eigenvals = False, pmap = False, savetruth = False, sync_time = 2000, dyn_noise = 0,
         root_folder = "/scratch/zt1/project/edott-prj/user/awikner1/res-noise-stabilization",
         save_folder = "/scratch/zt1/project/edott-prj/user/awikner1/res-noise-stabilization"):
 
@@ -39,6 +37,11 @@ def start_zaratan_run(system = 'KS', traintype = 'normal', noisetype = 'gaussian
         cpus_str = '--cpus-per-node=%d' % cpus_per_node
     else:
         cpus_str = ''
+
+    if savetruth:
+        savetruth_str = 'True'
+    else:
+        savetruth_str = 'False'
 
     if debug_part:
         debug_part_str = '-p debug'
@@ -86,34 +89,14 @@ def start_zaratan_run(system = 'KS', traintype = 'normal', noisetype = 'gaussian
     else:
         pmap_str = 'False'
 
-    if import_res:
-        import_res_str = 'True'
-    else:
-        import_res_str = 'False'
-
-    if import_train:
-        import_train_str = 'True'
-    else:
-        import_train_str = 'False'
-
-    if import_test:
-        import_test_str = 'True'
-    else:
-        import_test_str = 'False'
-
-    if import_noise:
-        import_noise_str = 'True'
-    else:
-        import_noise_str = 'False'
-
 
 
     testname = '%s_%s_%s_%d_%dnodes_%dtrain_rho%0.1f_sigma%0.1e_leakage%0.1f_tau%0.3f' % \
             (system, traintype, noisetype, noise_realizations, res_size, trainlen, rho, sigma, leakage,  tau)
     launch_script = "/scratch/zt1/project/edott-prj/user/awikner1/res-noise-stabilization/launch_files/slurm-launch-zaratan.py"
     run_script    = "/scratch/zt1/project/edott-prj/user/awikner1/res-noise-stabilization/src/res_reg_lmnt_awikner/reservoir_train_test.py"
-    options_str = '--savepred=%s --system=%s --noisetype=%s --traintype=%s -r %d --rho=%f --sigma=%f --leakage=%f --win_type=%s --bias_type=%s --tau=%f -N %d -T %d --testtime=%d --res=%d --tests=%d --trains=%d --debug=%s --squarenodes=%s --metric=%s --returnall=%s --savetime=%s --noisevals=%s --regvals=%s --maxvt=%d --machine=%s --parallel=%s --resstart=%d --trainstart=%d --teststart=%d --importres=%s --importtrain=%s --importtest=%s --importnoise=%s --regtraintimes=%s --discardlen=%d --prior=%s --saveeigenvals=%s --pmap=%s --datarootdir=%s --datasavedir=%s'\
-                  % (savepred_str, system, noisetype, traintype, noise_realizations,  rho,sigma, leakage, win_type, bias_type, tau, res_size, trainlen, testlen, num_res, num_tests, num_trains, debug_str, squarenodes_str, metric, returnall_str, savetime_str, noise_values_str, reg_values_str, max_valid_time, machine, parallel_str, res_start, train_start, test_start, import_res_str, import_train_str, import_test_str, import_noise_str, reg_train_times_str, discard_time, prior,save_eigenvals_str, pmap_str, root_folder, save_folder)
+    options_str = '--savepred=%s --system=%s --noisetype=%s --traintype=%s -r %d --rho=%f --sigma=%f --theta=%f --leakage=%f --win_type=%s --bias_type=%s --tau=%f -N %d -T %d --testtime=%d --res=%d --tests=%d --trains=%d --debug=%s --squarenodes=%s --metric=%s --returnall=%s --savetime=%s --noisevals=%s --regvals=%s --maxvt=%d --machine=%s --parallel=%s --resstart=%d --trainstart=%d --teststart=%d --regtraintimes=%s --discardlen=%d --prior=%s --saveeigenvals=%s --pmap=%s --datarootdir=%s --datasavedir=%s --savetruth=%s --synctime=%d'\
+                  % (savepred_str, system, noisetype, traintype, noise_realizations,  rho, sigma, theta, leakage, win_type, bias_type, tau, res_size, trainlen, testlen, num_res, num_tests, num_trains, debug_str, squarenodes_str, metric, returnall_str, savetime_str, noise_values_str, reg_values_str, max_valid_time, machine, parallel_str, res_start, train_start, test_start, reg_train_times_str, discard_time, prior,save_eigenvals_str, pmap_str, root_folder, save_folder, savetruth_str, sync_time)
     input_str = 'python -u %s --ifray %s --exp-name %s --command "python -u %s %s" --num-nodes %d %s --load-env "conda activate res39" -t %s -A %s %s'\
                 % (launch_script, parallel_str_bash, testname, run_script, options_str, num_nodes, cpus_str, runtime, account, debug_part_str)
     print(input_str)
