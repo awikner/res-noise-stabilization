@@ -11,7 +11,7 @@ import time
 from pathlib import Path
 
 folder_path = "/scratch/zt1/project/edott-prj/user/awikner1/res-noise-stabilization"
-template_file = os.path.join(folder_path, "slurm-template-zaratan.sh")
+template_file = os.path.join(folder_path, "launch_files/slurm-template-zaratan.sh")
 
 JOB_NAME = "${JOB_NAME}"
 NUM_NODES = "${NUM_NODES}"
