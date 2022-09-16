@@ -110,7 +110,7 @@ def start_zaratan_run(system = 'KS', traintype = 'normal', noisetype = 'gaussian
     print(time_str)
     print(run_out_str)
 
-    job_group = re.search('Submitted batch job (.*)\n', run_out_str)
+    job_group = re.search('Submitted batch job(.*)', run_out_str)
     job_id = job_group.group(1)
     if just_process:
         os.system('scancel %s' % job_id)
