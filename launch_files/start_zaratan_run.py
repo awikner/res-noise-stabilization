@@ -108,9 +108,9 @@ def start_zaratan_run(system = 'KS', traintype = 'normal', noisetype = 'gaussian
     log_file = re.search('log_files/(.*).log', run_out_str)
     time_str = log_file.group(1)[-11:]
     print(time_str)
-    job_id = [int(s) for s in run_out_str.split() if s.isdigit][0]
+    job_id = [int(s) for s in run_out_str[-12:].split() if s.isdigit()][0]
     print(job_id)
-    
+
     if just_process:
         os.system('scancel %s' % job_id)
     template = open('/scratch/zt1/project/edott-prj/user/awikner1/res-noise-stabilization/src/res_reg_lmnt_awikner/process_test_data.py', 'r')
