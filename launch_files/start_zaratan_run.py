@@ -111,7 +111,8 @@ def start_zaratan_run(system = 'KS', traintype = 'normal', noisetype = 'gaussian
     print(run_out_str)
 
     job_group = re.search('Submitted batch job(.*)\n', run_out_str)
-    job_id = job_group.group(1)
+    print(job_group)
+    job_id = job_group.group(0)
     if just_process:
         os.system('scancel %s' % job_id)
     template = open('/scratch/zt1/project/edott-prj/user/awikner1/res-noise-stabilization/src/res_reg_lmnt_awikner/process_test_data.py', 'r')
