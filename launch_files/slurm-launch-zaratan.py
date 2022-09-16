@@ -10,7 +10,7 @@ import time
 
 from pathlib import Path
 
-folder_path = "/afs/scratch.umd.edu/project/edott-prj/user/awikner1/res-noise-stabilization"
+folder_path = "/scratch/zt1/project/edott-prj/user/awikner1/res-noise-stabilization"
 template_file = os.path.join(folder_path, "slurm-template-zaratan.sh")
 
 JOB_NAME = "${JOB_NAME}"
