@@ -4,7 +4,7 @@
 # THIS FILE IS A TEMPLATE AND IT SHOULD NOT BE DEPLOYED TO PRODUCTION!
 ${PARTITION_OPTION}
 #SBATCH --job-name=${JOB_NAME}
-#SBATCH --output=/home/awikner1/scratch.edott-prj/res-noise-stabilization/log_files/${JOB_NAME}.log
+#SBATCH --output=/scratch/zt1/edott-prj/res-noise-stabilization/log_files/${JOB_NAME}.log
 #SBATCH -t ${RUNTIME}
 #SBATCH -A ${ACCOUNT}
 ${GIVEN_NODE}
