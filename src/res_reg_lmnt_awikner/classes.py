@@ -208,7 +208,7 @@ class RunOpts:
         eigenvalue solver should be suppressed. If left as False, will suppress errors im much of the core code,
         so this should be set to True if making changes. Default: False"""
         if not isinstance(argv, type(None)):
-            self.get_run_opts(argv)
+            self.get_run_opts()
         if isinstance(self.tau, type(None)):
             if self.system == 'lorenz':
                 self.tau = 0.1
