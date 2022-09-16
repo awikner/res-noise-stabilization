@@ -101,12 +101,14 @@ def start_zaratan_run(system = 'KS', traintype = 'normal', noisetype = 'gaussian
                 % (launch_script, parallel_str_bash, testname, run_script, options_str, num_nodes, cpus_str, runtime, account, debug_part_str)
     print(input_str)
     run_out = subprocess.check_output(input_str, shell=True)
+    run_out_str = str(run_out)
+    print(run_out_str)
     time.sleep(10)
 
-    log_file = re.search('log_files/(.*).log', str(run_out))
+    log_file = re.search('log_files/(.*).log', run_out_str)
     time_str = log_file.group(1)[-11:]
 
-    job_group = re.search('Submitted batch job (.*)\n', str(run_out))
+    job_group = re.search('Submitted batch job (.*)\n', run_out_str)
     job_id = job_group.group(1)
     if just_process:
         os.system('scancel %s' % job_id)
