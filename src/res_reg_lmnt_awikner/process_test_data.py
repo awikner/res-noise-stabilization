@@ -1,4 +1,4 @@
-#!/homes/awikner1/anaconda3/envs/res39/bin/python -u
+#!/home/awikner1/miniconda3/envs/res39/bin/python -u
 # Assume will be finished in no more than 18 hours
 # SBATCH -d afterok:{{JOB_ID}}
 # SBATCH -J {{JOB_NAME}}
