@@ -18,7 +18,7 @@ def start_zaratan_run(system = 'KS', traintype = 'normal', noisetype = 'gaussian
         import_noise = False, reg_train_times = None, discard_time = 500, prior = 'zero',\
         save_eigenvals = False, pmap = False,
         root_folder = "/scratch/zt1/project/edott-prj/user/awikner1/res-noise-stabilization",
-        save_folder = "/afs/shell.umd.edu/project/edott-prj/user/awikner1/res-noise-stabilization"):
+        save_folder = "/scratch/zt1/project/edott-prj/user/awikner1/res-noise-stabilization"):
 
     if isinstance(reg_train_times, np.ndarray) or isinstance(reg_train_times, list):
         reg_train_times_str = '%d' % reg_train_times[0]
@@ -126,7 +126,7 @@ def start_zaratan_run(system = 'KS', traintype = 'normal', noisetype = 'gaussian
     job_id = str(run_out)[-11:-3]
     if just_process:
         os.system('scancel %s' % job_id)
-    template = open('/afs/shell.umd.edu/project/edott-prj/user/awikner1/res-noise-stabilization/src/res_reg_lmnt_awikner/process_test_data.py', 'r')
+    template = open('/scratch/zt1/project/edott-prj/user/awikner1/res-noise-stabilization/src/res_reg_lmnt_awikner/process_test_data.py', 'r')
     lines = template.readlines()
     template.close()
 
