@@ -108,7 +108,8 @@ def start_zaratan_run(system = 'KS', traintype = 'normal', noisetype = 'gaussian
     log_file = re.search('log_files/(.*).log', run_out_str)
     time_str = log_file.group(1)[-11:]
     print(time_str)
-    job_id = [int(s) for s in run_out_str[-12:].split() if s.isdigit()][0]
+    job_num_list = [int(s) for s in run_out_str[-12:] if s.isdigit()]
+    job_id = ''.join(str(i) for i in job_num_list)
     print(job_id)
 
     if just_process:
