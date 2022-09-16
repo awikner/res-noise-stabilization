@@ -449,7 +449,7 @@ class RunOpts:
                     raise ValueError
             elif opt == '--machine':
                 self.machine = str(arg)
-                if self.machine not in ['deepthought2', 'personal']:
+                if self.machine not in ['deepthought2', 'zaratan', 'personal']:
                     raise ValueError
                 print('Machine: %s' % self.machine)
             elif opt == '--num_cpus':
