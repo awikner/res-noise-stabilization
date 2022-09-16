@@ -1757,7 +1757,7 @@ def start_reservoir_test(argv=None, run_opts=None):
     if run_opts.machine == 'personal':
         if run_opts.ifray:
             ray.init(num_cpus=run_opts.num_cpus)
-    elif run_opts.machine == 'deepthought2':
+    elif run_opts.machine in ['deepthought2', 'zaratan']:
         if run_opts.ifray:
             ray.init(address=os.environ["ip_head"])
 

@@ -213,7 +213,7 @@ def process_data(argv=None, run_opts=None):
 
     if run_opts.return_all:
 
-        save_filename = run_opts.run_file_name
+        save_filename = run_opts.save_file_name
         if os.path.exists(save_filename):
             saved_flag = True
             print('Found data file with the same name. Loading...')
@@ -432,11 +432,11 @@ def process_data(argv=None, run_opts=None):
 
         print('Compressing and saving data...')
         save_tic = time.perf_counter()
-        data_out.to_csv(run_opts.run_file_name)
+        data_out.to_csv(run_opts.save_file_name)
         save_toc = time.perf_counter()
         print('Time to compress and save data: %0.2f sec.' % ((save_toc - save_tic)))
 
-    comp_data_size = os.stat(run_opts.run_file_name).st_size
+    comp_data_size = os.stat(run_opts.save_file_name).st_size
 
     if run_opts.savepred:
         if run_opts.return_all:
@@ -467,8 +467,12 @@ def process_data(argv=None, run_opts=None):
         for file in all_files:
             if file not in pred_files and 'true_test' not in file:
                 os.remove(os.path.join(run_opts.run_folder_name, file))
+            else:
+                os.rename(os.path.join(run_opts.run_folder_name, file), os.path.join(run_opts.save_folder_name, file))
+        if len(os.listdir(run_opts.run_folder_name)) == 0:
+            os.rmdir(run_opts.run_folder_name)
         pred_data_size = 0
-        for ele in os.scandir(run_opts.run_folder_name):
+        for ele in os.scandir(run_opts.save_folder_name):
             pred_data_size += os.stat(ele).st_size
         raw_data_size += pred_data_size
         comp_data_size += pred_data_size
@@ -479,10 +483,14 @@ def process_data(argv=None, run_opts=None):
                 if os.path.isfile(os.path.join(run_opts.run_folder_name,
                                                file)) and 'pmap_max_res' not in file and 'true_test' not in file:
                     os.remove(os.path.join(run_opts.run_folder_name, file))
+                else:
+                    os.rename(os.path.join(run_opts.run_folder_name, file), os.path.join(run_opts.save_folder_name, file))
         else:
             for file in all_files:
                 if os.path.isfile(os.path.join(run_opts.run_folder_name, file)) and 'true_test' not in file:
                     os.remove(os.path.join(run_opts.run_folder_name, file))
+                else:
+                    os.rename(os.path.join(run_opts.run_folder_name, file), os.path.join(run_opts.save_folder_name, file))
         if len(os.listdir(run_opts.run_folder_name)) == 0:
             os.rmdir(run_opts.run_folder_name)
     print('Compressed data size: %0.3f kB' % (comp_data_size / 1000))

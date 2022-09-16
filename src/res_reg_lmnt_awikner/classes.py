@@ -58,6 +58,7 @@ class RunOpts:
                  test_start=0,
                  reg_train_times=None,
                  root_folder=None,
+                 save_folder=None,
                  prior='zero',
                  save_truth=False,
                  dyn_noise=0):
@@ -171,6 +172,9 @@ class RunOpts:
         self.root_folder = root_folder
         """Location where output data will be stored in the Data folder. If None, then defaults to the current working
         directory. Default: None"""
+        self.save_folder = save_folder
+        """Location where processed output data will be stored in the Data folder. If none, then defaults to the 
+        current working directory. Default: None"""
         self.return_all = return_all
         """Boolean for determining of all results should be returned, or only the results with the obtained using the
         "best" Tikhonov regularization parameter value based on the selected metric. Default: True"""
@@ -235,8 +239,9 @@ class RunOpts:
         if self.prior not in ['zero', 'input_pass']:
             print('Prior type not recognized.')
             raise ValueError
-        self.run_file_name = ''
+        self.save_file_name = ''
         self.run_folder_name = ''
+        self.save_folder_name = ''
         self.get_file_name()
 
     def get_file_name(self):
@@ -276,12 +281,15 @@ class RunOpts:
         else:
             dyn_noise_str = '_dnoise%e' % self.dyn_noise
         data_folder_base = os.path.join(self.root_folder, 'Data')
+        save_folder_base = os.path.join(self.save_folder, 'Data')
         if not os.path.isdir(data_folder_base):
             os.mkdir(data_folder_base)
+        if not os.path.isdir(save_folder_base):
+            os.mkdir(save_folder_base)
 
         if not self.return_all:
-            data_folder = os.path.join(data_folder_base, '%s_noisetest_noisetype_%s_traintype_%s' % (
-                self.system, self.noisetype, self.traintype))
+            data_folder = '%s_noisetest_noisetype_%s_traintype_%s' % (
+                self.system, self.noisetype, self.traintype)
             run_name = ('%s%s%s%s%s%s%s_rho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f'
                         '_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s%s_metric_%s') \
                        % (self.system, predflag, timeflag, eigenval_flag, pmap_flag, squarenodes_flag, dyn_noise_str,
@@ -289,22 +297,29 @@ class RunOpts:
                           self.train_time, self.noise_realizations, self.noisetype, self.traintype, prior_str,
                           self.metric)
         else:
-            data_folder = os.path.join(data_folder_base, '%s_noisetest_noisetype_%s_traintype_%s' % (
-                self.system, self.noisetype, self.traintype))
+            data_folder = '%s_noisetest_noisetype_%s_traintype_%s' % (
+                self.system, self.noisetype, self.traintype)
             run_name = ('%s%s%s%s%s%s%s_rho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f'
                         '_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s%s') % (
                            self.system, predflag, timeflag, eigenval_flag, pmap_flag, squarenodes_flag, dyn_noise_str,
                            self.rho, self.sigma,
                            self.leakage, self.win_type, self.bias_type, self.tau, self.res_size, self.train_time,
                            self.noise_realizations, self.noisetype, self.traintype, prior_str)
-
+        root_data_folder = os.path.join(data_folder_base, data_folder)
+        save_data_folder = os.path.join(save_folder_base, data_folder)
         if self.runflag:
-            if not os.path.isdir(data_folder):
-                os.mkdir(data_folder)
-            if not os.path.isdir(os.path.join(data_folder, run_name + '_folder')):
-                os.mkdir(os.path.join(data_folder, run_name + '_folder'))
-        self.run_file_name = os.path.join(data_folder, run_name + '.bz2')
+            if not os.path.isdir(root_data_folder):
+                os.mkdir(root_data_folder)
+            if not os.path.isdir(save_data_folder):
+                os.mkdir(save_data_folder)
+            if not os.path.isdir(os.path.join(root_data_folder, run_name + '_folder')):
+                os.mkdir(os.path.join(root_data_folder, run_name + '_folder'))
+            if not os.path.isdir(os.path.join(save_data_folder, run_name + '_folder')) and (self.savepred or
+                    self.pmap or self.save_truth):
+                os.mkdir(os.path.join(save_data_folder, run_name + '_folder'))
+        self.save_file_name = os.path.join(save_data_folder, run_name + '.bz2')
         self.run_folder_name = os.path.join(data_folder, run_name + '_folder')
+        self.save_folder_name = os.path.join(save_data_folder, run_name + '_folder')
 
     def get_run_opts(self):
         """Processes the command line input into instance variables.
@@ -323,7 +338,7 @@ class RunOpts:
                                         'savetime=', 'saveeigenvals=', 'noisevals=', 'regvals=', 'maxvt=',
                                         'resstart=', 'trainstart=', 'teststart=',
                                         'squarenodes=', 'regtraintimes=', 'discardlen=',
-                                        'prior=', 'synctime=', 'datarootdir=', 'savetruth='])
+                                        'prior=', 'synctime=', 'datarootdir=', 'datasavedir=', 'savetruth='])
         except getopt.GetoptError:
             print('Error: Some options not recognized')
             sys.exit(2)
@@ -347,6 +362,9 @@ class RunOpts:
             elif opt == '--datarootdir':
                 self.root_folder = str(arg)
                 print('Root directory for data: %s' % self.root_folder)
+            elif opt == '--datasavedir':
+                self.save_folder = str(arg)
+                print('Root directory for processed data: %s' % self.save_folder)
             elif opt == '--synctime':
                 self.sync_time = int(arg)
                 print('Sync time: %d' % self.sync_time)
@@ -821,7 +839,7 @@ class ResPreds:
         """Loads the prediction data from .csv files.
         Args:
             run_opts: RunOpts object containing the run parameters."""
-        self.data_filename, self.pred_folder = run_opts.run_file_name, run_opts.run_folder_name
+        self.data_filename, self.pred_folder = run_opts.save_file_name, run_opts.save_folder_name
         self.noise_vals = run_opts.noise_values_array
         self.reg_train_vals = run_opts.reg_train_times
         self.reg_vals = run_opts.reg_values
@@ -851,7 +869,7 @@ class ResPmap:
         """Loads the Poincare maxmimum map data from .csv files.
         Args:
             run_opts: RunOpts object containing the run parameters."""
-        self.data_filename, self.pred_folder = run_opts.run_file_name, run_opts.run_folder_name
+        self.data_filename, self.pred_folder = run_opts.save_file_name, run_opts.save_folder_name
         self.noise_vals = run_opts.noise_values_array
         self.reg_train_vals = run_opts.reg_train_times
         self.reg_vals = run_opts.reg_values
@@ -882,7 +900,7 @@ class ResData:
         """Loads the prediction analysis data from a compressed pandas data file.
             Args:
                 run_opts: RunOpts object containing the run parameters."""
-        self.data_filename, self.pred_folder = run_opts.run_file_name, run_opts.run_folder_name
+        self.data_filename, self.pred_folder = run_opts.save_file_name, run_opts.save_folder_name
         print('Starding data read...')
         tic = time.perf_counter()
         # print(self.data_filename)
