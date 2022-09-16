@@ -10,7 +10,7 @@ def start_zaratan_run(system = 'KS', traintype = 'normal', noisetype = 'gaussian
         noise_values_array = np.logspace(-3, 0, num = 19, base = 10)[5:11],
         alpha_values = np.append(0., np.logspace(-7, -3, 9)), num_res = 3,
         num_trains = 4, num_tests = 4, metric = 'mss_var', machine = 'zaratan',
-        returnall = False, savepred = False, squarenodes = False, savetime = False, max_valid_time = 500, 
+        returnall = False, savepred = False, squarenodes = False, savetime = False, max_valid_time = 500,
         debug = False, num_nodes = 4, cpus_per_node = None, runtime = '2:00:00',
         account = 'physics-hi',debug_part = False, just_process = False, parallel = True,
         res_start = 0, train_start = 0, test_start = 0, reg_train_times = None, discard_time = 500, prior = 'zero',

@@ -318,7 +318,7 @@ class RunOpts:
                     self.pmap or self.save_truth):
                 os.mkdir(os.path.join(save_data_folder, run_name + '_folder'))
         self.save_file_name = os.path.join(save_data_folder, run_name + '.bz2')
-        self.run_folder_name = os.path.join(data_folder, run_name + '_folder')
+        self.run_folder_name = os.path.join(root_data_folder, run_name + '_folder')
         self.save_folder_name = os.path.join(save_data_folder, run_name + '_folder')
 
     def get_run_opts(self):
