@@ -101,13 +101,13 @@ def start_zaratan_run(system = 'KS', traintype = 'normal', noisetype = 'gaussian
                 % (launch_script, parallel_str_bash, testname, run_script, options_str, num_nodes, cpus_str, runtime, account, debug_part_str)
     print(input_str)
     run_out = subprocess.check_output(input_str, shell=True)
-    print(str(run_out))
     time.sleep(10)
 
     log_file = re.search('log_files/(.*).log', str(run_out))
     time_str = log_file.group(1)[-11:]
 
-    job_id = str(run_out)[-11:-3]
+    job_group = re.search('Submitted batch job (.*)\n', str(run_out))
+    job_id = job_group.group(1)
     if just_process:
         os.system('scancel %s' % job_id)
     template = open('/scratch/zt1/project/edott-prj/user/awikner1/res-noise-stabilization/src/res_reg_lmnt_awikner/process_test_data.py', 'r')
