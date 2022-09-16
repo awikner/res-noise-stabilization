@@ -16,8 +16,9 @@ def start_zaratan_run(system = 'KS', traintype = 'normal', noisetype = 'gaussian
         res_start = 0, train_start = 0, test_start = 0, \
         import_res = False, import_train = False, import_test = False,\
         import_noise = False, reg_train_times = None, discard_time = 500, prior = 'zero',\
-        save_eigenvals = False, pmap = False, root_folder = "/home/awikner1/scratch.edott-prj/res-noise-stabilization",
-        save_folder = "/home/awikner1/SHELL.edott-prj/res-noise-stabilization"):
+        save_eigenvals = False, pmap = False,
+        root_folder = "/afs/scratch.umd.edu/project/edott-prj/user/awikner1/res-noise-stabilization",
+        save_folder = "/afs/shell.umd.edu/project/edott-prj/user/awikner1/res-noise-stabilization"):
 
     if isinstance(reg_train_times, np.ndarray) or isinstance(reg_train_times, list):
         reg_train_times_str = '%d' % reg_train_times[0]
@@ -109,7 +110,7 @@ def start_zaratan_run(system = 'KS', traintype = 'normal', noisetype = 'gaussian
 
     testname = '%s_%s_%s_%d_%dnodes_%dtrain_rho%0.1f_sigma%0.1e_leakage%0.1f_tau%0.3f' % \
             (system, traintype, noisetype, noise_realizations, res_size, trainlen, rho, sigma, leakage,  tau)
-    launch_script = "/home/awikner/scratch.edott-prj/res-noise-stabilization/slurm-launch-zaratan.py"
+    launch_script = "/afs/scratch.umd.edu/project/edott-prj/user/awikner1/res-noise-stabilization/slurm-launch-zaratan.py"
     options_str = '--savepred=%s --system=%s --noisetype=%s --traintype=%s -r %d --rho=%f --sigma=%f --leakage=%f --win_type=%s --bias_type=%s --tau=%f -N %d -T %d --testtime=%d --res=%d --tests=%d --trains=%d --debug=%s --squarenodes=%s --metric=%s --returnall=%s --savetime=%s --noisevals=%s --regvals=%s --maxvt=%d --machine=%s --parallel=%s --resstart=%d --trainstart=%d --teststart=%d --importres=%s --importtrain=%s --importtest=%s --importnoise=%s --regtraintimes=%s --discardlen=%d --prior=%s --saveeigenvals=%s --pmap=%s --datarootdir=%s --datasavedir=%s'\
                   % (savepred_str, system, noisetype, traintype, noise_realizations,  rho,sigma, leakage, win_type, bias_type, tau, res_size, trainlen, testlen, num_res, num_tests, num_trains, debug_str, squarenodes_str, metric, returnall_str, savetime_str, noise_values_str, reg_values_str, max_valid_time, machine, parallel_str, res_start, train_start, test_start, import_res_str, import_train_str, import_test_str, import_noise_str, reg_train_times_str, discard_time, prior,save_eigenvals_str, pmap_str, root_folder, save_folder)
     input_str = 'python %s --ifray %s --exp-name %s --command "python -u reservoir_train_test.py %s" --num-nodes %d %s --load-env "conda activate res39" -t %s -A %s %s'\
@@ -124,13 +125,13 @@ def start_zaratan_run(system = 'KS', traintype = 'normal', noisetype = 'gaussian
     job_id = str(run_out)[-11:-3]
     if just_process:
         os.system('scancel %s' % job_id)
-    template = open('/home/awikner1/SHELL.edott-prj/res-noise-stabilization/src/res_reg_lmnt_awikner/process_test_data.py', 'r')
+    template = open('/afs/shell.umd.edu/project/edott-prj/user/awikner1/res-noise-stabilization/src/res_reg_lmnt_awikner/process_test_data.py', 'r')
     lines = template.readlines()
     template.close()
 
-    script_name = '/home/awikner1/scratch.edott-prj/res-noise-stabilization/data_scripts/process_test_data_%s.py' % job_id
+    script_name = '/afs/scratch.umd.edu/project/edott-prj/user/awikner1/res-noise-stabilization/data_scripts/process_test_data_%s.py' % job_id
     job_name = '%s_%s_process_data' % (testname, time_str)
-    log_name = '/home/awikner1/scratch.edott-prj/res-noise-stabilization/log_files/%s.log' % job_name
+    log_name = '/afs/scratch.umd.edu/project/edott-prj/user/awikner1/res-noise-stabilization/log_files/%s.log' % job_name
     script = open(script_name, 'w')
     for line in lines:
         if '#SBATCH -t ' in line and debug_part:
