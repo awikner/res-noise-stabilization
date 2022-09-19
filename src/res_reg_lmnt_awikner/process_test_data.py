@@ -1,17 +1,17 @@
 #!/home/awikner1/miniconda3/envs/res39/bin/python -u
 # Assume will be finished in no more than 18 hours
-# SBATCH -d afterok:{{JOB_ID}}
-# SBATCH -J {{JOB_NAME}}
-# SBATCH --output={{LOG_NAME}}
-# SBATCH -t 4:00:00
-# SBATCH -A {{ACCOUNT}}
+#SBATCH -d afterok:{{JOB_ID}}
+#SBATCH -J {{JOB_NAME}}
+#SBATCH --output={{LOG_NAME}}
+#SBATCH -t 4:00:00
+#SBATCH -A {{ACCOUNT}}
 # Launch on 12 cores distributed over as many nodes as needed
-# SBATCH --ntasks=1
+#SBATCH --ntasks=1
 # Assume need 6 GB/core (6144 MB/core)
-# SBATCH --mem-per-cpu=6144
-# SBATCH --mail-user=awikner1@umd.edu
-# SBATCH --mail-type=BEGIN
-# SBATCH --mail-type=END
+#SBATCH --mem-per-cpu=6144
+#SBATCH --mail-user=awikner1@umd.edu
+#SBATCH --mail-type=BEGIN
+#SBATCH --mail-type=END
 from itertools import product
 import sys
 import os
