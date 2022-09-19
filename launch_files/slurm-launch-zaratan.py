@@ -89,8 +89,13 @@ if __name__ == "__main__":
     parser.add_argument(
         "--cpus-per-node",
         type = int,
-        default = 20,
+        default = 128,
         help = "The minimum number of CPUs per node.")
+    parser.add_argument(
+        "--mem-per-cpu",
+        type = int,
+        default = 4000,
+        help = "The amount of memory per cpu in MB.")
     parser.add_argument(
         "--tmp",
         type = int,
@@ -114,7 +119,7 @@ if __name__ == "__main__":
     partition_option = "#SBATCH --partition={}".format(
         args.partition) if args.partition else ""
 
-    memory = str(128000)
+    memory = str(int(args.mem_per_cpu)*int(args.cpus_per_node))
     # ===== Modified the template script =====
     with open(template_file, "r") as f:
         text = f.read()

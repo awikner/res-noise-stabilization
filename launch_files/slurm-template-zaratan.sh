@@ -13,6 +13,7 @@ ${GIVEN_NODE}
 #SBATCH --exclusive
 ### Give all resources to a single Ray task, ray can manage the resources internally
 #SBATCH --ntasks-per-node=1
+#SBATCH --cpus-per-task=${CPUS}
 #SBATCH --mem=${MEMORY}
 #SBATCH --tmp=${SCRATCH}
 #SBATCH --mail-user=awikner1@umd.edu

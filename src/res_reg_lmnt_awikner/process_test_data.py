@@ -7,8 +7,8 @@
 #SBATCH -A {{ACCOUNT}}
 # Launch on 12 cores distributed over as many nodes as needed
 #SBATCH --ntasks=1
-# Assume need 6 GB/core (6144 MB/core)
-#SBATCH --mem-per-cpu=6144
+# Assume need 4 GB/core (4000 MB/core)
+#SBATCH --mem-per-cpu=4000
 #SBATCH --mail-user=awikner1@umd.edu
 #SBATCH --mail-type=BEGIN
 #SBATCH --mail-type=END
