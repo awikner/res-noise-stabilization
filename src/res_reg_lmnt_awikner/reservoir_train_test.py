@@ -837,8 +837,8 @@ def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indice
         else:
             k = str_to_int(traintype.replace('gradientmultk', ''))
             U = u_arr_train[:, skip - 1:-2]
-            print('Gradient mult k:')
-            print(k)
+            #print('Gradient mult k:')
+            #print(k)
         # Linearized k-step noise
         # k = str_to_int(traintype.replace('gradientk', ''))
         reg_train_fracs = 1.0 / (reg_train_times - (k - 1))
@@ -1493,8 +1493,8 @@ def test_wrapped(res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_
                 else:
                     # if check_vt:
                     check_vt = False
-            print('Valid Time')
-            print(valid_time[i, k])
+            #print('Valid Time')
+            #print(valid_time[i, k])
             res_X = np.zeros((res_X.shape[0], max_valid_time + 2))
             res_X, p = get_X_wrapped(np.ascontiguousarray(
                 rktest_u_arr_test[:, k * max_valid_time:(k + 1) * max_valid_time + 1, i]), res_X, Win_data, Win_indices,
