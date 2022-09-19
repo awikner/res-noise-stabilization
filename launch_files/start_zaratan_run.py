@@ -130,7 +130,7 @@ def start_zaratan_run(system = 'KS', traintype = 'normal', noisetype = 'gaussian
         elif just_process and '{{JOB_ID}}' in line:
             pass
         else:
-            script.write(line.replace('{{JOB_ID}}',job_id).replace('{{JOB_NAME}}', log_name).\
+            script.write(line.replace('{{JOB_ID}}',job_id).replace('{{JOB_NAME}}', job_name).\
                          replace('{{LOG_NAME}}', log_name).replace('{{ACCOUNT}}', account))
     script.close()
 
