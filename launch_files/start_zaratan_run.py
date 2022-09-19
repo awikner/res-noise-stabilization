@@ -134,6 +134,8 @@ def start_zaratan_run(system = 'KS', traintype = 'normal', noisetype = 'gaussian
                          replace('{{LOG_NAME}}', log_name).replace('{{ACCOUNT}}', account))
     script.close()
 
-    os.system('sbatch %s %s' % (script_name, options_str))
+    process_data_str = 'sbatch %s %s' % (script_name, options_str)
+    print(process_data_str)
+    os.system(process_data_str)
 
     time.sleep(1)
