@@ -1639,8 +1639,8 @@ def get_res_results(run_opts, res_itr, res_gen, rk, noise, noise_stream,
     res_out = ResOutput(run_opts, noise)
     for noise_idx, noise in enumerate(noise_array):
         noise_tic = time.perf_counter()
-        min_optim_func = lambda alpha, alpha_idx: optim_func(run_opts, res_out, reservoir, noise_in[noise_idx], noise,
-                                                             noise_idx, \
+        min_optim_func = lambda alpha, alpha_idx: optim_func(run_opts, res_out, reservoir, noise_in[0], noise,
+                                                             noise_idx,
                                                              rktest_u_arr_train_nonoise, rktest_u_arr_test, alpha,
                                                              alpha_idx,
                                                              true_pmap_max, rkTime_test, split_test, params)
@@ -1774,7 +1774,7 @@ def start_reservoir_test(argv=None, run_opts=None):
     ss_dnoise_train = np.random.SeedSequence(910)
     ss_dnoise_test  = np.random.SeedSequence(1112)
     if run_opts.traintype in ['gradient1', 'gradient2',
-                              'gradient12'] or 'gradientk' in run_opts.traintype or 'regzerok' in run_opts.traintype:
+                              'gradient12'] or 'gradient' in run_opts.traintype or 'regzerok' in run_opts.traintype:
         res_seeds = ss_res.spawn(run_opts.res_per_test + run_opts.res_start)
         train_seeds = ss_train.spawn(run_opts.num_trains + run_opts.train_start)
         test_seeds = ss_test.spawn(run_opts.num_tests + run_opts.test_start)
