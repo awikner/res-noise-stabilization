@@ -15,7 +15,7 @@ from res_reg_lmnt_awikner.lorenzrungekutta_numba import lorenzrungekutta, lorenz
 from res_reg_lmnt_awikner.ks_etdrk4 import kursiv_predict, kursiv_predict_pred
 from res_reg_lmnt_awikner.csc_mult import *
 from res_reg_lmnt_awikner.helpers import get_windows_path, poincare_max
-from res_reg_lmnt_awikner.classes import RunOpts, NumericalModel, Reservoir, ResOutput
+from src.res_reg_lmnt_awikner.classes import RunOpts, NumericalModel, Reservoir, ResOutput
 
 warnings.filterwarnings("ignore", category=NumbaPerformanceWarning)
 
@@ -1352,7 +1352,7 @@ def get_test_data(run_opts, test_stream, dnoise_test_stream, overall_idx, rkTime
         int_step = 1
     transient = 2000
     total_iterations = rkTime + transient + split
-    dnoise = dnoise_test_stream[0].standard_normal((u0.size, total_iterations)) * np.sqrt(run_opts.dyn_noise)
+    dnoise = dnoise_test_stream[0].standard_normal((u0.size, (total_iterations+1)*int_step)) * np.sqrt(run_opts.dyn_noise)
     u_arr_train_nonoise, u_arr_test, p, params = numerical_model_wrapped(tau=run_opts.tau, T=total_iterations,
                                                                      ttsplit=split + transient,
                                                                      u0=u0, system=run_opts.system, int_step = int_step,
@@ -1493,8 +1493,8 @@ def test_wrapped(res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_
                 else:
                     # if check_vt:
                     check_vt = False
-            #print('Valid Time')
-            #print(valid_time[i, k])
+            print('Valid Time')
+            print(valid_time[i, k])
             res_X = np.zeros((res_X.shape[0], max_valid_time + 2))
             res_X, p = get_X_wrapped(np.ascontiguousarray(
                 rktest_u_arr_test[:, k * max_valid_time:(k + 1) * max_valid_time + 1, i]), res_X, Win_data, Win_indices,
@@ -1699,13 +1699,14 @@ def find_stability(run_opts, noise, train_seed, train_gen, dnoise_train_gen, res
         ic = train_gen.random(3) * 2 - 1
         rk = NumericalModel(u0 = np.array([ic[0], ic[1], 30 * ic[2]]), tau=run_opts.tau,
                         T=run_opts.train_time + run_opts.discard_time,
-                        ttsplit=run_opts.train_time + run_opts.discard_time, system=run_opts.system, params=params)
+                        ttsplit=run_opts.train_time + run_opts.discard_time, system=run_opts.system, params=params,
+                        dnoise_gen = dnoise_train_gen, dnoise_scaling = run_opts.dyn_noise)
     elif run_opts.system in ['KS', 'KS_d2175']:
         u0 = 0.6 * (train_gen.random(64) * 2 - 1)
         u0 = u0 - np.mean(u0)
         rk = NumericalModel(tau=run_opts.tau, T=run_opts.train_time + run_opts.discard_time,
                         ttsplit=run_opts.train_time + run_opts.discard_time, u0=u0, system=run_opts.system,
-                        params=params)
+                        params=params, dnoise_gen = dnoise_train_gen, dnoise_scaling = run_opts.dyn_noise)
     if run_opts.pmap:
         true_pmap_max_filename = run_opts.root_folder + \
                                  '%s_tau%0.2f_true_pmap_max.csv' % (run_opts.system, run_opts.tau)

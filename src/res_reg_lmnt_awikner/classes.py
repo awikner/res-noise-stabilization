@@ -228,6 +228,8 @@ class RunOpts:
                 raise TypeError()
         if isinstance(self.root_folder, type(None)):
             self.root_folder = os.getcwd()
+        if isinstance(self.save_folder, type(None)):
+            self.save_folder = os.getcwd()
         if isinstance(self.reg_train_times, np.ndarray) or isinstance(self.reg_train_times, list):
             if (self.reg_train_times[0] != self.train_time or len(self.reg_train_times) != 1) and (
                     self.traintype in ['normal', 'normalres1', 'normalres2', 'rmean', 'rmeanres1',
@@ -286,7 +288,6 @@ class RunOpts:
             os.mkdir(data_folder_base)
         if not os.path.isdir(save_folder_base):
             os.mkdir(save_folder_base)
-
         if not self.return_all:
             data_folder = '%s_noisetest_noisetype_%s_traintype_%s' % (
                 self.system, self.noisetype, self.traintype)
@@ -791,7 +792,7 @@ class ResOutput:
 class NumericalModel:
     """Class for generating training or testing data using one of the test numerical models."""
     def __init__(self, tau=0.1, int_step=1, T=300, ttsplit=5000, u0=0, system='lorenz',
-                 params=np.array([[], []], dtype=np.complex128)):
+                 params=np.array([[], []], dtype=np.complex128), dnoise_gen = None, dnoise_scaling = 0):
         """Creates the NumericalModel object.
         Args:
             self: NumericalModel object.
@@ -804,10 +805,14 @@ class NumericalModel:
             params: Internal parameters for model integration. Currently only used by KS options.
         Returns:
             Complete NumericalModel object with precomputed internal parameters."""
-
         if system == 'lorenz':
-            u_arr = np.ascontiguousarray(lorenzrungekutta(
-                u0, T, tau, int_step))
+            if isinstance(dnoise_gen, type(None)) or dnoise_scaling == 0:
+                u_arr = np.ascontiguousarray(lorenzrungekutta(
+                    u0, T, tau, int_step))
+            else:
+                dnoise = dnoise_gen.standard_normal((3, T*int_step+int_step))*np.sqrt(dnoise_scaling)
+                u_arr = np.ascontiguousarray(lorenzrungekutta(
+                    u0, T, tau, int_step, dnoise))
             self.input_size = 3
 
             u_arr[0] = (u_arr[0] - 0) / 7.929788629895004
@@ -816,11 +821,21 @@ class NumericalModel:
             self.params = params
 
         elif system == 'KS':
-            u_arr, self.params = kursiv_predict(u0, tau=tau, T=T, params=params, int_steps = int_step)
+            if isinstance(dnoise_gen, type(None)) or dnoise_scaling == 0:
+                u_arr, self.params = kursiv_predict(u0, tau=tau, T=T, params=params, int_steps = int_step)
+            else:
+                dnoise = dnoise_gen.standard_normal((64, T*int_step+int_step))*np.sqrt(dnoise_scaling)
+                u_arr, self.params = kursiv_predict(u0, tau=tau, T=T, params=params, int_steps=int_step,
+                                                    noise= dnoise)
             self.input_size = u_arr.shape[0]
             u_arr = np.ascontiguousarray(u_arr) / (1.1876770355823614)
         elif system == 'KS_d2175':
-            u_arr, self.params = kursiv_predict(u0, tau=tau, T=T, d=21.75, params=params, int_steps = int_step)
+            if isinstance(dnoise_gen, type(None)) or dnoise_scaling == 0:
+                u_arr, self.params = kursiv_predict(u0, tau=tau, T=T, d=21.75, params=params, int_steps = int_step)
+            else:
+                dnoise = dnoise_gen.standard_normal((64, T * int_step + int_step)) * np.sqrt(dnoise_scaling)
+                u_arr, self.params = kursiv_predict(u0, tau=tau, T=T, d=21.75, params=params,
+                                                    int_steps=int_step, noise = dnoise)
             self.input_size = u_arr.shape[0]
             u_arr = np.ascontiguousarray(u_arr) / (1.2146066380280796)
         else:
