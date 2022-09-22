@@ -339,7 +339,8 @@ class RunOpts:
                                         'savetime=', 'saveeigenvals=', 'noisevals=', 'regvals=', 'maxvt=',
                                         'resstart=', 'trainstart=', 'teststart=',
                                         'squarenodes=', 'regtraintimes=', 'discardlen=',
-                                        'prior=', 'synctime=', 'datarootdir=', 'datasavedir=', 'savetruth='])
+                                        'prior=', 'synctime=', 'datarootdir=', 'datasavedir=', 'savetruth=',
+                                        'dnoise='])
         except getopt.GetoptError:
             print('Error: Some options not recognized')
             sys.exit(2)
@@ -353,6 +354,9 @@ class RunOpts:
             elif opt == '-r':
                 self.noise_realizations = int(arg)
                 print('Noise Realizations: %d' % self.noise_realizations)
+            elif opt == '--dnoise':
+                self.dyn_noise = float(arg)
+                print('Dynamical noise variance: %e' % self.dyn_noise)
             elif opt == '--savetruth':
                 if arg == 'True':
                     self.save_truth = True
