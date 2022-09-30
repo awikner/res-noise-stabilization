@@ -3,10 +3,10 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 [project]
 name = "res_reg_lmnt_awikner"
-version = "0.0.73"
+version = "0.0.75"
 authors = [
 	{name="Alexander Wikner", email="apwikner@gmail.com"},]
-description = "Package for testing regularization performance on reservoir computer predictions"
+description = "Package for testing regularization performance on reservoir computer predictions. This version includes separate regularization for input pass-through."
 readme = "src/res_reg_lmnt_awikner/README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.9"

@@ -15,7 +15,7 @@ from res_reg_lmnt_awikner.lorenzrungekutta_numba import lorenzrungekutta, lorenz
 from res_reg_lmnt_awikner.ks_etdrk4 import kursiv_predict, kursiv_predict_pred
 from res_reg_lmnt_awikner.csc_mult import *
 from res_reg_lmnt_awikner.helpers import get_windows_path, poincare_max
-from src.res_reg_lmnt_awikner.classes import RunOpts, NumericalModel, Reservoir, ResOutput
+from res_reg_lmnt_awikner.classes import RunOpts, NumericalModel, Reservoir, ResOutput
 
 warnings.filterwarnings("ignore", category=NumbaPerformanceWarning)
 
