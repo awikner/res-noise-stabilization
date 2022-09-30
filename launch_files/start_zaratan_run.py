@@ -15,6 +15,7 @@ def start_zaratan_run(system = 'KS', traintype = 'normal', noisetype = 'gaussian
         account = 'physics-hi',debug_part = False, just_process = False, parallel = True,
         res_start = 0, train_start = 0, test_start = 0, reg_train_times = None, discard_time = 500, prior = 'zero',
         save_eigenvals = False, pmap = False, savetruth = False, sync_time = 2000, dyn_noise = 0,
+        passreg = None,
         root_folder = "/scratch/zt1/project/edott-prj/user/awikner1/res-noise-stabilization",
         save_folder = "/scratch/zt1/project/edott-prj/user/awikner1/res-noise-stabilization"):
 
@@ -42,6 +43,11 @@ def start_zaratan_run(system = 'KS', traintype = 'normal', noisetype = 'gaussian
         mem_str = '--mem-per-cpu=%d' % mem_per_cpu
     else:
         mem_str = ''
+
+    if isinstance(passreg, type (None)):
+        passreg_str = ''
+    else:
+        passreg_str = '--passreg=%e' % passreg
 
     if savetruth:
         savetruth_str = 'True'
@@ -100,8 +106,8 @@ def start_zaratan_run(system = 'KS', traintype = 'normal', noisetype = 'gaussian
             (system, traintype, noisetype, noise_realizations, res_size, trainlen, rho, sigma, leakage,  tau)
     launch_script = "/scratch/zt1/project/edott-prj/user/awikner1/res-noise-stabilization/launch_files/slurm-launch-zaratan.py"
     run_script    = "/scratch/zt1/project/edott-prj/user/awikner1/res-noise-stabilization/src/res_reg_lmnt_awikner/reservoir_train_test.py"
-    options_str = '--savepred=%s --system=%s --noisetype=%s --traintype=%s -r %d --rho=%f --sigma=%f --theta=%f --leakage=%f --win_type=%s --bias_type=%s --tau=%f -N %d -T %d --testtime=%d --res=%d --tests=%d --trains=%d --debug=%s --squarenodes=%s --metric=%s --returnall=%s --savetime=%s --noisevals=%s --regvals=%s --maxvt=%d --machine=%s --parallel=%s --resstart=%d --trainstart=%d --teststart=%d --regtraintimes=%s --discardlen=%d --prior=%s --saveeigenvals=%s --pmap=%s --datarootdir=%s --datasavedir=%s --savetruth=%s --synctime=%d --dnoise=%e'\
-                  % (savepred_str, system, noisetype, traintype, noise_realizations,  rho, sigma, theta, leakage, win_type, bias_type, tau, res_size, trainlen, testlen, num_res, num_tests, num_trains, debug_str, squarenodes_str, metric, returnall_str, savetime_str, noise_values_str, reg_values_str, max_valid_time, machine, parallel_str, res_start, train_start, test_start, reg_train_times_str, discard_time, prior,save_eigenvals_str, pmap_str, root_folder, save_folder, savetruth_str, sync_time, dyn_noise)
+    options_str = '%s --savepred=%s --system=%s --noisetype=%s --traintype=%s -r %d --rho=%f --sigma=%f --theta=%f --leakage=%f --win_type=%s --bias_type=%s --tau=%f -N %d -T %d --testtime=%d --res=%d --tests=%d --trains=%d --debug=%s --squarenodes=%s --metric=%s --returnall=%s --savetime=%s --noisevals=%s --regvals=%s --maxvt=%d --machine=%s --parallel=%s --resstart=%d --trainstart=%d --teststart=%d --regtraintimes=%s --discardlen=%d --prior=%s --saveeigenvals=%s --pmap=%s --datarootdir=%s --datasavedir=%s --savetruth=%s --synctime=%d --dnoise=%e'\
+                  % (passreg_str, savepred_str, system, noisetype, traintype, noise_realizations,  rho, sigma, theta, leakage, win_type, bias_type, tau, res_size, trainlen, testlen, num_res, num_tests, num_trains, debug_str, squarenodes_str, metric, returnall_str, savetime_str, noise_values_str, reg_values_str, max_valid_time, machine, parallel_str, res_start, train_start, test_start, reg_train_times_str, discard_time, prior,save_eigenvals_str, pmap_str, root_folder, save_folder, savetruth_str, sync_time, dyn_noise)
     input_str = 'python -u %s --ifray %s --exp-name %s --command "python -u %s %s" --num-nodes %d %s %s --load-env "conda activate res39" -t %s -A %s %s'\
                 % (launch_script, parallel_str_bash, testname, run_script, options_str, num_nodes, cpus_str, mem_str, runtime, account, debug_part_str)
     print(input_str)

@@ -15,7 +15,7 @@ from res_reg_lmnt_awikner.lorenzrungekutta_numba import lorenzrungekutta, lorenz
 from res_reg_lmnt_awikner.ks_etdrk4 import kursiv_predict, kursiv_predict_pred
 from res_reg_lmnt_awikner.csc_mult import *
 from res_reg_lmnt_awikner.helpers import get_windows_path, poincare_max
-from res_reg_lmnt_awikner.classes import RunOpts, NumericalModel, Reservoir, ResOutput
+from src.res_reg_lmnt_awikner.classes import RunOpts, NumericalModel, Reservoir, ResOutput
 
 warnings.filterwarnings("ignore", category=NumbaPerformanceWarning)
 
@@ -1493,8 +1493,8 @@ def test_wrapped(res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_
                 else:
                     # if check_vt:
                     check_vt = False
-            #print('Valid Time')
-            #print(valid_time[i, k])
+            print('Valid Time')
+            print(valid_time[i, k])
             res_X = np.zeros((res_X.shape[0], max_valid_time + 2))
             res_X, p = get_X_wrapped(np.ascontiguousarray(
                 rktest_u_arr_test[:, k * max_valid_time:(k + 1) * max_valid_time + 1, i]), res_X, Win_data, Win_indices,
@@ -1582,12 +1582,28 @@ def optim_func(run_opts, res_out, res, noise_in, noise, noise_idx, rktest_u_arr_
     else:
         res_feature_size = res.rsvr_size
     if run_opts.prior == 'zero':
-        idenmat = np.identity(
-            res_feature_size + 1 + rktest_u_arr_train_nonoise.shape[0]) * alpha
+        idenmat = np.zeros((res_feature_size + 1 + rktest_u_arr_train_nonoise.shape[0],
+                            res_feature_size + 1 + rktest_u_arr_train_nonoise.shape[0]))
+        idenmat[:(res_feature_size + 1),:(res_feature_size + 1)] = np.identity(
+            res_feature_size + 1) * alpha
+        if isinstance(run_opts.passreg, type(None)):
+            idenmat[(res_feature_size + 1):, (res_feature_size + 1):] = np.identity(
+                rktest_u_arr_train_nonoise.shape[0]) * alpha
+        else:
+            idenmat[(res_feature_size + 1):, (res_feature_size + 1):] = np.identity(
+                rktest_u_arr_train_nonoise.shape[0]) * run_opts.passreg
         prior = np.zeros(res.data_trstates.shape)
     elif run_opts.prior == 'input_pass':
-        idenmat = np.identity(
-            res_feature_size + 1 + rktest_u_arr_train_nonoise.shape[0]) * alpha
+        idenmat = np.zeros((res_feature_size + 1 + rktest_u_arr_train_nonoise.shape[0],
+                            res_feature_size + 1 + rktest_u_arr_train_nonoise.shape[0]))
+        idenmat[:(res_feature_size + 1), :(res_feature_size + 1)] = np.identity(
+            res_feature_size + 1) * alpha
+        if isinstance(run_opts.passreg, type(None)):
+            idenmat[(res_feature_size + 1):, (res_feature_size + 1):] = np.identity(
+                rktest_u_arr_train_nonoise.shape[0]) * alpha
+        else:
+            idenmat[(res_feature_size + 1):, (res_feature_size + 1):] = np.identity(
+                rktest_u_arr_train_nonoise.shape[0]) * run_opts.passreg
         prior = np.concatenate((np.zeros((rktest_u_arr_train_nonoise.shape[0], 1 + res_feature_size)),
                                 np.identity(rktest_u_arr_train_nonoise.shape[0])), axis=1) * alpha
 
@@ -1645,6 +1661,8 @@ def get_res_results(run_opts, res_itr, res_gen, rk, noise, noise_stream,
                                                              alpha_idx,
                                                              true_pmap_max, rkTime_test, split_test, params)
         func_vals = np.zeros(run_opts.reg_values.size)
+        if not isinstance(run_opts.passreg, type(None)):
+            print('Input Pass-through Regularization: ', run_opts.passreg)
         for j, alpha_value in enumerate(run_opts.reg_values):
             print('Regularization: ', run_opts.reg_values[j])
             if run_opts.debug_mode:

@@ -53,6 +53,7 @@ class RunOpts:
                  max_valid_time=2000,
                  noise_values_array=np.logspace(-4, 3, num=3, base=10),
                  reg_values=np.append(0., np.logspace(-11, -9, 5)),
+                 passreg = None,
                  res_start=0,
                  train_start=0,
                  test_start=0,
@@ -144,6 +145,7 @@ class RunOpts:
         """Numpy array containing the Tikhonov regularization parameter values. Each value contained in the array
         will be tested separately using each of the reservoirs, training, and testing data sets.
         Default: np.append(0., np.logspace(-11, -9, 5))"""
+        self.passreg = passreg
         self.prior = prior
         """Prior to be used when computing the output coupling matrix using Tikhonov regularization. Options are:
 
@@ -282,6 +284,12 @@ class RunOpts:
             dyn_noise_str = ''
         else:
             dyn_noise_str = '_dnoise%e' % self.dyn_noise
+
+        if isinstance(self.passreg, type(None)):
+            passreg_str = ''
+        else:
+            passreg_str = '_passreg%0.2e' % self.passreg
+
         data_folder_base = os.path.join(self.root_folder, 'Data')
         save_folder_base = os.path.join(self.save_folder, 'Data')
         if not os.path.isdir(data_folder_base):
@@ -292,20 +300,20 @@ class RunOpts:
             data_folder = '%s_noisetest_noisetype_%s_traintype_%s' % (
                 self.system, self.noisetype, self.traintype)
             run_name = ('%s%s%s%s%s%s%s_rho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f'
-                        '_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s%s_metric_%s') \
+                        '_%dnodes_%dtrain_%dreals%s_noisetype_%s_traintype_%s%s_metric_%s') \
                        % (self.system, predflag, timeflag, eigenval_flag, pmap_flag, squarenodes_flag, dyn_noise_str,
                           self.rho, self.sigma, self.leakage, self.win_type, self.bias_type, self.tau, self.res_size,
-                          self.train_time, self.noise_realizations, self.noisetype, self.traintype, prior_str,
+                          self.train_time, self.noise_realizations, passreg_str, self.noisetype, self.traintype, prior_str,
                           self.metric)
         else:
             data_folder = '%s_noisetest_noisetype_%s_traintype_%s' % (
                 self.system, self.noisetype, self.traintype)
             run_name = ('%s%s%s%s%s%s%s_rho%0.1f_sigma%1.1e_leakage%0.3f_win_%s_bias_%s_tau%0.2f'
-                        '_%dnodes_%dtrain_%dreals_noisetype_%s_traintype_%s%s') % (
+                        '_%dnodes_%dtrain_%dreals%s_noisetype_%s_traintype_%s%s') % (
                            self.system, predflag, timeflag, eigenval_flag, pmap_flag, squarenodes_flag, dyn_noise_str,
                            self.rho, self.sigma,
                            self.leakage, self.win_type, self.bias_type, self.tau, self.res_size, self.train_time,
-                           self.noise_realizations, self.noisetype, self.traintype, prior_str)
+                           self.noise_realizations, passreg_str, self.noisetype, self.traintype, prior_str)
         root_data_folder = os.path.join(data_folder_base, data_folder)
         save_data_folder = os.path.join(save_folder_base, data_folder)
         if self.runflag:
@@ -340,7 +348,7 @@ class RunOpts:
                                         'resstart=', 'trainstart=', 'teststart=',
                                         'squarenodes=', 'regtraintimes=', 'discardlen=',
                                         'prior=', 'synctime=', 'datarootdir=', 'datasavedir=', 'savetruth=',
-                                        'dnoise='])
+                                        'dnoise=', 'passreg='])
         except getopt.GetoptError:
             print('Error: Some options not recognized')
             sys.exit(2)
@@ -354,6 +362,9 @@ class RunOpts:
             elif opt == '-r':
                 self.noise_realizations = int(arg)
                 print('Noise Realizations: %d' % self.noise_realizations)
+            elif opt == '--passreg':
+                self.passreg = float(arg)
+                print('Input Pass-Through Regularization: %e' % self.passreg)
             elif opt == '--dnoise':
                 self.dyn_noise = float(arg)
                 print('Dynamical noise variance: %e' % self.dyn_noise)
