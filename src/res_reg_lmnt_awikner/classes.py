@@ -248,6 +248,10 @@ class RunOpts:
         self.save_folder_name = ''
         self.get_file_name()
 
+    def print(self):
+        for item in vars(self).items():
+            print("%s: %s" % item)
+
     def get_file_name(self):
         """Creates the folder and final data file name for the tests about to be run.
         Args:

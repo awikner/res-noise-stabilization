@@ -44,7 +44,7 @@ def start_zaratan_run(system = 'KS', traintype = 'normal', noisetype = 'gaussian
     else:
         mem_str = ''
 
-    if isinstance(passreg, type (None)):
+    if isinstance(passreg, type(None)):
         passreg_str = ''
     else:
         passreg_str = '--passreg=%e' % passreg
