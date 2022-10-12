@@ -85,3 +85,9 @@ def get_filename(run_folder_name, var_str, res_itr, train_seed, noise_val, reg_t
             raise TypeError()
     else:
         return filename
+
+@jit(nopython=True, fastmath=True)
+def compute_idx(max_size, num):
+    with objmode(idxs = 'int64[:]'):
+        idxs = np.linspace(0,max_size,num=num,dtype=int)
+    return idxs

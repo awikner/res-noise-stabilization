@@ -15,7 +15,7 @@ import time
 from res_reg_lmnt_awikner.lorenzrungekutta_numba import lorenzrungekutta, lorenzrungekutta_pred
 from res_reg_lmnt_awikner.ks_etdrk4 import kursiv_predict, kursiv_predict_pred
 from res_reg_lmnt_awikner.csc_mult import *
-from res_reg_lmnt_awikner.helpers import get_windows_path, poincare_max
+from res_reg_lmnt_awikner.helpers import get_windows_path, poincare_max, compute_idx
 from res_reg_lmnt_awikner.classes import RunOpts, NumericalModel, Reservoir, ResOutput
 
 warnings.filterwarnings("ignore", category=NumbaPerformanceWarning)
@@ -837,9 +837,7 @@ def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indice
         D = D[:, skip:(res_d - 2)]
         compute_idxs = List()
         for reg_train_time in reg_train_times:
-            with objmode(compute_idx = 'int64[:]'):
-                compute_idx = np.linspace(0, X.shape[1]-k, num=reg_train_time-(k-1), dtype=int)
-            compute_idxs.append(compute_idx)
+            compute_idxs.append(compute_idx(X.shape[1], reg_train_time-(k-1)))
         X_train = np.concatenate(
             (np.ones((1, d - (skip + 1))), X, u_arr_train[:, skip - 1:-2]), axis=0)
         X_train = get_squared(X_train, rsvr_size, squarenodes)
