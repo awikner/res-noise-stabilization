@@ -1860,7 +1860,7 @@ def start_reservoir_test(argv=None, run_opts=None):
 
     if not isinstance(argv, type(None)) and isinstance(run_opts, type(None)):
         run_opts = RunOpts(argv)
-    print(run_opts.run_folder_name)
+    run_opts.print()
     if run_opts.machine == 'personal':
         if run_opts.ifray:
             ray.init(num_cpus=run_opts.num_cpus)
