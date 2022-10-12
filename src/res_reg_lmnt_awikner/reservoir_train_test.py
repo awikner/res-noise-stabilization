@@ -838,7 +838,7 @@ def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indice
         compute_idxs = List()
         for reg_train_time in reg_train_times:
             with objmode(compute_idx = 'int64[:]'):
-                compute_idx = np.linspace(0, X.shape[1]-k, num=reg_train_time-(k-1), dtype=np.int64)
+                compute_idx = np.linspace(0, X.shape[1]-k, num=reg_train_time-(k-1), dtype=int)
             compute_idxs.append(compute_idx)
         X_train = np.concatenate(
             (np.ones((1, d - (skip + 1))), X, u_arr_train[:, skip - 1:-2]), axis=0)
