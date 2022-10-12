@@ -8,6 +8,7 @@ from scipy.linalg import solve, solve_sylvester
 from scipy.sparse.linalg import eigsh
 from numba import njit
 from numba.typed import List
+import numpy as np
 import math
 import time
 
