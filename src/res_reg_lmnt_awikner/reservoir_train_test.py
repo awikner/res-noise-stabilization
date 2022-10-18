@@ -834,7 +834,6 @@ def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indice
                              W_indptr,
                              W_shape, leakage, noise[0], noisetype, noise_scaling, 1, traintype)
         X = X[:, skip:(res_d - 2)]
-        print(X.shape)
         D = D[:, skip:(res_d - 2)]
         compute_idxs = List()
         for reg_train_time in reg_train_times:
@@ -1508,8 +1507,6 @@ def test_wrapped(res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_
                  max_valid_time=500, squarenodes=False, savepred=False, save_time_rms=False):
     # Numba compatable function for testing trained reservoir performance against true system time series
     stable_count = 0
-    print(rkTime)
-    print(split)
     num_vt_tests = ((rkTime - split)) // max_valid_time
     valid_time = np.zeros((num_tests, num_vt_tests))
     max_rms = np.zeros(num_tests)
