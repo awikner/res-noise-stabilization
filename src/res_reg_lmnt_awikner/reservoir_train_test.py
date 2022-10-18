@@ -834,10 +834,11 @@ def get_states_wrapped(u_arr_train, reg_train_times, res_X, Win_data, Win_indice
                              W_indptr,
                              W_shape, leakage, noise[0], noisetype, noise_scaling, 1, traintype)
         X = X[:, skip:(res_d - 2)]
+        print(X.shape)
         D = D[:, skip:(res_d - 2)]
         compute_idxs = List()
         for reg_train_time in reg_train_times:
-            compute_idxs.append(compute_idx(X.shape[1], reg_train_time-(k-1)))
+            compute_idxs.append(compute_idx(X.shape[1]-k, reg_train_time-(k-1)))
         X_train = np.concatenate(
             (np.ones((1, d - (skip + 1))), X, u_arr_train[:, skip - 1:-2]), axis=0)
         X_train = get_squared(X_train, rsvr_size, squarenodes)
@@ -1463,9 +1464,9 @@ def get_test_data(run_opts, test_stream, dnoise_test_stream, overall_idx, rkTime
         elif run_opts.system in ['KS', 'KS_d2175']:
             u0 = (test_stream[i].random(64) * 2 - 1) * 0.6
             u0 = u0 - np.mean(u0)
-        dnoise = dnoise_test_stream[i].standard_normal((u0.size, total_iterations * int_step)) * np.sqrt(run_opts.dyn_noise)
+        dnoise = dnoise_test_stream[i].standard_normal((u0.size, (total_iterations+1) * int_step)) * np.sqrt(run_opts.dyn_noise)
         u_arr_train_nonoise, rktest_u_arr_test[:, :, i], p, params = numerical_model_wrapped(tau=run_opts.tau,
-                                                                                         T=rkTime + transient + split,
+                                                                                         T=total_iterations,
                                                                                          ttsplit=split + transient,
                                                                                          u0=u0, system=run_opts.system,
                                                                                          int_step = int_step,
@@ -1507,6 +1508,8 @@ def test_wrapped(res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_
                  max_valid_time=500, squarenodes=False, savepred=False, save_time_rms=False):
     # Numba compatable function for testing trained reservoir performance against true system time series
     stable_count = 0
+    print(rkTime)
+    print(split)
     num_vt_tests = ((rkTime - split)) // max_valid_time
     valid_time = np.zeros((num_tests, num_vt_tests))
     max_rms = np.zeros(num_tests)
@@ -1582,9 +1585,9 @@ def test_wrapped(res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_
                     check_vt = False
             print('Valid Time')
             print(valid_time[i, k])
-            res_X = np.zeros((res_X.shape[0], max_valid_time + 2))
+            res_X = np.zeros((res_X.shape[0], split + 2))
             res_X, p = get_X_wrapped(np.ascontiguousarray(
-                rktest_u_arr_test[:, k * max_valid_time:(k + 1) * max_valid_time + 1, i]), res_X, Win_data, Win_indices,
+                rktest_u_arr_test[:, (k+1) * max_valid_time - split:(k + 1) * max_valid_time + 1, i]), res_X, Win_data, Win_indices,
                 Win_indptr, Win_shape, W_data, W_indices, W_indptr, W_shape, leakage, noise_in)
             if k < (num_vt_tests - 1):
                 pred = predictwrapped(res_X, Win_data, Win_indices, Win_indptr, Win_shape, W_data, W_indices, W_indptr,
